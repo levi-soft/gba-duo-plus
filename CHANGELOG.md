@@ -1,5 +1,10 @@
 # Plus changelog
 
+## 0.1.6
+
+- Align the displayed Plus version with its official v0.1.6 baseline; Android version code increases to 4. Earlier Plus numbers below are local development snapshots, not intervening upstream releases.
+- Document adding a Daijisho custom player, including launch arguments, file filters and release/debug package IDs. This documents the existing launch integration rather than adding automatic frontend registration.
+
 ## 0.1.2
 
 - Optional per-session Studio Connection in release game sessions.

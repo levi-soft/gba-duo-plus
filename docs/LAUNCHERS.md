@@ -8,6 +8,36 @@ Component:
 com.khumam.gbaduo.plus/com.khumam.gbaduo.library.LaunchActivity
 ```
 
+## Add a GBA Duo Plus player in Daijisho
+
+First install Plus and add your ROM folder inside Plus so Android grants access. In Daijisho, open **Settings > Library > Add a Player**, following the [Daijisho player configuration guide](https://github.com/TapiocaFox/Daijishou/wiki/Start-Arguments-Cheat-Sheet).
+
+| Field | Value |
+|---|---|
+| Player name | `GBA Duo Plus` |
+| Player accepted filename regex | `(?i)^.*\.(?:gba|gbc|gb|zip)$` |
+| Kill package processes before am start | Disabled |
+
+Paste these lines into **Player am start arguments** (do not include `am start` itself):
+
+```text
+-n com.khumam.gbaduo.plus/com.khumam.gbaduo.library.LaunchActivity
+-a android.intent.action.VIEW
+-e ROM {file.path}
+```
+
+Save the player and select it in the appropriate platform's player settings. Repeat the selection for GB, GBC or GBA platforms as needed. Daijisho substitutes `{file.path}` with the selected game's path; it is not a literal ROM filename. For a URI-based configuration, replace the last line with `-d {file.uri}`; the provider must grant read access.
+
+The instructions above target a **release** installation. For a debug installation, change only the package before the slash:
+
+```text
+-n com.khumam.gbaduo.plus.debug/com.khumam.gbaduo.library.LaunchActivity
+```
+
+`.debug` identifies a separate development app with separate saves, preferences and folder permissions. It is not a player option or a required suffix for the normal Plus build. Plus does not register this custom player automatically, and this guide does not imply inclusion in Daijisho's official player catalog.
+
+## ADB and other frontends
+
 Example from an ADB shell (replace the placeholder with a readable real path):
 
 ```sh

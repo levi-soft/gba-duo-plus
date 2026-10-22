@@ -4,6 +4,8 @@ Publication preparation: **2026-10-22**, Plus source version **0.1.2**, based on
 
 ## Current local checks
 
+Version alignment follow-up on **2026-10-22**: Plus **0.1.6** (Android version code 4) passed `assembleRelease` and 18 focused tests across `PlusFeatureContractTest`, `LaunchIntentResolverTest` and `ExternalRomPathTest`, with zero failures/errors. The public-source scan and whitespace checks also passed. The expanded Daijisho player guide was checked against Daijisho's configuration documentation and Plus's launch resolver; no new Daijisho device test was performed for this documentation update.
+
 - JDK 21, configured Android SDK/NDK/CMake: release native/Android build passed.
 - Focused release JVM gate: **51 tests passed in 10 suites, zero failures/errors**.
 - Coverage: Plus identity/removed features; read-only bridge bounds; cursor-state validation/cancellation; input mapper; shader presets; launch intent/path/archive handling; retained companion snapshots; raster-grid behavior.

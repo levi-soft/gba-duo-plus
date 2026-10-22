@@ -2,7 +2,7 @@
 
 This comparison is against **tag v0.1.6**, commit `0c201e9faa224eb1527651ac0ca3e12a3ce0fe5c`, not a claim about whatever the newest upstream release may contain in the future.
 
-| Capability | Official v0.1.6 baseline | Plus 0.1.2 |
+| Capability | Official v0.1.6 baseline | Plus 0.1.6 |
 |---|---|---|
 | GBA/GB/GBC emulation | mGBA core | Retained; not a new Plus core |
 | Two-screen game/companion placement | Present | Retained with additional companion sizing/placement fixes |

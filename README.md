@@ -6,7 +6,7 @@ GBA Duo made the central idea possible: play Game Boy Advance, Game Boy Color an
 
 This fork is maintained by [levi-soft](https://github.com/levi-soft). It adds RetroAchievements, additional pixel-art shaders, persistent control preferences, companion cursor navigation for selected games, and an optional local connection to GBA Duo Studio.
 
-**Current source version:** `0.1.2` · **Upstream base:** `v0.1.6` · **License:** [GPL v3](LICENSE)
+**Current source version:** `0.1.6` · **Upstream base:** `v0.1.6` · **License:** [GPL v3](LICENSE)
 
 [Features](#features) · [Comparison](docs/FEATURES.md) · [Build](docs/BUILDING.md) · [Launchers](docs/LAUNCHERS.md) · [Studio](docs/STUDIO-CONNECTION.md) · [Credits](CREDITS.md)
 
@@ -45,7 +45,7 @@ Plus is **not an official GBA Duo release** and is not endorsed by its original 
 | Controls | **Swap A/B is remembered** between game sessions. Existing shader persistence is retained for the expanded preset set. |
 | Companion interaction | Optional `input.focusUnit(id)` Lua action support for verified Fire Emblem cursor profiles. Navigation uses bounded D-pad input and respects game state and physical input. |
 | Companion rendering | Additional sizing, raster-grid/aspect-fit and retained-snapshot behavior used by complex packs. This does not make every arbitrary pack/device combination automatically compatible. |
-| Launcher compatibility | Retains upstream's `LaunchActivity`, with additional path aliases, input validation and session/lifecycle handling for configurable frontends such as Daijisho. |
+| Daijisho custom player | Add **GBA Duo Plus** as a player to launch ROMs directly. Retains upstream's `LaunchActivity`, with additional path aliases, input validation and session/lifecycle handling. See [player setup and launch arguments](docs/LAUNCHERS.md#add-a-gba-duo-plus-player-in-daijisho). |
 | Studio Connection | Per-session opt-in, read-only local RAM/snapshot bridge for compatible desktop tooling. No LAN listener or memory-write command. |
 
 See [the detailed baseline comparison](docs/FEATURES.md). Credit for algorithms, cores and APIs belongs to their original authors; Plus contributes their Android integration and the changes documented here.
@@ -67,6 +67,8 @@ See [the detailed baseline comparison](docs/FEATURES.md). Credit for algorithms,
 5. For desktop authoring tools, enable **Studio Connection** only for the current session and connect using USB debugging/ADB.
 
 No APK is committed into the source tree. Release signing requires the maintainer's own key; the public build no longer silently signs release APKs using a local debug key. Existing locally signed installations may require matching signatures to update. Back up your saves before changing installation/signing arrangements.
+
+Using Daijisho? Follow [Add a GBA Duo Plus player](docs/LAUNCHERS.md#add-a-gba-duo-plus-player-in-daijisho), then select it for your GB/GBC/GBA platform. Plus does not automatically install a player into Daijisho.
 
 ## Companion creation and compatibility
 
