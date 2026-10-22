@@ -4,7 +4,7 @@ permissions:
   contents: read
 jobs:
   release-source:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
         with:
@@ -18,6 +18,9 @@ jobs:
           node-version: '22'
       - run: node tools/check-public-source.mjs
       - uses: android-actions/setup-android@v3
+        with:
+          # The legacy SDK package "tools" is no longer available.
+          packages: platform-tools
       - run: sdkmanager "platforms;android-35" "build-tools;35.0.0" "ndk;27.2.12479018" "cmake;3.22.1"
       - uses: gradle/actions/setup-gradle@v4
       - name: Focused release tests
