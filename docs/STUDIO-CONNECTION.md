@@ -33,6 +33,8 @@ The bridge has **no write-memory, execute-memory, login-token or achievement-awa
 
 ## Studio integration
 
+Get [GBA Duo Studio](https://github.com/levi-soft/gba-duo-studio), the separate visual pack editor. Follow its [English user guide](https://github.com/levi-soft/gba-duo-studio/blob/main/docs/USER-GUIDE.md) or [Vietnamese user guide](https://github.com/levi-soft/gba-duo-studio/blob/main/docs/USER-GUIDE.vi.md) for installation and USB/ADB connection steps.
+
 Compatible GBA Duo Studio builds discover the device, establish forwarding and read this protocol. They can inspect raw memory and use the selected companion's actual runtime data for preview. The editor and bridge do not automatically discover every game's field addresses or guarantee hot reload. Save/export/import a pack using the normal workflow when changing it.
 
 Official GBA Duo v0.1.6 does not expose this Plus bridge. Ordinary native-format packs do not require it; it is optional authoring tooling. The Studio repository is a separate project and is not bundled in this source publication.

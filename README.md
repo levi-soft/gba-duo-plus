@@ -74,7 +74,9 @@ Using Daijisho? Follow [Add a GBA Duo Plus player](docs/LAUNCHERS.md#add-a-gba-d
 
 The native pack format is inherited from GBA Duo. The [upstream companion collection](https://github.com/khumam/gba-duo-companions) and the format examples in [docs-packs](docs-packs) remain useful references. Each pack may depend on a particular ROM version or memory layout.
 
-GBA Duo Studio is a separate visual authoring tool, not an emulator dependency. A normal pack should remain usable by compatible official GBA Duo releases. Plus-only actions and the Studio bridge require Plus support and should be optional in a portable pack. No private game-specific companion projects are published in this repository.
+[GBA Duo Studio](https://github.com/levi-soft/gba-duo-studio) is our companion visual authoring tool, with drag-and-drop design, an Inspector, sample/live-data preview and English/Vietnamese UI. Use Studio to create or edit a pack, export ZIP, then import and assign it in Plus. For live RAM inspection, enable **Studio Connection** in Plus and connect Studio over USB/ADB. See the [English Studio guide](https://github.com/levi-soft/gba-duo-studio/blob/main/docs/USER-GUIDE.md), [Vietnamese guide](https://github.com/levi-soft/gba-duo-studio/blob/main/docs/USER-GUIDE.vi.md) and [connection protocol](docs/STUDIO-CONNECTION.md).
+
+Studio is a separate tool, not an emulator dependency. A normal pack should remain usable by compatible official GBA Duo releases. Plus-only actions and the Studio bridge require Plus support and should be optional in a portable pack. No private game-specific companion projects are published in this repository.
 
 ## Development
 
