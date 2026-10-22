@@ -12,5 +12,5 @@ dependencyResolutionManagement {
         mavenCentral()
     }
 }
-rootProject.name = "GBADuo"
+rootProject.name = "GBA-Duo-Plus"
 include(":app")

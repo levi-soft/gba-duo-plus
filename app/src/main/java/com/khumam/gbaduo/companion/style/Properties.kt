@@ -30,6 +30,7 @@ object Properties {
         fun def(name: String, inherited: Boolean, initial: String, valid: (String) -> Boolean) = put(name, Def(inherited, initial, valid))
 
         // Layout
+        def("scroll-follow", false, "none", keywords("none", "end"))
         def("display", false, "flex", keywords("flex", "grid", "stack", "none", "block"))
         def("flex-direction", false, "row", keywords("row", "row-reverse", "column", "column-reverse"))
         def("flex-wrap", false, "nowrap", keywords("nowrap", "wrap", "wrap-reverse"))

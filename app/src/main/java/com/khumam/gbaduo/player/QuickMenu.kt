@@ -14,30 +14,36 @@ class QuickMenu(
     private val emu: EmuThread,
     private val states: SaveStates,
     initialShader: ShaderPreset,
+    initialSwapAb: Boolean = false,
     private val onSwapAb: (Boolean) -> Unit,
     private val onSetFfSpeed: (Int) -> Unit,
     private val onSetShader: (ShaderPreset) -> Unit,
     private val onQuit: () -> Unit,
+    private val onAchievements: (((() -> Unit)) -> Unit)? = null,
 ) {
-    private var swapAb = false
+    private var swapAb = initialSwapAb
     private var ffSpeed = 2
     private var shader = initialShader
     private var dialog: AlertDialog? = null
+    private var externalMenuShowing = false
 
     /** True while the menu (or its slot picker) is open; it has input focus then. */
-    val isShowing: Boolean get() = dialog?.isShowing == true
+    val isShowing: Boolean get() = dialog?.isShowing == true || externalMenuShowing
 
     fun show() {
         emu.paused = true
-        val items = listOf(
+        val items = mutableListOf(
             context.getString(R.string.resume),
             context.getString(R.string.save_state),
             context.getString(R.string.load_state),
             context.getString(R.string.ff_speed, ffSpeed),
             context.getString(R.string.shader_label, shader.displayName),
-            context.getString(R.string.swap_ab),
-            context.getString(R.string.quit),
-        ).toTypedArray()
+            context.getString(R.string.swap_ab) + if (swapAb) ": On" else ": Off",
+        ).apply {
+            add("Studio Connection: " + if (emu.studioConnectionEnabled) "On" else "Off")
+            if (onAchievements != null) add("RetroAchievements")
+            add(context.getString(R.string.quit))
+        }.toTypedArray()
 
         dialog = AlertDialog.Builder(context)
             .setItems(items) { _, which ->
@@ -46,9 +52,18 @@ class QuickMenu(
                     1 -> showSlotPicker(save = true)
                     2 -> showSlotPicker(save = false)
                     3 -> cycleFfSpeed()
-                    4 -> cycleShader()
+                    4 -> showShaderPicker()
                     5 -> { swapAb = !swapAb; onSwapAb(swapAb); emu.paused = false }
-                    6 -> onQuit()
+                    6 -> { emu.studioConnectionEnabled = !emu.studioConnectionEnabled; emu.paused = false }
+                    else -> {
+                        val extra = mutableListOf<((() -> Unit) -> Unit)>()
+                        onAchievements?.let { extra += it }
+                        val action = extra.getOrNull(which - 7)
+                        if (action == null) onQuit() else {
+                            externalMenuShowing = true
+                            action { externalMenuShowing = false; emu.paused = false }
+                        }
+                    }
                 }
             }
             .setOnCancelListener { emu.paused = false }
@@ -61,10 +76,19 @@ class QuickMenu(
         emu.paused = false
     }
 
-    private fun cycleShader() {
-        shader = ShaderPreset.next(shader)
-        onSetShader(shader)
-        emu.paused = false
+    private fun showShaderPicker() {
+        val presets = ShaderPreset.entries
+        dialog = AlertDialog.Builder(context)
+            .setTitle("Shader")
+            .setSingleChoiceItems(presets.map { it.displayName }.toTypedArray(), presets.indexOf(shader)) { picker, which ->
+                shader = presets[which]
+                onSetShader(shader)
+                picker.dismiss()
+                emu.paused = false
+            }
+            .setNegativeButton("Cancel") { _, _ -> emu.paused = false }
+            .setOnCancelListener { emu.paused = false }
+            .show()
     }
 
     private fun showSlotPicker(save: Boolean) {

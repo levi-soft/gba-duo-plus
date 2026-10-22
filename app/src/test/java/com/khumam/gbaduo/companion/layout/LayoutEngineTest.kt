@@ -7,6 +7,7 @@ import com.khumam.gbaduo.companion.style.StyleNode
 import com.khumam.gbaduo.companion.style.StyleResolver
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import kotlin.math.ceil
 
@@ -197,6 +198,20 @@ class LayoutEngineTest {
     fun aspectRatioDerivesTheOtherSide() {
         val r = LayoutEngine.layout(row().copy(alignItems = Align.START), ex(300f), ex(300f), listOf(Fixed(0f, 0f, BoxStyle(width = px(160f), aspectRatio = 16f / 9f)))).rects[0]!!
         assertEquals(90f, r.height, 0.01f)
+    }
+
+    @Test
+    fun aspectRatioFitsBothWideAndTallMapsInsideContainer() {
+        for (ratio in listOf(0.5f, 1f, 2f, 4f)) {
+            val r = LayoutEngine.layout(
+                row().copy(alignItems = Align.CENTER), ex(300f), ex(200f),
+                listOf(Fixed(0f, 0f, BoxStyle(width = Length.Percent(100f),
+                    maxHeight = Length.Percent(100f), aspectRatio = ratio, flexShrink = 0f)))
+            ).rects[0]!!
+            assertEquals(ratio, r.width / r.height, 0.001f)
+            assertTrue(r.width <= 300.01f && r.height <= 200.01f)
+            assertTrue(kotlin.math.abs(r.width - 300f) < 0.01f || kotlin.math.abs(r.height - 200f) < 0.01f)
+        }
     }
 
     // ---- grid ------------------------------------------------------------------

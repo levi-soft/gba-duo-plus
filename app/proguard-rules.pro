@@ -1,1 +1,2 @@
 -keep class com.khumam.gbaduo.emu.NativeCore { *; }
+-keep class com.khumam.gbaduo.achievements.NativeAchievements { *; }

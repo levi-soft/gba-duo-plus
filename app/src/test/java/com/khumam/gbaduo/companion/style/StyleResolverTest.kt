@@ -23,6 +23,21 @@ class StyleResolverTest {
     }
 
     @Test
+    fun sharesComputedMapCellStylesButInvalidatesChangedInputs() {
+        val resolver = StyleResolver(emptyList(), listOf(css("box { color: inherit; width: 10vw }")), viewportWidth = 100f)
+        val parent = StyleResolver(emptyList(), listOf(css("box { color: red }"))).resolve(StyleNode("box"), null)
+        val first = resolver.resolve(StyleNode("box"), parent)
+        assertTrue(first === resolver.resolve(StyleNode("box"), parent))
+        resolver.viewportWidth = 200f
+        val resized = resolver.resolve(StyleNode("box"), parent)
+        assertFalse(first === resized)
+        assertEquals(200f, resized.viewportWidth)
+        val changed = StyleNode("box").apply { bound = decls("color: blue") }
+        assertEquals("blue", resolver.resolve(changed, parent).raw("color"))
+        assertEquals("red", resolver.resolve(StyleNode("box"), parent).raw("color"))
+    }
+
+    @Test
     fun cascadeOrderBuiltInDefaultsPackInlineBound() {
         val resolver = StyleResolver(
             builtIn = listOf(css("box { width: 1px; height: 1px; opacity: .1 }")),

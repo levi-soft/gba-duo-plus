@@ -240,10 +240,16 @@ class CompanionTree(
             }
         }
         if (meta.bindStyle.isNotEmpty()) {
+            val previous = mutableMapOf<String, Pair<String, Declaration?>>()
             node.bindings += { ctx ->
                 val ignored = mutableListOf<CssWarning>()
                 val declarations = meta.bindStyle.mapNotNull { (property, template) ->
-                    CssParser.declaration(property, Binding.interpolate(template, ctx), null, "bindStyle", ignored)
+                    val value = Binding.interpolate(template, ctx)
+                    val cached = previous[property]
+                    if (cached != null && cached.first == value) cached.second
+                    else CssParser.declaration(property, value, null, "bindStyle", ignored).also {
+                        previous[property] = value to it
+                    }
                 }
                 setBound(node, declarations)
             }
@@ -383,7 +389,9 @@ class CompanionTree(
 
     private fun updateNode(node: CompanionNode, context: Any?) {
         for (binding in node.bindings) binding(context)
-        if (node.managesChildren) return
+        // Hidden pages keep only their own visibility/state bindings live.
+        // Their descendants bind the newest snapshot when shown again.
+        if (node.hidden || node.managesChildren) return
         for (child in node.children.toList()) updateNode(child, context)
     }
 

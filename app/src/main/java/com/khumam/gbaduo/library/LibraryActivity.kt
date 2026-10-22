@@ -15,6 +15,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.khumam.gbaduo.R
+import com.khumam.gbaduo.BuildConfig
 import com.khumam.gbaduo.companion.PackInstaller
 import com.khumam.gbaduo.companion.PackStore
 import com.khumam.gbaduo.player.PlayerActivity
@@ -56,6 +57,19 @@ class LibraryActivity : Activity() {
         }
         empty = findViewById(R.id.empty)
         emptyText = findViewById(R.id.empty_text)
+        forwardLegacyLaunch(intent)
+    }
+
+    override fun onNewIntent(incoming: Intent) {
+        super.onNewIntent(incoming)
+        forwardLegacyLaunch(incoming)
+    }
+
+    /** Keep existing Dev launcher configurations; LaunchActivity owns all resolution. */
+    private fun forwardLegacyLaunch(incoming: Intent) {
+        if (!LaunchIntentResolver.hasRequest(incoming)) return
+        setIntent(Intent(this, LibraryActivity::class.java))
+        startActivity(Intent(incoming).setClass(this, LaunchActivity::class.java))
     }
 
     override fun onDestroy() {

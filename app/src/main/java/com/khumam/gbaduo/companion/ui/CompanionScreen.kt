@@ -83,8 +83,22 @@ private const val DEFAULT_ACCENT = 0xFF6C4AB6.toInt()
 
 @Composable
 private fun CssNode(node: CompanionNode, tree: CompanionTree, platform: CompanionPlatform) {
+    if (node.hidden) return
+    val paintOnly by remember(node) {
+        androidx.compose.runtime.derivedStateOf {
+            val s = node.computed
+            s != null && s.keyword("display") != "none" &&
+                node.widget is com.khumam.gbaduo.companion.Widget.Box && node.children.isEmpty() &&
+                node.onClick == null && s.transitions.isEmpty() && s.keyword("transform") == "none" &&
+                s.keyword("position") != "relative"
+        }
+    }
+    if (paintOnly) {
+        CssPaintLeaf(node, platform)
+        return
+    }
     val style = node.computed ?: return
-    if (node.hidden || style.keyword("display") == "none") return
+    if (style.keyword("display") == "none") return
     val density = LocalDensity.current.density
     val transitions = remember(style) { style.transitions }
 
@@ -100,18 +114,19 @@ private fun CssNode(node: CompanionNode, tree: CompanionTree, platform: Companio
     val paintTarget = remember(style, density, if (node.kind == CompanionNode.Kind.FILL) parentStyle else null) {
         boxPaint(node, style, density, platform)
     }
-    val background by animateColorAsState(paintTarget.backgroundColor, spec(transitions, "background-color"), label = "background-color")
+    val background = if (transitions.isEmpty()) paintTarget.backgroundColor else animateColorAsState(paintTarget.backgroundColor, spec(transitions, "background-color"), label = "background-color").value
     val paint = paintTarget.copy(backgroundColor = background)
 
     // Opacity and transform.
     val visible = style.keyword("visibility").let { it != "hidden" && it != "collapse" }
-    val opacity by animateFloatAsState(if (visible) style.opacity else 0f, spec(transitions, "opacity"), label = "opacity")
+    val opacityTarget = if (visible) style.opacity else 0f
+    val opacity = if (transitions.isEmpty()) opacityTarget else animateFloatAsState(opacityTarget, spec(transitions, "opacity"), label = "opacity").value
     val t = remember(style) { style.transform }
     val translateX = animateLength(t.translateX, spec(transitions, "transform"))
     val translateY = animateLength(t.translateY, spec(transitions, "transform"))
-    val scaleX by animateFloatAsState(t.scaleX, spec(transitions, "transform"), label = "scaleX")
-    val scaleY by animateFloatAsState(t.scaleY, spec(transitions, "transform"), label = "scaleY")
-    val rotation by animateFloatAsState(t.rotateDeg, spec(transitions, "transform"), label = "rotate")
+    val scaleX = if (transitions.isEmpty()) t.scaleX else animateFloatAsState(t.scaleX, spec(transitions, "transform"), label = "scaleX").value
+    val scaleY = if (transitions.isEmpty()) t.scaleY else animateFloatAsState(t.scaleY, spec(transitions, "transform"), label = "scaleY").value
+    val rotation = if (transitions.isEmpty()) t.rotateDeg else animateFloatAsState(t.rotateDeg, spec(transitions, "transform"), label = "rotate").value
     val origin = remember(style) { style.transformOrigin }
     val relative = remember(style, density) { relativeOffset(style, density) }
 
@@ -136,7 +151,13 @@ private fun CssNode(node: CompanionNode, tree: CompanionTree, platform: Companio
     // height clamped to what's actually available to this node's own parent, offsetting the
     // oversized content by scroll position and clipping it to that available viewport.
     if (style.keyword("overflow") == "auto" || style.keyword("overflow") == "scroll") {
-        modifier = modifier.verticalScroll(rememberScrollState())
+        val scroll = rememberScrollState()
+        fun contentText(n: CompanionNode): String = (n.text ?: "") + n.children.joinToString("") { contentText(it) }
+        val content = if (style.keyword("scroll-follow") == "end") contentText(node) else null
+        LaunchedEffect(content, scroll.maxValue) {
+            if (content != null) { androidx.compose.runtime.withFrameNanos { }; scroll.scrollTo(scroll.maxValue) }
+        }
+        modifier = modifier.verticalScroll(scroll)
     }
     node.onClick?.let { onClick ->
         val interactions = remember { MutableInteractionSource() }
@@ -154,6 +175,13 @@ private fun CssNode(node: CompanionNode, tree: CompanionTree, platform: Companio
         node.isImage -> IMAGE_CONTENT
         else -> remember(style, density) { ContainerStyle.from(style).scaled(density) }
     }
+    val rasterGrid by remember(node, container) {
+        androidx.compose.runtime.derivedStateOf { rasterGridEligible(node, container) }
+    }
+    if (rasterGrid) {
+        CssRasterGrid(node, platform, container, modifier)
+        return
+    }
     CssLayout(container, insets, modifier) {
         when {
             text != null -> CssText(text, style, transitions, platform)
@@ -163,10 +191,29 @@ private fun CssNode(node: CompanionNode, tree: CompanionTree, platform: Companio
     }
 }
 
+/** Paint-only boxes do not need to recompose or remeasure when their colour/opacity changes. */
+@Composable
+private fun CssPaintLeaf(node: CompanionNode, platform: CompanionPlatform) {
+    val density = LocalDensity.current.density
+    val geometry by remember(node, density) {
+        androidx.compose.runtime.derivedStateOf {
+            val style = node.computed!!
+            CssParentData(BoxStyle.from(style).scaled(density), style.zIndex ?: 0)
+        }
+    }
+    androidx.compose.foundation.layout.Box(Modifier.then(geometry).graphicsLayer {
+        val style = node.computed!!
+        alpha = if (style.keyword("visibility") in listOf("hidden", "collapse")) 0f else style.opacity
+    }.drawBehind {
+        val style = node.computed!!
+        drawCssBox(boxPaint(node, style, density, platform), platform)
+    })
+}
+
 @Composable
 private fun CssText(raw: String, style: ComputedStyle, transitions: List<TransitionSpec>, platform: CompanionPlatform) {
     val density = LocalDensity.current.density
-    val color by animateColorAsState(Color(style.color), spec(transitions, "color"), label = "color")
+    val color = if (transitions.isEmpty()) Color(style.color) else animateColorAsState(Color(style.color), spec(transitions, "color"), label = "color").value
     val family = remember(style.fontFamilies) { platform.fontFamily(style.fontFamilies) }
     val text = when (style.keyword("text-transform")) {
         "uppercase" -> raw.uppercase()
@@ -237,7 +284,7 @@ private fun CssImage(image: ImageBitmap, style: ComputedStyle) {
 
 // ---- styles → paint --------------------------------------------------------------
 
-private fun boxPaint(node: CompanionNode, style: ComputedStyle, density: Float, platform: CompanionPlatform): BoxPaint {
+internal fun boxPaint(node: CompanionNode, style: ComputedStyle, density: Float, platform: CompanionPlatform): BoxPaint {
     val image = style.backgroundUrl?.let { platform.cssImage(it, style.baseDir("background-image")) }
     var backgroundColor = style.backgroundColor
     if (node.kind == CompanionNode.Kind.FILL && backgroundColor ushr 24 == 0 && image == null && style.backgroundGradient == null) {
@@ -306,7 +353,7 @@ private fun <T> spec(transitions: List<TransitionSpec>, property: String): Anima
 
 /** Animates a length within its unit; switching unit (px ↔ %) jumps. */
 @Composable
-private fun animateLength(target: Length, spec: AnimationSpec<Float>): Length = when (target) {
+private fun animateLength(target: Length, spec: AnimationSpec<Float>): Length = if (spec is androidx.compose.animation.core.SnapSpec) target else when (target) {
     is Length.Px -> Length.Px(animateFloatAsState(target.px, spec, label = "px").value)
     is Length.Percent -> Length.Percent(animateFloatAsState(target.percent, spec, label = "percent").value)
     Length.Auto -> Length.Auto

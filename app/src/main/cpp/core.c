@@ -22,6 +22,7 @@ struct GbaDuoState {
     unsigned videoWidth;
     unsigned videoHeight;
     void* romBuffer;
+    size_t romSize;
 };
 
 static struct GbaDuoState g_state;
@@ -29,6 +30,10 @@ static struct GbaDuoState g_state;
 /** Used by script.c's mem.* Lua API; NULL when no ROM is loaded. */
 struct mCore* gbaduo_active_core(void) {
     return g_state.core;
+}
+const uint8_t* gbaduo_rom_data(size_t* size) {
+    *size = g_state.romSize;
+    return g_state.romBuffer;
 }
 
 JNIEXPORT jboolean JNICALL
@@ -106,6 +111,7 @@ Java_com_khumam_gbaduo_emu_NativeCore_load(JNIEnv* env, jobject thiz, jbyteArray
     g_state.videoWidth = videoWidth;
     g_state.videoHeight = videoHeight;
     g_state.romBuffer = romBuffer;
+    g_state.romSize = (size_t) romSize;
     return JNI_TRUE;
 }
 
@@ -251,6 +257,32 @@ Java_com_khumam_gbaduo_emu_NativeCore_frameCounter(JNIEnv* env, jobject thiz) {
         return 0;
     }
     return (jlong) g_state.core->frameCounter(g_state.core);
+}
+
+JNIEXPORT jbyteArray JNICALL
+Java_com_khumam_gbaduo_emu_NativeCore_readRam(JNIEnv* env, jobject thiz, jlong address, jint length) {
+    if (!g_state.core || g_state.core->platform(g_state.core) != mPLATFORM_GBA) {
+        (*env)->ThrowNew(env, (*env)->FindClass(env, "java/lang/IllegalStateException"), "No GBA core loaded");
+        return NULL;
+    }
+    bool valid = length > 0 && length <= 0x40000 &&
+        ((address >= 0x02000000 && address < 0x02040000 && length <= 0x02040000 - address) ||
+         (address >= 0x03000000 && address < 0x03008000 && length <= 0x03008000 - address));
+    if (!valid) {
+        (*env)->ThrowNew(env, (*env)->FindClass(env, "java/lang/IllegalArgumentException"), "Invalid GBA RAM range");
+        return NULL;
+    }
+    jbyteArray result = (*env)->NewByteArray(env, length);
+    if (!result) return NULL;
+    jbyte* bytes = malloc((size_t)length);
+    if (!bytes) {
+        (*env)->ThrowNew(env, (*env)->FindClass(env, "java/lang/OutOfMemoryError"), "RAM capture allocation failed");
+        return NULL;
+    }
+    for (jint i = 0; i < length; ++i) bytes[i] = (jbyte)g_state.core->rawRead8(g_state.core, (uint32_t)(address + i), -1);
+    (*env)->SetByteArrayRegion(env, result, 0, length, bytes);
+    free(bytes);
+    return result;
 }
 
 JNIEXPORT void JNICALL

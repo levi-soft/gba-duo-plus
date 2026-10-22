@@ -59,7 +59,14 @@ list(FILTER LUA_SOURCES EXCLUDE REGEX "/lua\\.c$|/luac\\.c$")
 add_library(lua STATIC ${LUA_SOURCES})
 target_include_directories(lua PUBLIC "${LUA_DIR}/src")
 
-add_library(gbaduo SHARED core.c script.c)
+get_filename_component(RC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../../../engine/rcheevos" ABSOLUTE)
+file(GLOB RC_SOURCES "${RC_DIR}/src/*.c" "${RC_DIR}/src/rapi/*.c" "${RC_DIR}/src/rcheevos/*.c" "${RC_DIR}/src/rhash/*.c")
+list(FILTER RC_SOURCES EXCLUDE REGEX "/rc_libretro\\.c$|/rc_client_external\\.c$|/rc_client_raintegration\\.c$")
+add_library(rcheevos STATIC ${RC_SOURCES})
+target_compile_definitions(rcheevos PUBLIC RC_DISABLE_LUA RC_CLIENT_SUPPORTS_HASH)
+target_include_directories(rcheevos PUBLIC "${RC_DIR}/include")
+
+add_library(gbaduo SHARED core.c script.c achievements.c)
 
 target_compile_definitions(gbaduo PRIVATE USE_PTHREADS M_CORE_GBA M_CORE_GB)
 
@@ -69,4 +76,4 @@ target_include_directories(gbaduo PRIVATE
     "${CMAKE_CURRENT_BINARY_DIR}/mgba/include"
     "${LUA_DIR}/src")
 
-target_link_libraries(gbaduo mgba lua android log)
+target_link_libraries(gbaduo mgba lua rcheevos android log)

@@ -29,7 +29,7 @@ class GameView(context: Context, attrs: AttributeSet? = null) : GLSurfaceView(co
     }
 
     init {
-        setEGLContextClientVersion(2)
+        setEGLContextClientVersion(3)
         setRenderer(renderer)
         renderMode = RENDERMODE_WHEN_DIRTY
     }
@@ -50,6 +50,7 @@ class GameView(context: Context, attrs: AttributeSet? = null) : GLSurfaceView(co
         @Volatile var videoSize: Pair<Int, Int> = 240 to 160
 
         private var activeShader: ShaderPreset? = null
+        private var pipeline: LibretroShaderRenderer? = null
         private var program = 0
         private var texture = 0
         private var positionHandle = 0
@@ -59,6 +60,9 @@ class GameView(context: Context, attrs: AttributeSet? = null) : GLSurfaceView(co
         private lateinit var vertexBuffer: FloatBuffer
 
         override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
+            // Previous GL objects belong to the lost context.
+            pipeline = null
+            program = 0
             val textures = IntArray(1)
             GLES20.glGenTextures(1, textures, 0)
             texture = textures[0]
@@ -100,6 +104,22 @@ class GameView(context: Context, attrs: AttributeSet? = null) : GLSurfaceView(co
             val buffer = frameBuffer ?: return
             val (videoWidth, videoHeight) = videoSize
             GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT)
+            if (pipeline != null) {
+                GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
+                GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, texture)
+                buffer.rewind()
+                GLES20.glTexImage2D(GLES20.GL_TEXTURE_2D, 0, GLES20.GL_RGBA, videoWidth, videoHeight, 0, GLES20.GL_RGBA, GLES20.GL_UNSIGNED_BYTE, buffer)
+                try {
+                    pipeline!!.draw(texture, videoWidth, videoHeight, surfaceWidth, surfaceHeight)
+                } catch (error: Exception) {
+                    Log.e(TAG, "Shader pipeline failed, reverting to Off", error)
+                    GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, 0)
+                    GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
+                    pendingShader = ShaderPreset.OFF
+                    applyShader(ShaderPreset.OFF)
+                }
+                return
+            }
             applyAspectFitViewport(videoWidth, videoHeight)
             GLES20.glUseProgram(program)
             if (texSizeHandle >= 0) {
@@ -121,6 +141,17 @@ class GameView(context: Context, attrs: AttributeSet? = null) : GLSurfaceView(co
 
         /** Compiles+links [preset]; on failure logs and keeps whatever program was already active. */
         private fun applyShader(preset: ShaderPreset) {
+            if (preset.usesPipeline) {
+                val replacement = runCatching { LibretroShaderRenderer(assets, preset) }.getOrElse {
+                    Log.e(TAG, "Failed to build shader '${preset.id}', keeping previous", it)
+                    pendingShader = activeShader ?: ShaderPreset.OFF
+                    return
+                }
+                pipeline?.close()
+                pipeline = replacement
+                activeShader = preset
+                return
+            }
             val newProgram = runCatching { buildProgram(preset) }.getOrElse { error ->
                 Log.e(TAG, "Failed to build shader '${preset.id}', keeping previous", error)
                 null
@@ -133,6 +164,8 @@ class GameView(context: Context, attrs: AttributeSet? = null) : GLSurfaceView(co
             if (program != 0) {
                 GLES20.glDeleteProgram(program)
             }
+            pipeline?.close()
+            pipeline = null
             program = newProgram
             activeShader = preset
             positionHandle = GLES20.glGetAttribLocation(program, "position")

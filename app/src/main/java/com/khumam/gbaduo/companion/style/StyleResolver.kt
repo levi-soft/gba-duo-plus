@@ -33,13 +33,22 @@ class StyleResolver(
         }
     }
 
+    private val rulesBySubject = rules.groupBy { it.selector.subjectKey }
+
     val fontFaces: List<FontFace> = (builtIn + pack).flatMap { it.fontFaces }
 
     /** Problems found while resolving (e.g. a `var()` with no value). Deduplicated. */
     val warnings = LinkedHashSet<String>()
 
+    private data class CacheKey(val declarations: List<Declaration>, val parent: ComputedStyle?, val width: Float, val height: Float)
+    private val computedCache = object : LinkedHashMap<CacheKey, ComputedStyle>(512, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<CacheKey, ComputedStyle>?) = size > 512
+    }
+
     fun resolve(node: StyleNode, parent: ComputedStyle?): ComputedStyle {
         val declarations = cascade(node)
+        val cacheKey = CacheKey(declarations, parent, viewportWidth, viewportHeight)
+        computedCache[cacheKey]?.let { return it }
 
         // Pass 1: custom properties (inherit, and later declarations win).
         val customs = LinkedHashMap(parent?.customProperties ?: emptyMap())
@@ -118,7 +127,7 @@ class StyleResolver(
             fontWeight = fontWeight,
             viewportWidth = viewportWidth,
             viewportHeight = viewportHeight,
-        )
+        ).also { computedCache[cacheKey] = it }
     }
 
     private fun inherit(property: String, parent: ComputedStyle?, values: MutableMap<String, String>, baseDirs: MutableMap<String, File?>, def: Properties.Def) {
@@ -132,7 +141,12 @@ class StyleResolver(
 
     /** All declarations that apply to [node], in cascade order (later wins). */
     private fun cascade(node: StyleNode): List<Declaration> {
-        val matched = rules.filter { it.selector.matches(node) }
+        val candidates = mutableListOf<IndexedRule>()
+        candidates += rulesBySubject["*"].orEmpty()
+        candidates += rulesBySubject[node.type].orEmpty()
+        node.id?.let { candidates += rulesBySubject["#" + it].orEmpty() }
+        for (cls in node.classes) candidates += rulesBySubject["." + cls].orEmpty()
+        val matched = candidates.filter { it.selector.matches(node) }
         fun sorted(origin: Int) = matched.filter { it.origin == origin }
             .sortedWith(compareBy<IndexedRule> { it.selector.specificity }.thenBy { it.order })
             .flatMap { it.declarations }

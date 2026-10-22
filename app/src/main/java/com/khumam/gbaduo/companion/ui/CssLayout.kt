@@ -24,7 +24,7 @@ import kotlin.math.ceil
 import kotlin.math.roundToInt
 
 /** A child's CSS box (device px) and stacking order, read by its parent [CssLayout]. */
-internal class CssParentData(val box: BoxStyle, val zIndex: Int) : ParentDataModifier {
+internal data class CssParentData(val box: BoxStyle, val zIndex: Int) : ParentDataModifier {
     override fun Density.modifyParentData(parentData: Any?): Any = this@CssParentData
 }
 

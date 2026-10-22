@@ -48,6 +48,21 @@ struct GbaDuoScript {
 };
 
 static struct GbaDuoScript g_script;
+static int requested_focus_unit;
+static bool input_action_active;
+
+/* Input requests contain only a deployment ID. The host validates the ROM,
+ * free-cursor process, visibility and occupancy before generating D-pad input. */
+static int l_input_focus_unit(lua_State* L) {
+    if(!input_action_active) return luaL_error(L,"input.focusUnit is only available from a tap action");
+    lua_Integer id=luaL_checkinteger(L,1);
+    if(id<1 || id>178) return luaL_error(L,"unit ID out of range");
+    requested_focus_unit=(int)id;
+    return 0;
+}
+JNIEXPORT jint JNICALL Java_com_khumam_gbaduo_emu_NativeCore_takeScriptFocusUnit(JNIEnv* env,jobject self) {
+    (void)env;(void)self;int id=requested_focus_unit;requested_focus_unit=0;return id;
+}
 
 /* Guards g_script.images: gfx.decode/unloadScript run on the emu thread while
  * nativeImage is called from the UI thread. */
@@ -666,6 +681,10 @@ static void remove_global(lua_State* L, const char* name) {
 }
 
 static void register_api(lua_State* L) {
+    requested_focus_unit=0;
+    static const luaL_Reg inputFuncs[]={{"focusUnit",l_input_focus_unit},{NULL,NULL}};
+    luaL_newlib(L,inputFuncs);
+    lua_setglobal(L,"input");
     static const luaL_Reg memFuncs[] = {
         {"u8", l_mem_u8}, {"s8", l_mem_s8},
         {"u16", l_mem_u16}, {"s16", l_mem_s16},
@@ -971,9 +990,12 @@ Java_com_khumam_gbaduo_emu_NativeCore_callScriptAction(JNIEnv* env, jobject thiz
     lua_pushcfunction(L, call_action);
     lua_pushlightuserdata(L, &c);
     g_script.instructionsLeft = INSTRUCTION_BUDGET_PER_TICK;
+    input_action_active=true;
     int status = lua_pcall(L, 1, 1, 0);
+    input_action_active=false;
     (*env)->ReleaseStringUTFChars(env, name, nameChars);
     if (status != LUA_OK) {
+        requested_focus_unit=0;
         const char* err = lua_tostring(L, -1);
         strncpy(g_script.lastError, err ? err : "action failed", sizeof(g_script.lastError) - 1);
         lua_pop(L, 1);
@@ -1022,6 +1044,8 @@ Java_com_khumam_gbaduo_emu_NativeCore_lastScriptError(JNIEnv* env, jobject thiz)
 
 JNIEXPORT void JNICALL
 Java_com_khumam_gbaduo_emu_NativeCore_unloadScript(JNIEnv* env, jobject thiz) {
+    requested_focus_unit=0;
+    input_action_active=false;
     if (g_script.L) {
         lua_close(g_script.L);
         g_script.L = NULL;

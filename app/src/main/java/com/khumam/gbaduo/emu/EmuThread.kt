@@ -1,12 +1,21 @@
 package com.khumam.gbaduo.emu
 
 import android.util.Log
+import com.khumam.gbaduo.BuildConfig
+import com.khumam.gbaduo.debug.BridgeProtocol
+import com.khumam.gbaduo.debug.DebugBridge
 import com.khumam.gbaduo.companion.CompanionSnapshot
 import com.khumam.gbaduo.companion.LuaScript
 import com.khumam.gbaduo.companion.NativeCoreMemoryReader
 import com.khumam.gbaduo.companion.PackManifest
 import java.io.File
 import java.util.concurrent.ConcurrentLinkedQueue
+import java.util.concurrent.ArrayBlockingQueue
+import java.util.concurrent.FutureTask
+import java.util.concurrent.TimeUnit
+import java.util.UUID
+import org.json.JSONObject
+import com.khumam.gbaduo.achievements.RetroAchievementsSession
 
 /**
  * Owns the native core for one play session. Runs frames paced to the GBA's
@@ -18,11 +27,14 @@ class EmuThread(
     private val gameView: GameView,
     private val audioOut: AudioOut,
     private val input: InputMapper,
+    private val achievements: RetroAchievementsSession? = null,
 ) : Thread("gbaduo-emu") {
 
     @Volatile private var running = false
     @Volatile var paused = false
     @Volatile var ffMultiplier = 2
+    /** Explicit per-session opt-in for Studio's read-only RAM tools. */
+    @Volatile var studioConnectionEnabled = false
 
     private val frameNanos = (1_000_000_000.0 / 59.7275).toLong()
 
@@ -55,11 +67,57 @@ class EmuThread(
     @Volatile private var uiStateChanged = true
     @Volatile private var snapshotRequested = false
     private val pendingCalls = ConcurrentLinkedQueue<Pair<String, List<Any?>>>()
+    private val debugRequests = ArrayBlockingQueue<FutureTask<JSONObject>>(16)
+    private val debugSession = UUID.randomUUID().toString()
+    private var debugGameCode = ""
+    private var debugCrc = ""
+    private var latestDebugData: Map<String, Any?>? = null
+    private var latestDebugFrame: Long? = null
+    private var effectiveInputKeys = 0
+    private var navigatorTarget = 0
+    private val debugProtocol = BridgeProtocol(object : BridgeProtocol.Backend {
+        override fun info() = JSONObject().put("sessionId", debugSession)
+            .put("gameCode", debugGameCode).put("crc32", debugCrc)
+            .put("platform", if (NativeCore.videoWidth() == 240) "gba" else "gb")
+            .put("frame", NativeCore.frameCounter()).put("paused", paused)
+            .put("packId", activePack?.id ?: JSONObject.NULL)
+            .put("dataFrame", latestDebugFrame ?: JSONObject.NULL)
+            .put("inputKeys", input.keys()).put("fastForward", input.fastForward())
+            .put("effectiveInputKeys", effectiveInputKeys).put("cursorNavigation", navigatorTarget)
+        override fun read(address: Long, length: Int) = NativeCore.readRam(address, length)
+        override fun data() = latestDebugData?.let { JSONObject(it) }
+    })
+
+    private fun requestDebug(request: JSONObject): JSONObject {
+        val task = FutureTask { debugProtocol.handle(request) }
+        fun failure(message: String) = JSONObject().put("protocol", 1)
+            .put("id", request.opt("id") ?: JSONObject.NULL).put("ok", false).put("error", message)
+        if (!debugRequests.offer(task)) return failure("Bridge queue full")
+        return try { task.get(5, TimeUnit.SECONDS) }
+        catch (error: Exception) {
+            task.cancel(false)
+            failure("Emulator request timed out or session ended")
+        }
+    }
+
+    private fun serviceDebugRequests() {
+        // Bound the work per frame even if a client sends requests continuously.
+        repeat(4) { (debugRequests.poll() ?: return).run() }
+    }
 
     override fun run() {
         loaded = loadCore()
         if (!loaded) return
+        achievements?.start()
 
+        debugGameCode = NativeCore.gameCode().removePrefix("AGB-")
+        debugCrc = "%08X".format(NativeCore.crc32())
+        val cursorProfile = CursorProfile.forRom(debugGameCode,debugCrc)
+        val cursorNavigator = Fe7CursorNavigator(NativeCore::rawRead8, NativeCore::rawRead16, NativeCore::rawRead32,cursorProfile ?: CursorProfile.FE7)
+        val supportsCursor = cursorProfile != null
+        var bridge: DebugBridge? = null
+
+        try {
         gameView.setVideoSize(NativeCore.videoWidth(), NativeCore.videoHeight())
         gameView.frameBuffer = NativeCore.videoBuffer()
         audioOut.start()
@@ -67,20 +125,36 @@ class EmuThread(
 
         var nextFrameAt = System.nanoTime()
         while (running) {
+            val wantsBridge = BuildConfig.DEBUG || studioConnectionEnabled
+            if (wantsBridge && bridge == null) bridge = DebugBridge(::requestDebug, "gbaduo-plus-studio").also { it.start() }
+            if (!wantsBridge && bridge != null) { bridge.close(); bridge = null }
+            serviceDebugRequests()
+            if (activePack !== scriptLoadedForPack) cursorNavigator.cancel()
+            achievements?.service(paused)
             if (paused) {
+                cursorNavigator.cancel()
                 // Taps on the companion screen still get their data while the game is paused.
                 if (snapshotRequested) serviceCompanion(activePack)
+                NativeCore.takeScriptFocusUnit() // discard taps made while paused
                 Thread.sleep(16)
                 nextFrameAt = System.nanoTime()
                 continue
             }
+            if (pendingSaveState.get() != null) cursorNavigator.cancel()
             servicePendingStateRequest()
+            val focusUnit = NativeCore.takeScriptFocusUnit()
+            if (focusUnit != 0) cursorNavigator.focus(focusUnit, supportsCursor)
 
             val fastForward = input.fastForward()
             val speed = if (fastForward) ffMultiplier.coerceAtLeast(2) else 1
 
             repeat(speed) {
-                NativeCore.runFrame(input.keys())
+                val physical = input.keys()
+                val effective = cursorNavigator.keys(physical)
+                if (BuildConfig.DEBUG && effective != effectiveInputKeys) android.util.Log.d("GbaDuoInput", "frame=" + NativeCore.frameCounter() + " physical=" + physical + " effective=" + effective + " target=" + cursorNavigator.activeTarget + " ff=" + input.fastForward())
+                effectiveInputKeys = effective; navigatorTarget = cursorNavigator.activeTarget
+                NativeCore.runFrame(effective)
+                achievements?.let { com.khumam.gbaduo.achievements.NativeAchievements.frame(false) }
             }
             gameView.postFrame()
             audioOut.pump(mute = speed != 1)
@@ -96,9 +170,15 @@ class EmuThread(
             }
         }
 
-        LuaScript.unload()
-        audioOut.stop()
-        NativeCore.unload()
+        } finally {
+            bridge?.close()
+            while (true) (debugRequests.poll() ?: break).cancel(false)
+            LuaScript.unload()
+            achievements?.stop()
+            audioOut.stop()
+            NativeCore.unload()
+            loaded = false
+        }
     }
 
     /** In its own frame so nothing in [run] keeps the ROM reachable once the core has copied it. */
@@ -139,9 +219,17 @@ class EmuThread(
         }
         framesSinceSnapshot++
         val interval = (60 / pack.tickHz).coerceAtLeast(1)
+        // Automatic pack reads/Lua work share the emulation thread. Defer them
+        // during physical cursor movement, just like the UI draw; taps still run immediately.
+        val directions = GbaKeys.UP or GbaKeys.DOWN or GbaKeys.LEFT or GbaKeys.RIGHT
+        if (!due && input.keys() and directions != 0) return
         if (due || framesSinceSnapshot >= interval) {
             framesSinceSnapshot = 0
+            val snapshotStarted = System.nanoTime()
             val snapshot = CompanionSnapshot.build(pack, NativeCoreMemoryReader, NativeCore.frameCounter(), scriptActive)
+            if (BuildConfig.DEBUG) android.util.Log.d("GbaDuoPerf", "snapshotMs=" + (System.nanoTime() - snapshotStarted) / 1_000_000)
+            latestDebugData = snapshot
+            latestDebugFrame = NativeCore.frameCounter()
             onSnapshot?.invoke(snapshot)
         }
     }
@@ -186,6 +274,9 @@ class EmuThread(
         val request = pendingSaveState.getAndSet(null) ?: return
         val (path, save) = request
         lastStateResult = if (save) NativeCore.saveState(path) else NativeCore.loadState(path)
+        if (lastStateResult == true) {
+            if (save) achievements?.saveProgress(path) else achievements?.loadProgress(path)
+        }
     }
 
     fun shutdown() {

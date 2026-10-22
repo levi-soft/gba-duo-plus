@@ -45,6 +45,7 @@ class CompanionController(
     }
 
     private var content: Content by mutableStateOf(message(context.getString(R.string.no_companion_pack)))
+    fun close() {}
 
     /** Called on the main thread with the new UI state (`ui` in the pack's Lua). */
     var onUiChange: (Map<String, Any?>) -> Unit = {}
@@ -77,6 +78,7 @@ class CompanionController(
      * be loaded (the screen then explains why instead).
      */
     fun showPack(manifest: PackManifest, packDir: File): Boolean {
+
         content = runCatching {
             val layout = LayoutParser.parseWithWarnings(File(packDir, manifest.layoutFile).readText())
             logWarnings(manifest.layoutFile, layout.warnings)
@@ -84,9 +86,16 @@ class CompanionController(
             val builtIn = PackStyles.builtIn(context)
             val platform = AndroidCompanionPlatform(packDir, (builtIn + styles).flatMap { it.fontFaces })
             val tree = CompanionTree(layout.root, builtIn, styles, platform::loadImage)
-            tree.onUiChange = { onUiChange(it) }
+            val followPreference = "dialogue-follow." + manifest.id
+            val follow = context.getSharedPreferences("companion", Context.MODE_PRIVATE).getString(followPreference, "on")
+            tree.perform(listOf(Action.Set(mapOf("dialogueFollowMode" to if (follow == "off") "off" else "on"))))
+            tree.onUiChange = { state ->
+                (state["dialogueFollowMode"] as? String)?.takeIf { it == "on" || it == "off" }?.let { context.getSharedPreferences("companion", Context.MODE_PRIVATE).edit().putString(followPreference, it).apply() }
+                onUiChange(state)
+            }
             tree.onCall = { name, args -> onScriptCall(name, args) }
             logWarnings("styles", tree.warnings)
+            onUiChange(tree.ui)
             Content.Pack(tree, platform)
         }.getOrElse { error ->
             Log.e(TAG, "Could not load layout of pack '${manifest.id}'", error)
@@ -102,10 +111,13 @@ class CompanionController(
      * after the data is applied — see [CompanionTree.updateFromScript].
      */
     fun update(values: Map<String, Any?>) {
+        val started = android.os.SystemClock.uptimeMillis()
         val tree = (content as? Content.Pack)?.tree ?: return
         val warnings = mutableListOf<String>()
         tree.updateFromScript(values, warnings)
         logWarnings("update() ui", warnings)
+        val elapsed = android.os.SystemClock.uptimeMillis() - started
+        if (com.khumam.gbaduo.BuildConfig.DEBUG && elapsed >= 16) Log.d("GbaDuoInput", "companionUpdateMs=" + elapsed + " unit=" + values["deployment"])
     }
 
     /**

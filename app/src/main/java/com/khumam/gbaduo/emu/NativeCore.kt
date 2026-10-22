@@ -39,8 +39,13 @@ object NativeCore {
     external fun rawRead16(address: Long): Int
     external fun rawRead32(address: Long): Long
 
+    /** GBA EWRAM/IWRAM only; throws when no core or an invalid range is requested. */
+    external fun readRam(address: Long, length: Int): ByteArray
+
     /** Frames run so far on the current core. 0 if no core loaded. */
     external fun frameCounter(): Long
+    /** Consumes the pack's latest input.focusUnit request; zero when none. */
+    external fun takeScriptFocusUnit(): Int
 
     /**
      * Replaces any currently-loaded pack script with [source], run in a sandboxed Lua

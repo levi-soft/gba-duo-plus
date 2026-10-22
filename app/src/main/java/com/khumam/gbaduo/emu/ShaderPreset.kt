@@ -40,21 +40,19 @@ enum class ShaderPreset(
         fragmentAsset = "shaders/scanlines/fragment.glsl",
         uniforms = listOf("lineBrightness" to 0.5f),
     ),
-    // xBR-lv2 was tried first (as originally planned) but mGBA's xbr.fs uses mat4x3/transpose()
-    // and implicit int-vec4 math, which GLSL ES 1.00 (what Android's GLES2 actually runs) doesn't
-    // support — it fails to compile on-device. Scale2x gives a similar "smoothed upscale" look
-    // and is plain vec2/vec4 arithmetic, so it compiles cleanly under GLES2.
-    SCALE2X(
-        id = "scale2x",
-        displayName = "Scale2x",
-        vertexAsset = "shaders/common_vertex.glsl",
-        fragmentAsset = "shaders/scale2x/fragment.glsl",
-        uniforms = emptyList(),
-    ),
+    XBRZ("xbrz", "xBRZ", "", "", emptyList()),
+    HQ2X("hq2x", "HQ2x", "", "", emptyList()),
+    SCALEFX("scalefx", "ScaleFX", "", "", emptyList()),
     ;
 
+    val usesPipeline: Boolean get() = this == XBRZ || this == HQ2X || this == SCALEFX
+
     companion object {
-        fun byId(id: String?): ShaderPreset = entries.firstOrNull { it.id == id } ?: OFF
+        fun byId(id: String?): ShaderPreset = when (id) {
+            "gba_color_soft" -> GBA_COLOR
+            "lcd_soft" -> LCD
+            else -> entries.firstOrNull { it.id == id } ?: OFF
+        }
 
         /** Cycles to the next preset, wrapping back to the first after the last. */
         fun next(current: ShaderPreset): ShaderPreset {

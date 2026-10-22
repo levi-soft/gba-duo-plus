@@ -1,3 +1,6 @@
 [submodule "engine/mgba"]
 	path = engine/mgba
 	url = https://github.com/mgba-emu/mgba.git
+[submodule "engine/rcheevos"]
+	path = engine/rcheevos
+	url = https://github.com/RetroAchievements/rcheevos.git

@@ -29,6 +29,36 @@ class CompanionTreeTest {
     private fun CompanionNode.child(vararg path: Int): CompanionNode = path.fold(this) { n, i -> n.children[i] }
 
     @Test
+    fun cachedBoundStyleStillTracksChangesAndRestoresPreviousValue() {
+        val t = tree("""{"type":"box","bindStyle":{"background-color":"{shade}"},"children":[]}""")
+        t.update(mapOf("shade" to "#112233"))
+        val first = t.root.computed
+        t.update(mapOf("shade" to "#112233"))
+        assertTrue(first === t.root.computed)
+        t.update(mapOf("shade" to "#445566"))
+        assertEquals(0xff445566.toInt(), t.root.computed!!.backgroundColor)
+        t.update(mapOf("shade" to "#112233"))
+        assertEquals(0xff112233.toInt(), t.root.computed!!.backgroundColor)
+    }
+
+    @Test
+    fun hiddenPageSkipsDescendantsAndBindsLatestSnapshotWhenShown() {
+        var imageLoads = 0
+        val t = tree("""{"type":"pages","state":"page","initial":"units","pages":[
+            {"name":"units","child":{"type":"text","text":"{name}"}},
+            {"name":"map","child":{"type":"column","children":[{"type":"text","text":"{name}"},{"type":"image","src":"${'$'}portrait"}]}}
+        ]}""", images = { imageLoads++; null })
+        t.update(mapOf("name" to "First", "portrait" to "asset:first.png"))
+        t.update(mapOf("name" to "Latest", "portrait" to "asset:latest.png"))
+        assertEquals("Latest", t.root.child(0).text)
+        assertEquals("", t.root.child(1, 0).text)
+        assertEquals(0, imageLoads)
+        t.perform(listOf(Action.Set(mapOf("page" to "map"))))
+        assertEquals("Latest", t.root.child(1, 0).text)
+        assertEquals(1, imageLoads)
+    }
+
+    @Test
     fun legacyLayoutGetsItsOldDefaults() {
         val t = tree(
             """{"type":"column","gap":10,"children":[

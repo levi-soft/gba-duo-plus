@@ -23,23 +23,39 @@ object Binding {
         return resolvePlain(path, context)
     }
 
+    private val paths = java.util.concurrent.ConcurrentHashMap<String, List<Any>>()
+    private val templates = java.util.concurrent.ConcurrentHashMap<String, List<Pair<String, Boolean>>>()
+
     private fun resolvePlain(path: String, root: Any?): Any? {
-        var current: Any? = root
-        for (match in SEGMENT.findAll(path)) {
-            val key = match.groupValues[1]
-            current = if (key.isNotEmpty()) {
-                (current as? Map<*, *>)?.get(key)
-            } else {
-                val index = match.groupValues[2].toInt()
-                (current as? List<*>)?.getOrNull(index)
-            }
+        val segments = paths.getOrPut(path) {
+            SEGMENT.findAll(path).map { match ->
+                match.groupValues[1].takeIf { it.isNotEmpty() } ?: match.groupValues[2].toInt()
+            }.toList()
+        }
+        var current = root
+        for (segment in segments) {
+            current = if (segment is String) (current as? Map<*, *>)?.get(segment)
+                else (current as? List<*>)?.getOrNull(segment as Int)
             if (current == null) return null
         }
         return current
     }
 
-    fun interpolate(template: String, context: Any?): String =
-        TOKEN.replace(template) { match -> format(resolve(match.groupValues[1], context)) }
+    fun interpolate(template: String, context: Any?): String {
+        val pieces = templates.getOrPut(template) {
+            val result = mutableListOf<Pair<String, Boolean>>()
+            var offset = 0
+            for (match in TOKEN.findAll(template)) {
+                if (match.range.first > offset) result += template.substring(offset, match.range.first) to false
+                result += match.groupValues[1] to true
+                offset = match.range.last + 1
+            }
+            if (offset < template.length) result += template.substring(offset) to false
+            result
+        }
+        if (pieces.size == 1 && !pieces[0].second) return template
+        return buildString { for ((value, bound) in pieces) append(if (bound) format(resolve(value, context)) else value) }
+    }
 
     private fun format(value: Any?): String = when (value) {
         null -> ""

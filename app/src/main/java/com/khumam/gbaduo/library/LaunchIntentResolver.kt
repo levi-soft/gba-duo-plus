@@ -32,26 +32,30 @@ object LaunchIntentResolver {
         override fun extraString(key: String): String? = intent.getStringExtra(key)
     }
 
-    private val EXTRA_KEYS = listOf("rom", "ROM", "path", "PATH", "file", "FILE")
+    private val EXTRA_KEYS = listOf("rom", "ROM", "path", "PATH", "file", "FILE", "rom_uri", "rom_path")
     private const val FILE_SCHEME = "file://"
 
     fun resolve(intent: Intent?): Target? =
         if (intent == null) null else resolveAccessor(AndroidIntentAccessor(intent))
 
+    fun hasRequest(intent: Intent): Boolean = !intent.dataString.isNullOrBlank() ||
+        EXTRA_KEYS.any { !intent.getStringExtra(it).isNullOrBlank() }
+
     fun resolveAccessor(accessor: IntentAccessor?): Target? {
         if (accessor == null) return null
 
-        val dataString = accessor.dataString()?.trim()
+        val dataString = accessor.dataString()?.trim()?.removeSurrounding("\"")
         if (!dataString.isNullOrEmpty()) {
             val name = fileNameFromUriString(dataString)
-            if (name != null && RomArchive.isLibraryFileName(name)) {
-                return Target(dataString, name, filePathOf(dataString))
+            if (dataString.startsWith("content://") || dataString.startsWith(FILE_SCHEME) && name != null && RomArchive.isLibraryFileName(name)) {
+                return Target(dataString, name.orEmpty(), filePathOf(dataString))
             }
         }
 
         for (key in EXTRA_KEYS) {
-            val raw = accessor.extraString(key)?.trim()
+            val raw = accessor.extraString(key)?.trim()?.removeSurrounding("\"")
             if (raw.isNullOrEmpty()) continue
+            if (raw.contains("://") && !raw.startsWith("content://") && !raw.startsWith(FILE_SCHEME)) continue
             val target = if (raw.startsWith("content://") || raw.startsWith(FILE_SCHEME)) {
                 fileNameFromUriString(raw)?.let { Target(raw, it, filePathOf(raw)) }
             } else {
@@ -59,7 +63,7 @@ object LaunchIntentResolver {
                 val path = if (raw.startsWith("/")) raw else "/$raw"
                 Target(FILE_SCHEME + path, path.substringAfterLast('/'), path)
             }
-            if (target != null && RomArchive.isLibraryFileName(target.fileName)) return target
+            if (target != null && (target.uriString.startsWith("content://") || RomArchive.isLibraryFileName(target.fileName))) return target
         }
 
         return null
@@ -71,23 +75,16 @@ object LaunchIntentResolver {
      * `/storage/9C33-6BBD/ROMs/a.gba` -> `9C33-6BBD:ROMs/a.gba`. Null for paths outside shared storage.
      */
     fun documentIdForPath(path: String): String? {
-        val parts = path.split('/').filter { it.isNotEmpty() && it != "." }
-        if (parts.any { it == ".." }) return null
-        val (volume, rest) = when {
-            parts.size >= 3 && parts[0] == "storage" && parts[1] == "emulated" -> "primary" to parts.drop(3)
-            parts.size >= 2 && parts[0] == "storage" && parts[1] != "self" -> parts[1] to parts.drop(2)
-            parts.size >= 2 && parts[0] == "sdcard" -> "primary" to parts.drop(1)
-            parts.size >= 4 && parts[0] == "mnt" && parts[1] == "media_rw" -> parts[2] to parts.drop(3)
-            else -> return null
-        }
-        if (rest.isEmpty()) return null
-        return volume + ":" + rest.joinToString("/")
+        // Reject traversal in launcher paths, while retaining Dev's storage aliases
+        // and strict volume matching. Relative paths are never resolved here.
+        if (path.split('/').any { it == ".." }) return null
+        return ExternalRomPath.documentId(path)
     }
 
     /** The first of [treeDocumentIds] (SAF tree document ids) that contains [documentId], or null. */
     fun coveringTree(documentId: String, treeDocumentIds: List<String>): String? =
         treeDocumentIds.firstOrNull { tree ->
-            documentId.startsWith(if (tree.endsWith(":")) tree else "$tree/")
+            ExternalRomPath.withinTree(documentId, tree)
         }
 
     private fun filePathOf(uriString: String): String? =

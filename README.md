@@ -1,185 +1,97 @@
-<div align="center">
+# GBA Duo Plus
 
-<img src="art/banner.png" alt="GBA Duo: play GBA, GBC and GB games with a companion on the bottom screen of the AYN Thor" width="100%">
+**A community fork of [GBA Duo](https://github.com/khumam/gba-duo), created by [khumam](https://github.com/khumam).**
 
-<h3>Play on the top screen. Your game's stats, guides and more on the bottom one.</h3>
+GBA Duo made the central idea possible: play Game Boy Advance, Game Boy Color and Game Boy games on one screen of an Android handheld, with an interactive companion on the other. Plus builds on that work rather than replacing its authorship. Thank you to khumam and every upstream contributor for publishing the original application and companion system.
 
-<p>
-  <a href="https://github.com/khumam/gba-duo/releases/latest"><img src="https://img.shields.io/github/v/release/khumam/gba-duo?label=release&color=6c4ab6" alt="Latest GBADuo release"></a>
-  <a href="https://github.com/khumam/gba-duo/releases"><img src="https://img.shields.io/github/downloads/khumam/gba-duo/total?label=downloads&color=e3a008" alt="Total downloads"></a>
-</p>
+This fork is maintained by [levi-soft](https://github.com/levi-soft). It adds RetroAchievements, additional pixel-art shaders, persistent control preferences, companion cursor navigation for selected games, and an optional local connection to GBA Duo Studio.
 
-<p>
-  <strong><a href="https://github.com/khumam/gba-duo/releases/latest">Download</a></strong>
-  · <strong><a href="#features">Features</a></strong>
-  · <strong><a href="#companion-packs">Companion packs</a></strong>
-  · <strong><a href="#make-your-own-pack">Make your own pack</a></strong>
-  · <strong><a href="https://github.com/khumam/gba-duo/issues">Report a problem</a></strong>
-</p>
+**Current source version:** `0.1.2` · **Upstream base:** `v0.1.6` · **License:** [GPL v3](LICENSE)
 
-</div>
+[Features](#features) · [Comparison](docs/FEATURES.md) · [Build](docs/BUILDING.md) · [Launchers](docs/LAUNCHERS.md) · [Studio](docs/STUDIO-CONNECTION.md) · [Credits](CREDITS.md)
 
-GBADuo is a Game Boy Advance, Game Boy Color and Game Boy player for dual-screen
-Android handhelds. The game runs on the screen you open it on (usually the top
-one), and the other screen is a **companion**: a screen built from a pack that reads your game's memory as you
-play and shows what matters, like your party and bag in Pokémon FireRed or your
-rucksack and friendships in Harvest Moon. Packs are plain files (a layout, CSS and
-a Lua script), so anyone can build one for their favorite game.
+## Project identity
 
-## Devices
+| | GBA Duo Plus |
+|---|---|
+| Source | [levi-soft/gba-duo-plus](https://github.com/levi-soft/gba-duo-plus) |
+| Original project | [khumam/gba-duo](https://github.com/khumam/gba-duo) |
+| Exact upstream baseline | [`0c201e9faa224eb1527651ac0ca3e12a3ce0fe5c`](https://github.com/khumam/gba-duo/commit/0c201e9faa224eb1527651ac0ca3e12a3ce0fe5c), tag `v0.1.6` |
+| Release application ID | `com.khumam.gbaduo.plus` |
+| Debug application ID | `com.khumam.gbaduo.plus.debug` |
+| Requirements | Android 11/API 30 or later; ARM64; a second Android display for the companion |
+| Primary development device | AYN Thor; other dual-screen devices require testing |
 
-| Device    | Status                                                                     |
-| --------- | -------------------------------------------------------------------------- |
-| AYN Thor  | Tested, made for it                                                        |
-| Others    | Should run on any dual-screen Android 11+ device (arm64), not yet tested   |
-
-The companion needs a second screen. Open GBADuo on either screen: the game
-plays there and the companion takes the other one.
-
-## Install
-
-1. Download `gbaduo-<version>.apk` from the
-   [latest release](https://github.com/khumam/gba-duo/releases/latest) on the device.
-2. Open it. If Android asks, allow your browser or file manager to install apps.
-3. Open GBADuo and tap **+** to add a ROM folder. Every `.gba`, `.gbc` and `.gb`
-   file in it shows up in your library. You can add more folders, or remove
-   one, under **ROM folders**; removing a folder never deletes its files.
-
-**No games are included.** Use your own legally dumped ROMs.
-
-<details>
-<summary><strong>Updates</strong></summary>
-
-GBADuo doesn't check for updates. Download the newer APK from the
-[releases page](https://github.com/khumam/gba-duo/releases) and install it over
-the old one; your saves stay.
-
-</details>
+Plus is **not an official GBA Duo release** and is not endorsed by its original author, RetroAchievements, Libretro or the other credited projects. It installs separately from the official application. Separate package IDs mean separate app-private saves, settings, login sessions and folder permissions; there is no automatic cross-edition migration.
 
 ## Features
 
-### The companion (bottom screen)
+### Inherited from GBA Duo
 
-- **Packs per game** - tap **⋮** next to a game in your library to choose its
-  companion pack, or **Import pack…** to add one from a `.zip`. Each game remembers
-  its own pack.
-- **Live** - the pack's Lua script reads the game's memory several times a second,
-  so the screen follows along as you play.
-- **Touch** - tabs, buttons and pages you can tap through; the controller keeps
-  driving the game whichever screen has focus.
-- **Pages that open by themselves** - a pack can switch pages when something happens
-  in the game, like FireRed's battle page opening when a battle starts and closing
-  when it ends.
+- mGBA-powered GBA, GBC and GB emulation, gamepad input and dual-screen placement.
+- Game-specific companion ZIP packs using a manifest, JSON layout, CSS, assets and optional Lua.
+- Companion pages, tabs, lists, buttons, live values and automatic page changes.
+- ROM-folder management, settings and an external `VIEW` launch activity introduced upstream in `v0.1.6`.
+- In-game saves, nine save-state slots, fast-forward and the original display filters.
+- Saved shader selection. This was **already present upstream**; Plus extends the available shader set.
 
-### The player (top screen)
+### Added or extended in Plus
 
-- **Save states** - 9 slots per game, each showing when it was saved.
-- **In-game saves** - kept per game, next to its save states.
-- **Fast-forward** - hold **R2**; 2x, 3x or 4x, picked in the menu.
-- **Shaders** - Off, GBA Color, LCD Grid, Scanlines and Scale2x.
-- **Swap A/B** - flips the A and B buttons if they feel the wrong way round.
+| Area | Plus behavior |
+|---|---|
+| RetroAchievements | Integrated [rcheevos](https://github.com/RetroAchievements/rcheevos) client, account sign-in, recognized-game progress, achievement list, badge images and queued unlock notifications. |
+| Achievement presentation | Automatic sign-in/game notices, game image and unlocked/total count; bottom-right unlock popups with a 70% background opacity. Unsupported ROMs show a no-achievements notice. |
+| Pixel-art shaders | **xBRZ, HQ2x and ScaleFX**, adapted from the Libretro GLSL shader collection with original notices retained. |
+| Controls | **Swap A/B is remembered** between game sessions. Existing shader persistence is retained for the expanded preset set. |
+| Companion interaction | Optional `input.focusUnit(id)` Lua action support for verified Fire Emblem cursor profiles. Navigation uses bounded D-pad input and respects game state and physical input. |
+| Companion rendering | Additional sizing, raster-grid/aspect-fit and retained-snapshot behavior used by complex packs. This does not make every arbitrary pack/device combination automatically compatible. |
+| Launcher compatibility | Retains upstream's `LaunchActivity`, with additional path aliases, input validation and session/lifecycle handling for configurable frontends such as Daijisho. |
+| Studio Connection | Per-session opt-in, read-only local RAM/snapshot bridge for compatible desktop tooling. No LAN listener or memory-write command. |
 
-Press **L2** or **BACK** in a game for the menu: resume, save state, load state,
-fast-forward speed, shader, swap A/B and quit.
+See [the detailed baseline comparison](docs/FEATURES.md). Credit for algorithms, cores and APIs belongs to their original authors; Plus contributes their Android integration and the changes documented here.
 
-### Controls
+### Deliberate boundaries
 
-| Thor        | Game              |
-| ----------- | ----------------- |
-| D-pad       | D-pad             |
-| A / B       | A / B (Swap A/B flips them) |
-| L1 / R1     | L / R             |
-| Start       | Start             |
-| Select      | Select            |
-| R2 (hold)   | Fast-forward      |
-| L2 / BACK   | Menu              |
+- **No ROM-hash override or identity spoofing.** RetroAchievements identifies the actual loaded ROM. A modified/translated ROM must be supported by RetroAchievements to use its achievement set normally.
+- **No translation engine or translation credentials.** Google/Qwen/offline translation experiments are not part of Plus.
+- **No Hardcore mode.** This edition retains companion and save-state workflows and runs achievement support in the non-Hardcore mode supported by the implementation.
+- No bundled ROMs, BIOS dumps, personal saves, login tokens or private companion releases.
+- Cursor navigation is profile-specific, not a universal control API for every game or ROM hack.
 
-## Companion packs
+## Getting started
 
-Packs live in their own repo,
-[gba-duo-companions](https://github.com/khumam/gba-duo-companions). Download a
-pack's `.zip` from its [releases](https://github.com/khumam/gba-duo-companions/releases)
-and add it with **⋮ > Import pack…**.
+1. Obtain a **Plus** build from this repository's [Releases page](https://github.com/levi-soft/gba-duo-plus/releases) when a maintainer publishes one, or [build from source](docs/BUILDING.md). Upstream APKs are the official edition, not Plus.
+2. Open Plus and grant access to your own ROM folder using Android's folder picker. Supported inputs include `.gba`, `.gbc`, `.gb` and supported ZIP archives.
+3. Choose a game. Open the in-game menu with L2/BACK for save states, shader selection, Swap A/B and RetroAchievements.
+4. Import a compatible companion ZIP from the library menu and assign it to the game. Packs remain separate from the emulator.
+5. For desktop authoring tools, enable **Studio Connection** only for the current session and connect using USB debugging/ADB.
 
-| Game                                         | Pack                          | Shows                                                                                       |
-| -------------------------------------------- | ----------------------------- | ------------------------------------------------------------------------------------------- |
-| Pokémon FireRed (US)                         | `pokemon-firered-companion`   | Party, bag pockets, trainer card, and a battle page with both Pokémon's live stats          |
-| Harvest Moon: Friends of Mineral Town (EU/US) | `harvest-moon-fomt-companion` | Gold, date and time, stamina, held tool and rucksack, affection, Harvest Sprites' work      |
+No APK is committed into the source tree. Release signing requires the maintainer's own key; the public build no longer silently signs release APKs using a local debug key. Existing locally signed installations may require matching signatures to update. Back up your saves before changing installation/signing arrangements.
 
-Want a pack for another game? [Open an issue](https://github.com/khumam/gba-duo/issues),
-or make one.
+## Companion creation and compatibility
 
-## Make your own pack
+The native pack format is inherited from GBA Duo. The [upstream companion collection](https://github.com/khumam/gba-duo-companions) and the format examples in [docs-packs](docs-packs) remain useful references. Each pack may depend on a particular ROM version or memory layout.
 
-A pack is a folder with:
+GBA Duo Studio is a separate visual authoring tool, not an emulator dependency. A normal pack should remain usable by compatible official GBA Duo releases. Plus-only actions and the Studio bridge require Plus support and should be optional in a portable pack. No private game-specific companion projects are published in this repository.
 
-- `manifest.json` - its id, name and which games it's for (game code or CRC32);
-- `layout.json` - the screen: boxes, text, images, bars, lists, tabs and pages;
-- `style.css` - real CSS: flex and grid layout, colors, borders, shadows, fonts and transitions;
-- `main.lua` - an `update()` that reads the game's memory and returns the values the layout shows.
-
-The guides are in [`docs-packs/`](docs-packs/):
-[styling the companion](docs-packs/companion-styling.md) and
-[pages and buttons](docs-packs/companion-pages.md), with examples in
-[`docs-packs/examples`](docs-packs/examples).
-
-<details>
-<summary><strong>Preview a pack in the browser</strong></summary>
-
-The [companion simulator](https://github.com/khumam/gba-duo-companion-simulator)
-renders a pack the way the app does. Open a pack folder, edit its layout, CSS and
-sample data side by side, and see the result straight away. It doesn't run the
-pack's Lua, so you feed it sample data in `preview-data.json`.
-
-</details>
-
-## Privacy
-
-GBADuo has no accounts, ads or analytics, and asks for no permissions: it never goes
-online. Your games, saves and packs never leave your device.
-
-<details>
-<summary><strong>AI tooling note</strong></summary>
-
-This project uses AI-assisted development tools, such as Claude Code, to help with code generation, refactoring, and documentation. All changes are still reviewed by the maintainer and tested before release.
-
-</details>
-
-## Building from source
-
-You need JDK 17, the Android SDK and NDK `27.2.12479018`, and the mGBA submodule:
+## Development
 
 ```sh
-git clone --recurse-submodules https://github.com/khumam/gba-duo.git
-cd gba-duo
-./gradlew assembleRelease
+git clone --recurse-submodules https://github.com/levi-soft/gba-duo-plus.git
+cd gba-duo-plus
+./gradlew :app:assembleRelease
 ```
 
-The APK lands in `app/build/outputs/apk/release/`.
+Windows: use `gradlew.bat`. Build requirements are JDK 21, Android SDK 35, NDK `27.2.12479018` and CMake `3.22.1`. See [BUILDING](docs/BUILDING.md) for setup, signing, tests and dependency revisions.
 
-## Credits
+[Validation notes](docs/VALIDATION.md) distinguish automated checks, historical device observations and behavior not freshly exercised. A successful build is not a certification of achievement awards, sustained shader performance or every dual-screen device.
 
-<details>
-<summary>mGBA, Lua, AndroidX</summary>
+Report Plus-specific problems in [this repository's issue tracker](https://github.com/levi-soft/gba-duo-plus/issues), with app version, device, Android version and reproduction steps. Do not include ROM files, credentials or private RAM captures. See [SECURITY](SECURITY.md) for sensitive reports.
 
-- [mGBA](https://mgba.io) by Vicki Pfau (endrift) and contributors runs the games (MPL 2.0;
-  source in [`engine/mgba`](https://github.com/mgba-emu/mgba)).
-- [Lua](https://www.lua.org) by PUC-Rio (MIT) runs the companion packs' scripts.
-- AndroidX, Jetpack Compose, Material Components and Kotlin (Apache 2.0).
-- The Harvest Moon pack's memory map comes from
-  [Data Crystal](https://datacrystal.tcrf.net/wiki/Harvest_Moon:_Friends_of_Mineral_Town/RAM_map)
-  and samurai goroh's code guide; the FireRed pack's from the
-  [pret](https://github.com/pret) decompilation and the Ironmon-Tracker.
+## Acknowledgements and license
 
-</details>
+The original application, its architecture and companion platform are by **khumam and GBA Duo contributors**. Emulation is provided by **mGBA**, scripting by **Lua**, achievement processing by **rcheevos/RetroAchievements**, and the additional shader algorithms by their credited authors in the **Libretro GLSL shader collection**. AndroidX, Compose, Material Components, Kotlin and the Android build tools provide the application platform.
 
-## License
+Please read [CREDITS.md](CREDITS.md), [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) and the retained file headers. Source history is rooted in the official `v0.1.6` history; this fork does not claim authorship of that work.
 
-GBADuo is free software under the [GNU GPL v3](LICENSE): you can share and change
-it, and anything built from it must stay open source under the same license.
-
-GBADuo is a fan project, not affiliated with or endorsed by Nintendo, Game Freak,
-Creatures, The Pokémon Company or Marvelous. Pokémon, Harvest Moon and all related
-names are trademarks of their respective owners; Game Boy, Game Boy Color and Game
-Boy Advance are trademarks of Nintendo. AYN Thor belongs to its maker. No games, BIOS
-or game art are included: use your own legally dumped ROMs.
+GBA Duo Plus continues under the [GNU GPL v3](LICENSE). Individual third-party components retain their original licenses and copyright notices. Trademarks and branding remain the property of their respective owners. Game Boy/Game Boy Color/Game Boy Advance are Nintendo trademarks; use of their names describes compatibility, not endorsement. This software is supplied without warranty.

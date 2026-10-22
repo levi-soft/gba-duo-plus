@@ -9,12 +9,28 @@ android {
     compileSdk = 35
     ndkVersion = "27.2.12479018"
 
+    // Public builds do not reuse a developer's debug key for release APKs.
+    // Supply all four variables to sign, otherwise assembleRelease is unsigned.
+    val signingNames = listOf("PLUS_KEYSTORE_PATH", "PLUS_STORE_PASSWORD", "PLUS_KEY_ALIAS", "PLUS_KEY_PASSWORD")
+    val signingValues = signingNames.map { providers.environmentVariable(it).orNull }
+    require(signingValues.all { it.isNullOrBlank() } || signingValues.all { !it.isNullOrBlank() }) {
+        "Set all four PLUS signing environment variables, or leave all unset for an unsigned release."
+    }
+    signingConfigs {
+        if (signingValues.all { !it.isNullOrBlank() }) create("plusRelease") {
+            storeFile = file(requireNotNull(signingValues[0]))
+            storePassword = signingValues[1]
+            keyAlias = signingValues[2]
+            keyPassword = signingValues[3]
+        }
+    }
+
     defaultConfig {
-        applicationId = "com.khumam.gbaduo"
+        applicationId = "com.khumam.gbaduo.plus"
         minSdk = 30
         targetSdk = 35
-        versionCode = 7
-        versionName = "0.1.6"
+        versionCode = 3
+        versionName = "0.1.2"
 
         ndk {
             abiFilters += "arm64-v8a"
@@ -27,11 +43,15 @@ android {
     }
 
     buildTypes {
+        debug {
+            applicationIdSuffix = ".debug"
+            versionNameSuffix = "-debug"
+        }
         release {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.findByName("plusRelease")
         }
     }
 
@@ -48,6 +68,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 
     kotlinOptions {

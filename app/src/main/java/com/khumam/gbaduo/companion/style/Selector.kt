@@ -97,6 +97,11 @@ class Selector private constructor(
         )
     }
 
+    /** A necessary subject condition, for the resolver's candidate-rule index. */
+    val subjectKey: String = parts.first().first.let { c ->
+        c.id?.let { "#" + it } ?: c.classes.firstOrNull()?.let { "." + it } ?: c.type ?: "*"
+    }
+
     /** Uses [StyleNode.states] for the subject and its ancestors alike. */
     fun matches(node: StyleNode): Boolean = matchFrom(0, node)
 

@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">GBADuo</string>
+    <string name="app_name">GBA Duo Plus</string>
     <string name="no_folder_chosen">Open Settings (⚙) to add a ROM folder</string>
     <plurals name="no_roms">
         <item quantity="one">No .gba, .gb or .gbc files found in your folder</item>
@@ -31,5 +31,5 @@
     <string name="folder_added">Folder added</string>
     <string name="launch_needs_folder">Can\'t open %s: add the folder it\'s in under Settings › ROM folders</string>
     <string name="no_folders_yet">No folders yet</string>
-    <string name="github_url">https://github.com/khumam/gba-duo</string>
+    <string name="github_url">https://github.com/levi-soft/gba-duo-plus</string>
 </resources>

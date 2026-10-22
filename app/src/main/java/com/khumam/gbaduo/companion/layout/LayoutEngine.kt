@@ -66,6 +66,17 @@ object LayoutEngine {
         val maxW = style.maxWidth?.let { resolve(it, containerWidth)?.plus(style.extraWidth) } ?: INF
         val minH = resolve(style.minHeight, containerHeight)?.plus(style.extraHeight) ?: 0f
         val maxH = style.maxHeight?.let { resolve(it, containerHeight)?.plus(style.extraHeight) } ?: INF
+        // With one automatic axis, limits must constrain both dimensions together.
+        // Clamping only the derived height stretches width-led aspect-ratio boxes.
+        if (ratio != null && w != null && h != null &&
+            (style.width == Length.Auto || style.height == Length.Auto)) {
+            val lowerWidth = maxOf(minW, minH * ratio)
+            val upperWidth = minOf(maxW, maxH * ratio)
+            if (lowerWidth <= upperWidth) {
+                w = clamp(w, lowerWidth, upperWidth)
+                h = w / ratio
+            }
+        }
         return Sizing(w?.let { clamp(it, minW, maxW) }, h?.let { clamp(it, minH, maxH) }, minW, maxW, minH, maxH)
     }
 

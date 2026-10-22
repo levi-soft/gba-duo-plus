@@ -117,4 +117,21 @@ class LaunchIntentResolverTest {
         assertNull(LaunchIntentResolver.resolveAccessor(null))
         assertNull(LaunchIntentResolver.resolveAccessor(FakeIntent()))
     }
+
+    @Test
+    fun retainsDevAliasesQuotesAndOpaqueProviderUris() {
+        for (key in listOf("rom_uri", "rom_path")) {
+            assertEquals("/sdcard/A B.zip", LaunchIntentResolver.resolveAccessor(FakeIntent(extras=mapOf(key to "\"/sdcard/A B.zip\"")))?.path)
+        }
+        assertEquals("content://provider/document/123", LaunchIntentResolver.resolveAccessor(FakeIntent(dataString="content://provider/document/123"))?.uriString)
+        assertNull(LaunchIntentResolver.resolveAccessor(FakeIntent(dataString="https://example.org/a.gba")))
+        assertNull(LaunchIntentResolver.resolveAccessor(FakeIntent(extras=mapOf("ROM" to "https://example.org/a.gba"))))
+    }
+
+    @Test
+    fun retainsStrictPathAndGrantBoundaries() {
+        assertEquals("primary:Roms/a.gba", LaunchIntentResolver.documentIdForPath("/storage/self/primary/Roms/a.gba"))
+        assertNull(LaunchIntentResolver.documentIdForPath("/storage/emulated/10/Roms/a.gba"))
+        assertNull(LaunchIntentResolver.coveringTree("primary:ROMs2/a.gba", listOf("primary:ROMs")))
+    }
 }

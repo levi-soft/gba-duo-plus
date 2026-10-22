@@ -10,6 +10,9 @@ import android.view.KeyEvent
 import android.view.View
 import android.widget.Toast
 import com.khumam.gbaduo.R
+import com.khumam.gbaduo.BuildConfig
+import com.khumam.gbaduo.achievements.RetroAchievementsSession
+import com.khumam.gbaduo.achievements.AchievementPopup
 import com.khumam.gbaduo.companion.CompanionActivity
 import com.khumam.gbaduo.companion.CompanionController
 import com.khumam.gbaduo.companion.CompanionPlacement
@@ -37,6 +40,8 @@ class PlayerActivity : Activity() {
     private var companionPresentation: CompanionPresentation? = null
     private var companionActivity: CompanionActivity.Session? = null
     private var resumed = false
+    private var achievements: RetroAchievementsSession? = null
+    private var achievementPopup: AchievementPopup? = null
 
     /**
      * Whether this is Android's top resumed activity: the one on the top focused display,
@@ -50,6 +55,9 @@ class PlayerActivity : Activity() {
     private var savedShader: ShaderPreset
         get() = ShaderPreset.byId(prefs.getString("shader_id", null))
         set(value) = prefs.edit().putString("shader_id", value.id).apply()
+    private var savedSwapAb: Boolean
+        get() = prefs.getBoolean("swap_ab", false)
+        set(value) = prefs.edit().putBoolean("swap_ab", value).apply()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -89,15 +97,29 @@ class PlayerActivity : Activity() {
         LegacyMigration.migrate(filesDir, romFileName, crc32, storage)
         storage.ensureDirs()
 
-        input = InputMapper()
+        input = InputMapper().apply { swapAb = savedSwapAb }
         audioOut = AudioOut()
         val gameView = findViewById<GameView>(R.id.game_view)
         gameView.setShader(savedShader)
-        emu = EmuThread(romBytes, storage.saveFile.absolutePath, gameView, audioOut, input)
+        achievementPopup = AchievementPopup(this)
+        achievements = RetroAchievementsSession(applicationContext, { event -> achievementPopup?.enqueue(event) }) { text ->
+            if (!isDestroyed) Toast.makeText(this, text, Toast.LENGTH_LONG).show()
+        }
+        emu = EmuThread(romBytes, storage.saveFile.absolutePath, gameView, audioOut, input, achievements)
         emu.start()
 
         // The quick menu and companion screen talk to the core, so wait until the emu thread has loaded it.
         waitForLoadThenSetUp(gameView, header, crc32, storage)
+    }
+
+    override fun onNewIntent(incoming: Intent) {
+        super.onNewIntent(incoming)
+        if (incoming.getStringExtra(EXTRA_ROM_URI) == null) return
+        val sameRom = incoming.getStringExtra(EXTRA_ROM_URI) == intent.getStringExtra(EXTRA_ROM_URI)
+        setIntent(incoming)
+        // Debug singleTask keeps one native core owner. Recreate destroys the old
+        // emulation session before onCreate starts another ROM.
+        if (!sameRom) recreate()
     }
 
     private fun waitForLoadThenSetUp(gameView: GameView, header: RomHeader, crc32: Long, storage: GameStorage) {
@@ -110,10 +132,12 @@ class PlayerActivity : Activity() {
                         emu = emu,
                         states = SaveStates(storage),
                         initialShader = savedShader,
-                        onSwapAb = { input.swapAb = it },
+                        initialSwapAb = savedSwapAb,
+                        onSwapAb = { savedSwapAb = it; input.swapAb = it },
                         onSetFfSpeed = { emu.ffMultiplier = it },
                         onSetShader = { savedShader = it; gameView.setShader(it) },
                         onQuit = { finish() },
+                        onAchievements = achievements?.let { session -> { done -> session.show(this@PlayerActivity, done) } },
                     )
                     setUpCompanion(header, crc32, storage)
                 } else {
@@ -153,7 +177,7 @@ class PlayerActivity : Activity() {
 
         emu.activePackDir = packDir
         emu.activePack = manifest
-        emu.onSnapshot = { snapshot -> runOnUiThread { companionScreen?.update(snapshot) } }
+        emu.onSnapshot = { snapshot -> latestCompanionSnapshot.offer(snapshot); requestCompanionDraw() }
         // Taps on the companion screen reach the pack's Lua through the emu thread.
         emu.onActionResult = { result -> runOnUiThread { companionScreen?.applyScriptResult(result) } }
         controller.onUiChange = emu::setUiState
@@ -189,6 +213,20 @@ class PlayerActivity : Activity() {
     }
 
     /** Shared by this activity and the companion screen, so the game gets the controller whichever window has focus. */
+    private val latestCompanionSnapshot = com.khumam.gbaduo.companion.LatestCompanionSnapshot()
+    private val companionDrawQueued = java.util.concurrent.atomic.AtomicBoolean(false)
+    private val companionHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    private val directionMask = com.khumam.gbaduo.emu.GbaKeys.UP or com.khumam.gbaduo.emu.GbaKeys.DOWN or com.khumam.gbaduo.emu.GbaKeys.LEFT or com.khumam.gbaduo.emu.GbaKeys.RIGHT
+
+    private fun requestCompanionDraw() {
+        if (!::input.isInitialized || input.keys() and directionMask != 0) return
+        if (!companionDrawQueued.compareAndSet(false, true)) return
+        companionHandler.post {
+            companionDrawQueued.set(false)
+            if (!isFinishing && input.keys() and directionMask == 0) latestCompanionSnapshot.take()?.let { companionScreen?.update(it) }
+        }
+    }
+
     private fun handleKeyEvent(event: KeyEvent): Boolean {
         val down = when (event.action) {
             KeyEvent.ACTION_DOWN -> true
@@ -200,7 +238,10 @@ class PlayerActivity : Activity() {
             return true
         }
         if (!::input.isInitialized) return false
-        return input.onKey(event.keyCode, down)
+        val handled = input.onKey(event.keyCode, down)
+        if (handled && input.keys() and directionMask == 0) requestCompanionDraw()
+        if (BuildConfig.DEBUG && handled && (event.repeatCount == 0 || !down)) android.util.Log.d("GbaDuoInput", "key=" + event.keyCode + " down=" + down + " device=" + event.deviceId + " lagMs=" + (android.os.SystemClock.uptimeMillis() - event.eventTime) + " mask=" + input.keys() + " ff=" + input.fastForward())
+        return handled
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean =
@@ -229,10 +270,12 @@ class PlayerActivity : Activity() {
     override fun onResume() {
         super.onResume()
         resumed = true
-        if (::emu.isInitialized) emu.paused = false
+        if (::emu.isInitialized) emu.paused = quickMenu?.isShowing == true
     }
 
     override fun onDestroy() {
+        companionScreen?.close()
+        achievementPopup?.close()
         if (::emu.isInitialized) {
             emu.shutdown()
             emu.join(1000)
