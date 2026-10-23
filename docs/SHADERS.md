@@ -14,4 +14,4 @@ Plus adapts GLSL stage/version handling to GLES3, removes UI-only pragmas, selec
 
 ScaleFX requires renderable floating-point targets. Unsupported/failed pipelines log an error and fall back to Off. Visual quality and speed depend on the game, output size and GPU; shaders can increase power consumption and heat. Historical Thor checks covered compilation, orientation, colors and selected scenes, not sustained performance across every title.
 
-For algorithm authors and license details, see [CREDITS](../CREDITS.md) and the headers under `app/src/main/assets/shaders/libretro/`.
+For algorithm authors and license details, see [CREDITS](../CREDITS.md) and the headers under `plus/src/main/assets/shaders/libretro/`.

@@ -66,6 +66,11 @@ CI is configured to build an unsigned release and run the focused gate. Device i
 
 ## Native dependency revisions
 
+Plus-only Kotlin, asset and resource directories are wired into the main source
+set from `plus/src/main`; do not build them as a second application or copy them
+back into `app/src/main`. Run `node tools/upstream-boundary.mjs check` before the
+Gradle gates. See [the extension boundary](../plus/README.md) for maintenance.
+
 | Component | Source location | Pinned version/revision |
 |---|---|---|
 | mGBA | `engine/mgba` submodule | `26b7884bc25a5933960f3cdcd98bac1ae14d42e2` (`0.10.5`) |

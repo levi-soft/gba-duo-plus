@@ -1,5 +1,9 @@
 # GBA Duo Plus
 
+Maintenance: Plus-only implementations live in [`plus/`](plus/README.md), with
+an explicit upstream integration inventory and upgrade checker. This remains a
+fork with official Git history; it is not a patch-only distribution.
+
 **A community fork of [GBA Duo](https://github.com/khumam/gba-duo), created by [khumam](https://github.com/khumam).**
 
 GBA Duo made the central idea possible: play Game Boy Advance, Game Boy Color and Game Boy games on one screen of an Android handheld, with an interactive companion on the other. Plus builds on that work rather than replacing its authorship. Thank you to khumam and every upstream contributor for publishing the original application and companion system.

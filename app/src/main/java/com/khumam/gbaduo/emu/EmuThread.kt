@@ -3,16 +3,13 @@ package com.khumam.gbaduo.emu
 import android.util.Log
 import com.khumam.gbaduo.BuildConfig
 import com.khumam.gbaduo.debug.BridgeProtocol
-import com.khumam.gbaduo.debug.DebugBridge
+import com.khumam.gbaduo.debug.StudioConnection
 import com.khumam.gbaduo.companion.CompanionSnapshot
 import com.khumam.gbaduo.companion.LuaScript
 import com.khumam.gbaduo.companion.NativeCoreMemoryReader
 import com.khumam.gbaduo.companion.PackManifest
 import java.io.File
 import java.util.concurrent.ConcurrentLinkedQueue
-import java.util.concurrent.ArrayBlockingQueue
-import java.util.concurrent.FutureTask
-import java.util.concurrent.TimeUnit
 import java.util.UUID
 import org.json.JSONObject
 import com.khumam.gbaduo.achievements.RetroAchievements
@@ -106,7 +103,6 @@ class EmuThread(
     @Volatile private var uiStateChanged = true
     @Volatile private var snapshotRequested = false
     private val pendingCalls = ConcurrentLinkedQueue<Pair<String, List<Any?>>>()
-    private val debugRequests = ArrayBlockingQueue<FutureTask<JSONObject>>(16)
     private val debugSession = UUID.randomUUID().toString()
     private var debugGameCode = ""
     private var debugCrc = ""
@@ -114,7 +110,7 @@ class EmuThread(
     private var latestDebugFrame: Long? = null
     private var effectiveInputKeys = 0
     private var navigatorTarget = 0
-    private val debugProtocol = BridgeProtocol(object : BridgeProtocol.Backend {
+    private val studioConnection = StudioConnection(object : BridgeProtocol.Backend {
         override fun info() = JSONObject().put("sessionId", debugSession)
             .put("gameCode", debugGameCode).put("crc32", debugCrc)
             .put("platform", if (NativeCore.videoWidth() == 240) "gba" else "gb")
@@ -126,23 +122,6 @@ class EmuThread(
         override fun read(address: Long, length: Int) = NativeCore.readRam(address, length)
         override fun data() = latestDebugData?.let { JSONObject(it) }
     })
-
-    private fun requestDebug(request: JSONObject): JSONObject {
-        val task = FutureTask { debugProtocol.handle(request) }
-        fun failure(message: String) = JSONObject().put("protocol", 1)
-            .put("id", request.opt("id") ?: JSONObject.NULL).put("ok", false).put("error", message)
-        if (!debugRequests.offer(task)) return failure("Bridge queue full")
-        return try { task.get(5, TimeUnit.SECONDS) }
-        catch (error: Exception) {
-            task.cancel(false)
-            failure("Emulator request timed out or session ended")
-        }
-    }
-
-    private fun serviceDebugRequests() {
-        // Bound the work per frame even if a client sends requests continuously.
-        repeat(4) { (debugRequests.poll() ?: return).run() }
-    }
 
     override fun run() {
         try {
@@ -163,7 +142,6 @@ class EmuThread(
         val cursorProfile = CursorProfile.forRom(debugGameCode,debugCrc)
         val cursorNavigator = Fe7CursorNavigator(NativeCore::rawRead8, NativeCore::rawRead16, NativeCore::rawRead32,cursorProfile ?: CursorProfile.FE7)
         val supportsCursor = cursorProfile != null
-        var bridge: DebugBridge? = null
 
         try {
         gameView.setVideoSize(NativeCore.videoWidth(), NativeCore.videoHeight())
@@ -173,10 +151,7 @@ class EmuThread(
 
         var nextFrameAt = System.nanoTime()
         while (running) {
-            val wantsBridge = BuildConfig.DEBUG || studioConnectionEnabled
-            if (wantsBridge && bridge == null) bridge = DebugBridge(::requestDebug, "gbaduo-plus-studio").also { it.start() }
-            if (!wantsBridge && bridge != null) { bridge.close(); bridge = null }
-            serviceDebugRequests()
+            studioConnection.service(BuildConfig.DEBUG || studioConnectionEnabled)
             if (activePack !== scriptLoadedForPack) cursorNavigator.cancel()
             RetroAchievements.serviceCommands()
             if (paused) {
@@ -221,8 +196,7 @@ class EmuThread(
         }
 
         } finally {
-            bridge?.close()
-            while (true) (debugRequests.poll() ?: break).cancel(false)
+            studioConnection.close()
             LuaScript.unload()
             RetroAchievements.gameStopped()
             audioOut.stop()

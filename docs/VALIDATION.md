@@ -64,3 +64,15 @@ No device was installed, modified or freshly tested as part of this GitHub sourc
 The workflow builds an unsigned release and runs the focused gate from a recursive checkout using pinned dependencies. Its remote result is not assumed before GitHub executes it. CI artifacts, if downloaded, are unsigned development output rather than a maintainer-signed release.
 
 Build/test success establishes source/build behavior within that environment. It does not promise RetroAchievements server availability, recognition of arbitrary patched ROMs or universal companion compatibility.
+# Plus extension boundary refactor (2026-10-23)
+
+- Moved 18 existing Plus-only source/resource files to `plus/src/main` and extracted
+  the Studio queue/socket lifecycle into a nineteenth extension file.
+- Release assembly and 311 JVM tests passed (the same four Compose golden cases
+  remain excluded on this host). Native code was unchanged in this refactor.
+- The boundary checker and its temporary-repository regression fixture passed;
+  31 upstream application/build integration files have explicit reasons.
+- Created a clean detached official v0.1.7 reference worktree outside the Plus
+  repository. It is not another bundled copy of the emulator.
+- This refactor build was not installed on the device; the previously validated
+  signed APK remains installed. No new real-device regression claim is made here.

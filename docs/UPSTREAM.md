@@ -1,5 +1,13 @@
 # Upstream origin and maintenance boundary
 
+Plus-owned implementations now live under [`plus/src/main`](../plus/README.md).
+The application uses that source set plus explicit upstream integration edits;
+it does not replace official classes with hidden overlay copies. The baseline and
+integration inventory are pinned in [`plus/upstream.json`](../plus/upstream.json).
+Run `node tools/upstream-boundary.mjs check` before committing, and `compare <tag>`
+before the next upgrade. See the extension README for the pristine checkout and
+upgrade procedure.
+
 - Original application: https://github.com/khumam/gba-duo
 - Creator/project owner: **khumam**, with upstream contributors.
 - Plus baseline: **v0.1.7**, commit `6aa3823b7c4e4c8478b74fe24cf837a19224fc23`.

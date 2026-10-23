@@ -42,6 +42,14 @@ android {
         }
     }
 
+    // Plus-only implementations live outside the upstream application tree.
+    // One compilation unit preserves internal visibility without duplicate classes.
+    sourceSets.getByName("main") {
+        java.srcDir("../plus/src/main/java")
+        assets.srcDir("../plus/src/main/assets")
+        res.srcDir("../plus/src/main/res")
+    }
+
     buildTypes {
         debug {
             applicationIdSuffix = ".debug"
