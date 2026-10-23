@@ -1,6 +1,7 @@
 package com.khumam.gbaduo.companion.tree
 
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import com.khumam.gbaduo.companion.Action
 import com.khumam.gbaduo.companion.LayoutParser
 import com.khumam.gbaduo.companion.style.CssParser
@@ -10,12 +11,17 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 import java.io.File
 
 /**
  * The companion screen's model: bindings, CSS resolution per node, lists, tabs,
  * bars and images. Rendering itself is covered by PackScreenshotTest.
  */
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [34])
 class CompanionTreeTest {
 
     private val defaultCss = CssParser.parse(File("src/main/assets/companion/default.css").readText())
@@ -185,7 +191,8 @@ class CompanionTreeTest {
     fun imagesLoadByKeyAndSpritesRetryUntilDecoded() {
         val requested = mutableListOf<String>()
         var spriteReady = false
-        val fake = ImageBitmap(1, 1)
+        // Use Robolectric's supported Bitmap overload, not Compose's API26 color-space factory.
+        val fake = android.graphics.Bitmap.createBitmap(1, 1, android.graphics.Bitmap.Config.ARGB_8888).asImageBitmap()
         val t = tree(
             """{"type":"column","children":[{"type":"image","src":"asset:icon.png"},{"type":"image","src":"gfx:0000abcd"},{"type":"image","src":"${'$'}icon"}]}""",
             images = { key ->

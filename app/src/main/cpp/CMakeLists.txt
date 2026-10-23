@@ -58,15 +58,43 @@ list(FILTER LUA_SOURCES EXCLUDE REGEX "/lua\\.c$|/luac\\.c$")
 
 add_library(lua STATIC ${LUA_SOURCES})
 target_include_directories(lua PUBLIC "${LUA_DIR}/src")
+# lstrlib.c's pattern matcher calls this (script.c) so a pathological pattern can't
+# run past the script's time budget (local patch to the vendored source).
+target_compile_definitions(lua PRIVATE LUA_PATTERN_STEP_HOOK=gbaduo_pattern_step)
 
-get_filename_component(RC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../../../engine/rcheevos" ABSOLUTE)
-file(GLOB RC_SOURCES "${RC_DIR}/src/*.c" "${RC_DIR}/src/rapi/*.c" "${RC_DIR}/src/rcheevos/*.c" "${RC_DIR}/src/rhash/*.c")
-list(FILTER RC_SOURCES EXCLUDE REGEX "/rc_libretro\\.c$|/rc_client_external\\.c$|/rc_client_raintegration\\.c$")
-add_library(rcheevos STATIC ${RC_SOURCES})
-target_compile_definitions(rcheevos PUBLIC RC_DISABLE_LUA RC_CLIENT_SUPPORTS_HASH)
-target_include_directories(rcheevos PUBLIC "${RC_DIR}/include")
+# ---------------------------------------------------------------------------
+# Vendored rcheevos 12.5.0 (RetroAchievements runtime, MIT — see engine/rcheevos).
+# rc_client + rapi + rhash for ROM files. Left out: disc / encrypted / zip hashing
+# (GBA and GB/GBC hash the ROM itself), RAIntegration (Windows) and the libretro
+# helpers. rcheevos makes no network calls itself: achievements.c hands them to Kotlin.
+# ---------------------------------------------------------------------------
+get_filename_component(RCHEEVOS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../../../engine/rcheevos" ABSOLUTE)
 
-add_library(gbaduo SHARED core.c script.c achievements.c)
+if(NOT EXISTS "${RCHEEVOS_DIR}/include/rc_client.h")
+    message(FATAL_ERROR "rcheevos source missing at ${RCHEEVOS_DIR}")
+endif()
+
+file(GLOB RCHEEVOS_SOURCES
+    "${RCHEEVOS_DIR}/src/rcheevos/*.c"
+    "${RCHEEVOS_DIR}/src/rapi/*.c"
+    "${RCHEEVOS_DIR}/src/rhash/hash.c"
+    "${RCHEEVOS_DIR}/src/rhash/hash_rom.c"
+    "${RCHEEVOS_DIR}/src/rhash/md5.c"
+    "${RCHEEVOS_DIR}/src/rc_client.c"
+    "${RCHEEVOS_DIR}/src/rc_compat.c"
+    "${RCHEEVOS_DIR}/src/rc_util.c"
+    "${RCHEEVOS_DIR}/src/rc_version.c")
+
+add_library(rcheevos STATIC ${RCHEEVOS_SOURCES})
+target_include_directories(rcheevos PUBLIC "${RCHEEVOS_DIR}/include")
+target_compile_definitions(rcheevos PUBLIC
+    RC_DISABLE_LUA
+    RC_CLIENT_SUPPORTS_HASH
+    RC_HASH_NO_DISC
+    RC_HASH_NO_ENCRYPTED
+    RC_HASH_NO_ZIP)
+
+add_library(gbaduo SHARED core.c script.c memwrite.c achievements.c)
 
 target_compile_definitions(gbaduo PRIVATE USE_PTHREADS M_CORE_GBA M_CORE_GB)
 

@@ -4,9 +4,9 @@
 
 GBA Duo made the central idea possible: play Game Boy Advance, Game Boy Color and Game Boy games on one screen of an Android handheld, with an interactive companion on the other. Plus builds on that work rather than replacing its authorship. Thank you to khumam and every upstream contributor for publishing the original application and companion system.
 
-This fork is maintained by [levi-soft](https://github.com/levi-soft). It adds RetroAchievements, additional pixel-art shaders, persistent control preferences, companion cursor navigation for selected games, and an optional local connection to GBA Duo Studio.
+This fork is maintained by [levi-soft](https://github.com/levi-soft). It extends RetroAchievements and adds additional pixel-art shaders, persistent control preferences, companion cursor navigation for selected games, and an optional local connection to GBA Duo Studio.
 
-**Current source version:** `0.1.6` · **Upstream base:** `v0.1.6` · **License:** [GPL v3](LICENSE)
+**Current source version:** `0.1.7` · **Upstream base:** `v0.1.7` · **License:** [GPL v3](LICENSE)
 
 [Features](#features) · [Comparison](docs/FEATURES.md) · [Build](docs/BUILDING.md) · [Launchers](docs/LAUNCHERS.md) · [Studio](docs/STUDIO-CONNECTION.md) · [Credits](CREDITS.md)
 
@@ -16,7 +16,7 @@ This fork is maintained by [levi-soft](https://github.com/levi-soft). It adds Re
 |---|---|
 | Source | [levi-soft/gba-duo-plus](https://github.com/levi-soft/gba-duo-plus) |
 | Original project | [khumam/gba-duo](https://github.com/khumam/gba-duo) |
-| Exact upstream baseline | [`0c201e9faa224eb1527651ac0ca3e12a3ce0fe5c`](https://github.com/khumam/gba-duo/commit/0c201e9faa224eb1527651ac0ca3e12a3ce0fe5c), tag `v0.1.6` |
+| Exact upstream baseline | [`6aa3823b7c4e4c8478b74fe24cf837a19224fc23`](https://github.com/khumam/gba-duo/commit/6aa3823b7c4e4c8478b74fe24cf837a19224fc23), tag `v0.1.7` |
 | Release application ID | `com.khumam.gbaduo.plus` |
 | Debug application ID | `com.khumam.gbaduo.plus.debug` |
 | Requirements | Android 11/API 30 or later; ARM64; a second Android display for the companion |
@@ -46,7 +46,11 @@ Plus is **not an official GBA Duo release** and is not endorsed by its original 
 | Companion interaction | Optional `input.focusUnit(id)` Lua action support for verified Fire Emblem cursor profiles. Navigation uses bounded D-pad input and respects game state and physical input. |
 | Companion rendering | Additional sizing, raster-grid/aspect-fit and retained-snapshot behavior used by complex packs. This does not make every arbitrary pack/device combination automatically compatible. |
 | Daijisho custom player | Add **GBA Duo Plus** as a player to launch ROMs directly. Retains upstream's `LaunchActivity`, with additional path aliases, input validation and session/lifecycle handling. See [player setup and launch arguments](docs/LAUNCHERS.md#add-a-gba-duo-plus-player-in-daijisho). |
-| Studio Connection | Per-session opt-in, read-only local RAM/snapshot bridge for compatible desktop tooling. No LAN listener or memory-write command. |
+| Studio Connection | Per-session opt-in, read-only local RAM/snapshot bridge for compatible desktop tooling. No LAN listener or memory-write command. The upstream permission-gated pack tap API is separate from this read-only desktop bridge. |
+
+RetroAchievements now uses the official 0.1.7 integration as its foundation. Plus adds encrypted token storage, achievement-list UI, save-state progress and the selected popup presentation to that single official client. The former Plus RA runtime has been removed.
+
+Inherited from 0.1.7: pixel-style library and Settings, readable game titles, external save-folder synchronization, permission-gated RAM writes, ROM sprite/tilemap decoding, responsive CSS and bounded Lua execution.
 
 See [the detailed baseline comparison](docs/FEATURES.md). Credit for algorithms, cores and APIs belongs to their original authors; Plus contributes their Android integration and the changes documented here.
 

@@ -60,7 +60,7 @@ The current publication gate runs the focused release JVM tests:
 ./gradlew :app:testReleaseUnitTest --tests '*PlusFeatureContractTest' --tests '*BridgeProtocolTest' --tests '*Fe7CursorNavigatorTest' --tests '*InputMapperTest' --tests '*ShaderPresetTest' --tests '*LaunchIntentResolverTest' --tests '*ExternalRomPathTest' --tests '*RomArchiveTest' --tests '*LatestCompanionSnapshotTest' --tests '*CssRasterGridTest'
 ```
 
-Use the release test variant for `PlusFeatureContractTest`, which verifies the release application ID. The full host suite can be run with `:app:testReleaseUnitTest`; Compose screenshot/raster host-environment limitations are recorded in [VALIDATION](VALIDATION.md), not silently presented as full-suite success.
+Use the release test variant for `PlusFeatureContractTest`, which verifies the release application ID. The 0.1.7 upgrade audit passed 311 JVM tests, excluding the four Compose golden-image cases. The full host suite can be run with `:app:testReleaseUnitTest`; Compose screenshot/raster host-environment limitations are recorded in [VALIDATION](VALIDATION.md), not silently presented as full-suite success.
 
 CI is configured to build an unsigned release and run the focused gate. Device installation, real achievement awards, controller behavior and GPU performance require separate testing.
 
@@ -69,7 +69,7 @@ CI is configured to build an unsigned release and run the focused gate. Device i
 | Component | Source location | Pinned version/revision |
 |---|---|---|
 | mGBA | `engine/mgba` submodule | `26b7884bc25a5933960f3cdcd98bac1ae14d42e2` (`0.10.5`) |
-| rcheevos | `engine/rcheevos` submodule | `1433173220a7eaede6a9ed7a18e94117be1821e0` (`v12.5.0`) |
+| rcheevos | Vendored `engine/rcheevos` source | `1433173220a7eaede6a9ed7a18e94117be1821e0` (`v12.5.0`) |
 | Lua | Vendored `engine/lua` source | `5.4.7` |
 
-Native CMake builds the GB/GBA cores, the sandboxed Lua host and rcheevos; optional mGBA frontends/dependencies are disabled. Preserve licenses and file headers if changing any component. A source ZIP downloaded from GitHub does not embed submodule contents: clone recursively or initialize the pinned submodules before building.
+Native CMake builds the GB/GBA cores, the sandboxed Lua host and rcheevos; optional mGBA frontends/dependencies are disabled. Preserve licenses and file headers if changing any component. A source ZIP downloaded from GitHub does not embed submodule contents: clone recursively or initialize the pinned mGBA submodule before building. rcheevos is now vendored as in official 0.1.7.

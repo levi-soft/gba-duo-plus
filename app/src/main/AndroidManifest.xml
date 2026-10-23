@@ -48,6 +48,9 @@
         <activity android:name=".settings.SettingsActivity" android:exported="false" />
         <activity android:name=".settings.RomFoldersActivity" android:exported="false" />
         <activity android:name=".settings.AboutActivity" android:exported="false" />
+        <activity android:name=".settings.SaveFolderActivity" android:exported="false" />
+        <activity android:name=".settings.RetroAchievementsActivity" android:exported="false"
+            android:windowSoftInputMode="adjustResize|stateHidden" />
 
         <activity
             android:name=".player.PlayerActivity"

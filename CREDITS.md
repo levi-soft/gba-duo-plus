@@ -4,7 +4,7 @@
 
 Our first and most important thanks go to **[khumam](https://github.com/khumam)** and the contributors to **[GBA Duo](https://github.com/khumam/gba-duo)**. They created the Android application, dual-screen companion concept, native pack format, Lua integration, CSS/layout engine, controller handling, library and much of the workflow that Plus extends.
 
-Plus is a derivative community fork, not an independently invented replacement. The public history is based on upstream tag **v0.1.6**, commit **0c201e9faa224eb1527651ac0ca3e12a3ce0fe5c**. Original commits and source notices are retained. The inherited `art/banner.png`, original application artwork and format examples come from the upstream project; they are not presented as new Plus artwork.
+Plus is a derivative community fork, not an independently invented replacement. The public history is based on upstream tag **v0.1.6**, commit **0c201e9faa224eb1527651ac0ca3e12a3ce0fe5c**. The current 0.1.7 upgrade also merges official tag v0.1.7, commit 6aa3823b7c4e4c8478b74fe24cf837a19224fc23, including the new library, Settings, graphics/CSS APIs, sandbox limits and save synchronization. Original commits and source notices are retained. The inherited `art/banner.png`, original application artwork and format examples come from the upstream project; they are not presented as new Plus artwork.
 
 Plus development is maintained by **[levi-soft](https://github.com/levi-soft)**. Its contributions include the Android RetroAchievements integration/presentation, integration of additional shader pipelines, persistent Swap A/B, companion navigation and rendering changes, opt-in Studio connectivity, and the fork's packaging/documentation. The shader algorithms and achievement rules themselves are not claimed as Plus inventions.
 
@@ -44,3 +44,7 @@ Thanks to the Android, AndroidX, Jetpack Compose, Material Components, Kotlin, G
 Thank you to the dual-screen handheld community and testers for reporting input, rendering, launcher and companion issues. Please preserve these acknowledgements when redistributing this fork, and credit any additional assets or algorithms you introduce.
 
 Project names, logos, game titles and device names are used for attribution or compatibility descriptions. Their owners retain their rights; no upstream project or hardware vendor is represented as endorsing Plus.
+
+## Fonts inherited in 0.1.7
+
+**IBM Plex Mono** by IBM and contributors and **Silkscreen** by the Silkscreen Project Authors are used by the new upstream pixel UI. Their SIL Open Font License texts are retained under `app/src/main/assets/licenses/`; their font files remain under `app/src/main/res/font/`.

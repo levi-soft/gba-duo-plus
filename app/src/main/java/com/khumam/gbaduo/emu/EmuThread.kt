@@ -15,7 +15,7 @@ import java.util.concurrent.FutureTask
 import java.util.concurrent.TimeUnit
 import java.util.UUID
 import org.json.JSONObject
-import com.khumam.gbaduo.achievements.RetroAchievementsSession
+import com.khumam.gbaduo.achievements.RetroAchievements
 
 /**
  * Owns the native core for one play session. Runs frames paced to the GBA's
@@ -27,7 +27,6 @@ class EmuThread(
     private val gameView: GameView,
     private val audioOut: AudioOut,
     private val input: InputMapper,
-    private val achievements: RetroAchievementsSession? = null,
 ) : Thread("gbaduo-emu") {
 
     @Volatile private var running = false
@@ -58,6 +57,46 @@ class EmuThread(
 
     /** Called on the emu thread with what a script action returned (UI actions for the companion screen). */
     @Volatile var onActionResult: ((Any?) -> Unit)? = null
+
+    /** Whether the active pack's actions may change the game's memory (`mem.write*`). */
+    enum class WriteAccess {
+        /** No: the pack doesn't ask, the setting is off, or the player said no. Writes are refused. */
+        NONE,
+
+        /** Yes: the player allowed this pack for this game. */
+        ALLOWED,
+
+        /** Not decided yet: the next action waits while [onWriteConsentNeeded] asks the player. */
+        ASK,
+    }
+
+    /** Set by PlayerActivity with the pack; see [answerWriteConsent]. */
+    @Volatile var writeAccess = WriteAccess.NONE
+
+    /**
+     * Called on this thread, once, when an action is waiting for the player to allow
+     * (or refuse) writes. Answer with [answerWriteConsent]; until then actions stay queued.
+     */
+    @Volatile var onWriteConsentNeeded: (() -> Unit)? = null
+
+    @Volatile private var consentAsked = false
+
+    /** A save state to write right before the first allowed action runs (see [answerWriteConsent]). */
+    @Volatile private var safetyStatePath: String? = null
+
+    /**
+     * Called on this thread when the game's save data may have changed on disk: the
+     * save file's size or time changed (checked every [SAVE_CHECK_FRAMES]), or a save
+     * state was written. Used to copy saves out to the save folder.
+     */
+    @Volatile var onSaveDataChanged: (() -> Unit)? = null
+
+    /** Called on this thread as it ends, after the core is unloaded (its save written): every time, even after a failure. */
+    @Volatile var onStopped: (() -> Unit)? = null
+
+    private val saveFile = File(savePath)
+    private var saveSeen = 0L to 0L
+    private var framesSinceSaveCheck = 0
 
     private var framesSinceSnapshot = 0
     private var scriptLoadedForPack: PackManifest? = null
@@ -106,9 +145,18 @@ class EmuThread(
     }
 
     override fun run() {
+        try {
+            play()
+        } finally {
+            onStopped?.invoke()
+        }
+    }
+
+    private fun play() {
         loaded = loadCore()
         if (!loaded) return
-        achievements?.start()
+        saveSeen = saveFile.length() to saveFile.lastModified()
+        RetroAchievements.gameStarted()
 
         debugGameCode = NativeCore.gameCode().removePrefix("AGB-")
         debugCrc = "%08X".format(NativeCore.crc32())
@@ -130,12 +178,13 @@ class EmuThread(
             if (!wantsBridge && bridge != null) { bridge.close(); bridge = null }
             serviceDebugRequests()
             if (activePack !== scriptLoadedForPack) cursorNavigator.cancel()
-            achievements?.service(paused)
+            RetroAchievements.serviceCommands()
             if (paused) {
                 cursorNavigator.cancel()
                 // Taps on the companion screen still get their data while the game is paused.
                 if (snapshotRequested) serviceCompanion(activePack)
                 NativeCore.takeScriptFocusUnit() // discard taps made while paused
+                RetroAchievements.paused()
                 Thread.sleep(16)
                 nextFrameAt = System.nanoTime()
                 continue
@@ -154,12 +203,13 @@ class EmuThread(
                 if (BuildConfig.DEBUG && effective != effectiveInputKeys) android.util.Log.d("GbaDuoInput", "frame=" + NativeCore.frameCounter() + " physical=" + physical + " effective=" + effective + " target=" + cursorNavigator.activeTarget + " ff=" + input.fastForward())
                 effectiveInputKeys = effective; navigatorTarget = cursorNavigator.activeTarget
                 NativeCore.runFrame(effective)
-                achievements?.let { com.khumam.gbaduo.achievements.NativeAchievements.frame(false) }
+                RetroAchievements.frame()
             }
             gameView.postFrame()
             audioOut.pump(mute = speed != 1)
 
             serviceCompanion(activePack)
+            checkSaveFile()
 
             nextFrameAt += frameNanos / speed
             val sleepNanos = nextFrameAt - System.nanoTime()
@@ -174,10 +224,21 @@ class EmuThread(
             bridge?.close()
             while (true) (debugRequests.poll() ?: break).cancel(false)
             LuaScript.unload()
-            achievements?.stop()
+            RetroAchievements.gameStopped()
             audioOut.stop()
             NativeCore.unload()
             loaded = false
+        }
+    }
+
+    /** mGBA writes the save file itself shortly after the game saves; notice when it has. */
+    private fun checkSaveFile() {
+        if (++framesSinceSaveCheck < SAVE_CHECK_FRAMES) return
+        framesSinceSaveCheck = 0
+        val now = saveFile.length() to saveFile.lastModified()
+        if (now != saveSeen) {
+            saveSeen = now
+            onSaveDataChanged?.invoke()
         }
     }
 
@@ -204,8 +265,17 @@ class EmuThread(
                     LuaScript.setUi(uiState)
                 }
                 while (true) {
+                    if (writeAccess == WriteAccess.ASK) {
+                        // The pack may write: nothing runs until the player has answered.
+                        if (pendingCalls.isNotEmpty() && !consentAsked) {
+                            consentAsked = true
+                            onWriteConsentNeeded?.invoke()
+                        }
+                        break
+                    }
                     val (name, args) = pendingCalls.poll() ?: break
-                    val result = LuaScript.call(name, args)
+                    val mayWrite = writeAccess == WriteAccess.ALLOWED && saveSafetyState()
+                    val result = LuaScript.call(name, args, mayWrite)
                     if (result != null) {
                         onActionResult?.invoke(result)
                     } else {
@@ -241,6 +311,18 @@ class EmuThread(
         snapshotRequested = true
     }
 
+    /**
+     * Thread-safe: the player's answer to [onWriteConsentNeeded]; runs the actions that
+     * were waiting. With [safetyState], a save state is written there first, on this
+     * thread, before the pack's first write can happen (even while the game is paused).
+     */
+    fun answerWriteConsent(access: WriteAccess, safetyState: String? = null) {
+        safetyStatePath = safetyState
+        writeAccess = access
+        consentAsked = false
+        snapshotRequested = true
+    }
+
     /** Thread-safe: queues a call to the script's `actions.<name>(args...)`, run before the next snapshot. */
     fun callAction(name: String, args: List<Any?>) {
         pendingCalls += name to args
@@ -265,6 +347,20 @@ class EmuThread(
         }
     }
 
+    private fun saveSafetyState(): Boolean {
+        val path = safetyStatePath ?: return true
+        safetyStatePath = null
+        File(path).parentFile?.mkdirs()
+        if (NativeCore.saveState(path)) {
+            RetroAchievements.saveProgress(path)
+            onSaveDataChanged?.invoke()
+            return true
+        }
+        writeAccess = WriteAccess.NONE
+        Log.w(TAG, "pack writes refused: could not create the safety state")
+        return false
+    }
+
     /** Thread-safe; services the request on the emu thread between frames. */
     fun requestState(path: String, save: Boolean) {
         pendingSaveState.set(path to save)
@@ -275,8 +371,9 @@ class EmuThread(
         val (path, save) = request
         lastStateResult = if (save) NativeCore.saveState(path) else NativeCore.loadState(path)
         if (lastStateResult == true) {
-            if (save) achievements?.saveProgress(path) else achievements?.loadProgress(path)
+            if (save) RetroAchievements.saveProgress(path) else RetroAchievements.loadProgress(path)
         }
+        if (save && lastStateResult == true) onSaveDataChanged?.invoke()
     }
 
     fun shutdown() {
@@ -285,5 +382,8 @@ class EmuThread(
 
     private companion object {
         const val TAG = "EmuThread"
+
+        /** About every 3 seconds. */
+        const val SAVE_CHECK_FRAMES = 180
     }
 }

@@ -1,41 +1,40 @@
-# Features compared with official GBA Duo v0.1.6
+﻿# Plus 0.1.7 compared with official GBA Duo v0.1.7
 
-This comparison is against **tag v0.1.6**, commit `0c201e9faa224eb1527651ac0ca3e12a3ce0fe5c`, not a claim about whatever the newest upstream release may contain in the future.
+Baseline: official tag `v0.1.7`, commit `6aa3823b7c4e4c8478b74fe24cf837a19224fc23`.
+This is a source comparison; runtime validation limits are in [VALIDATION](VALIDATION.md).
 
-| Capability | Official v0.1.6 baseline | Plus 0.1.6 |
-|---|---|---|
-| GBA/GB/GBC emulation | mGBA core | Retained; not a new Plus core |
-| Two-screen game/companion placement | Present | Retained with additional companion sizing/placement fixes |
-| JSON/CSS/Lua companion ZIPs | Present | Retained; no mandatory Plus-only pack format |
-| Pages, tabs, buttons, lists, bindings | Present | Retained with rendering/snapshot fixes for complex layouts |
-| Save RAM and nine save-state slots | Present | Retained |
-| Fast-forward and controller input | Present | Retained, with input/cursor cancellation coordination |
-| ROM folders, Settings and About | Present | Retained; Plus identity and attribution added |
-| External VIEW LaunchActivity | Introduced upstream | Adopted; additional input aliases, validation and lifecycle handling retained |
-| Shader selection saved across sessions | Present | Retained, including new preset IDs |
-| Swap A/B | Runtime toggle | Toggle persisted across sessions |
-| Off / GBA Color / LCD Grid / Scanlines | Present | Retained |
-| Scale2x | Present | Not exposed in the Plus preset picker |
-| xBRZ / HQ2x / ScaleFX | Not present in this baseline | Added GLES3 shader pipelines |
-| RetroAchievements client | Not present in this baseline | Added rcheevos integration, login, achievement list and notifications |
-| Hardcore achievements | Not present | Not implemented/enabled |
-| Companion requests to focus a game unit | Not present | Added for explicitly whitelisted profiles using D-pad pulses |
-| Desktop read-only Studio connection | Not present | Added; release builds require per-session opt-in |
-| ROM-hash identity override | Not present | Not included |
-| Translation service/model integration | Not present | Not included |
+| Capability | Official 0.1.7 | Upgraded Plus 0.1.7 | Integration decision |
+|---|---|---|---|
+| mGBA GB/GBC/GBA and dual-screen placement | Present | Retained | Keep upstream core and platform support. |
+| Pixel library, cartridge carousel, readable game titles | Present | Adopted with Plus identity | Keep the new library, title cleanup and controller navigation. |
+| Pixel Settings and folder screens | Present | Adopted | Keep upstream UI, original attribution and Plus links. |
+| External save folder and conflict-preserving synchronization | Present | Adopted, including Plus RA state sidecars | Keep upstream sync; copy `slotN.ss.ra` alongside states. |
+| RetroAchievements Softcore | Present | Official process-wide RA runtime with Plus extensions | Use the official login, ROM identification, event and reconnect pipeline. Add Keystore token protection, achievement list and progress save/load on that same client. |
+| Achievement popups | Present | Official queued popups with Plus position/opacity settings | Use upstream popup design/queue; apply bottom-right position and 70% panel background. |
+| Swap A/B remembered | Session toggle only | Persisted across sessions | Retain Plus preferences. |
+| Pixel shaders | Original filters and Scale2x | xBRZ, HQ2x, ScaleFX and selected original filters | Retain Plus shader pipelines; Scale2x stays hidden. Shader persistence was already upstream. |
+| Launcher intents / Daijisho custom player | Present | Retained, with Plus path aliases and session handling | Keep the upstream launch entry point and Plus compatibility additions. No bundled Daijisho profile. |
+| Companion JSON/CSS/Lua packs | Present | Retained | Native format remains shared. Feature availability still depends on host version. |
+| `gfx.decode`, `gfx.sprite`, `gfx.tilemap`, LZ77 | Present | Adopted | Keep expanded ROM-derived graphics, limits and image cache. No game art is bundled here. |
+| Responsive CSS / math / grid tracks | Present | Adopted with Plus indexed selector/cache optimization | Keep `@media`, `calc`, `min`, `max`, `clamp`, auto-fill/fit and minmax; apply media predicates before using cached styles. |
+| Bounded Lua / native work | 1M work budget and 25ms per call | Adopted unchanged | Keep load budget 5M/250ms and per-call limits; no silent increase for private packs. |
+| Permission-gated pack RAM writes | Present | Adopted | Opt-in setting and per-pack/game consent, bounded work RAM writes, safety state. Plus refuses writes if that safety save fails. |
+| Tap a supported FE unit to move the cursor | No Plus `input.focusUnit` API | Retained | Tap-only ID requests, bounded D-pad navigation and cancellation on physical input; not raw cursor RAM writes. |
+| USB Studio Connection | No Plus bridge | Retained | Per-session opt-in read-only abstract socket forwarded with ADB. Pack RAM-write permission does not authorize bridge writes. |
+| Hardcore / hash override / translation | No Hardcore in this release | Not included | Keep Plus's existing scope. Actual ROM identity is used for achievements. |
 
-## Integration details
+## Upgrade choices
 
-**RetroAchievements:** Actual ROM identification is performed through rcheevos. Login credentials are not companion fields. Automatic notices distinguish signed-in state, recognized games and unsupported hashes. Badge fetching is separate from the emulator/UI threads. This integration does not make a ROM recognized by the service merely because a companion works with it.
+The new upstream runtime and graphics/CSS APIs are the foundation. Existing Plus rendering fixes,
+input coordination, shader presets, launcher handling and desktop bridge remain on top.
+The RA dependency is the same rcheevos 12.5.0 in both implementations. The dependency now uses
+upstream's vendored layout rather than the former Plus submodule.
 
-**Rendering:** Layout/raster-grid/aspect-fit changes and retention of the latest valid companion snapshot address observed issues in complex packs. These are native host changes, not proprietary assets or a requirement to embed a particular game in the emulator.
+RetroAchievements now uses the official 0.1.7 native/Kotlin integration and process-wide client.
+Plus's former NativeAchievements/RetroAchievementsSession implementation is removed.
+Missing Plus features extend the official client: encrypted Keystore token storage, achievement list,
+RA progress serialization with save states, bounded HTTPS requests and serialized native access.
+The official pixel popup design/queue is retained with the user's bottom-right/70% presentation.
+No plain-text token fallback is written when the Keystore is unavailable.
 
-**Shaders:** Algorithms come from the credited upstream shader authors. Plus supplies GLES3 loading, multipass render targets, sampler bindings, presentation and saved-selection integration. ScaleFX needs suitable floating-point render-target support and may be expensive on some GPUs.
-
-**Launchers:** Daijisho can be configured to launch Plus through Android intents. This is configurable frontend compatibility, not a bundled Daijisho player profile or official integration partnership. Frontend achievement metadata and Plus's runtime achievement client are distinct systems.
-
-**Cursor focus:** A companion can request a deployment ID. The host checks the ROM/game state and supplies bounded directional input. It does not write cursor coordinates to RAM or automatically press A/B. Unsupported games retain ordinary local companion selection without a universal host cursor feature.
-
-**Studio:** Release users explicitly enable the connection for the current game session. Debug builds also expose the development bridge while a game runs. The abstract Unix socket is not a network server; PC tools forward it through ADB.
-
-See [VALIDATION](VALIDATION.md) for the evidence boundary. Presence in source or a passing host test is not the same as live-device coverage for every transition.
+Private companion packs, ROMs, save files, captures and signing keys are not part of this repository.

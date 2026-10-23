@@ -23,6 +23,8 @@ jobs:
           packages: platform-tools
       - run: sdkmanager "platforms;android-35" "build-tools;35.0.0" "ndk;27.2.12479018" "cmake;3.22.1"
       - uses: gradle/actions/setup-gradle@v4
+      - name: Native sandbox and graphics checks
+        run: app/src/test/native/run.sh
       - name: Focused release tests
         run: >-
           ./gradlew :app:testReleaseUnitTest
@@ -31,6 +33,11 @@ jobs:
           --tests '*ShaderPresetTest' --tests '*LaunchIntentResolverTest'
           --tests '*ExternalRomPathTest' --tests '*RomArchiveTest'
           --tests '*LatestCompanionSnapshotTest' --tests '*CssRasterGridTest'
+          --tests '*ResponsiveCssTest' --tests '*GameTitleTest'
+          --tests '*SaveSyncTest' --tests '*GameStorageTest'
+          --tests '*PackFingerprintTest' --tests '*PackManifestTest'
+          --tests '*RetroAchievementsActivityTest'
+          --tests '*AchievementPopupsTest' --tests '*CompanionTreeTest'
       - run: ./gradlew :app:assembleRelease
       - uses: actions/upload-artifact@v4
         with:
