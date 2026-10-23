@@ -10,6 +10,7 @@
 #include "bus.h"
 #include "fake_bus.h"
 #include "script.h"
+#include "../../../../plus/src/main/cpp/studio_memory_range.h"
 
 static int failures = 0;
 static int checks = 0;
@@ -519,6 +520,20 @@ static void plus_cursor_requests_stay_tap_scoped(void) {
 }
 
 int main(void) {
+    CHECK(plus_studio_range_valid(0x08000000, 1, 0x1000000));
+    CHECK(plus_studio_range_valid(0x08FFFFFF, 1, 0x1000000));
+    CHECK(!plus_studio_range_valid(0x08FFFFFF, 2, 0x1000000));
+    CHECK(!plus_studio_range_valid(0x09000000, 1, 0x1000000));
+    CHECK(!plus_studio_range_valid(0x08000000, 1, 0));
+    CHECK(!plus_studio_range_valid(0x04000000, 1, 0x1000000));
+    CHECK(plus_studio_range_valid(0x050003FF, 1, 0x1000000));
+    CHECK(!plus_studio_range_valid(0x050003FF, 2, 0x1000000));
+    CHECK(plus_studio_range_valid(0x06017FFF, 1, 0x1000000));
+    CHECK(!plus_studio_range_valid(0x06018000, 1, 0x1000000));
+    CHECK(plus_studio_range_valid(0x070003FF, 1, 0x1000000));
+    CHECK(!plus_studio_range_valid(UINT64_MAX, 1, 0x1000000));
+    CHECK(!plus_studio_range_valid(0x08000000, 65537, 0x1000000));
+    CHECK(!plus_studio_range_valid(0x08000000, 0, 0x1000000));
     plus_cursor_requests_stay_tap_scoped();
     refused_outside_an_action();
     refused_without_permission();

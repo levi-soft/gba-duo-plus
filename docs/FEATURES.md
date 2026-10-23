@@ -20,7 +20,7 @@ This is a source comparison; runtime validation limits are in [VALIDATION](VALID
 | Bounded Lua / native work | 1M work budget and 25ms per call | Adopted unchanged | Keep load budget 5M/250ms and per-call limits; no silent increase for private packs. |
 | Permission-gated pack RAM writes | Present | Adopted | Opt-in setting and per-pack/game consent, bounded work RAM writes, safety state. Plus refuses writes if that safety save fails. |
 | Tap a supported FE unit to move the cursor | No Plus `input.focusUnit` API | Retained | Tap-only ID requests, bounded D-pad navigation and cancellation on physical input; not raw cursor RAM writes. |
-| USB Studio Connection | No Plus bridge | Retained | Per-session opt-in read-only abstract socket forwarded with ADB. Pack RAM-write permission does not authorize bridge writes. |
+| USB Studio Connection | No Plus bridge | Expanded | Per-session read-only RAM, ROM and graphics inspection with capability discovery. Abstract socket forwarded with ADB; pack RAM-write permission does not authorize bridge writes. |
 | Hardcore / hash override / translation | No Hardcore in this release | Not included | Keep Plus's existing scope. Actual ROM identity is used for achievements. |
 
 ## Upgrade choices

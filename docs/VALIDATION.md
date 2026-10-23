@@ -76,3 +76,18 @@ Build/test success establishes source/build behavior within that environment. It
   repository. It is not another bundled copy of the emulator.
 - This refactor build was not installed on the device; the previously validated
   signed APK remains installed. No new real-device regression claim is made here.
+
+# Studio ROM inspection revision 2 (2026-10-23)
+
+- Added bounded, opt-in, read-only ROM/graphics inspection in Plus-owned Kotlin/C
+  modules. Revision-1 response envelopes remain compatible with existing clients.
+- 312 JVM tests passed (four Compose golden tests still excluded on Windows).
+  The native sandbox harness plus new range checks passed 155 checks on Thor.
+- Release assembly, native JNI loading, in-place signing/update and revision-2
+  live capability handshake succeeded. A known ROM icon matched the same local
+  ROM bytes and displayed through a generated asset-free companion on the device.
+- New range checks reject I/O, BIOS, save memory, mirrors beyond actual ROM size,
+  overflow, truncated reads and oversized requests. No write or execution command
+  was added to the bridge.
+- This is a graphics authoring foundation, not automatic game asset recognition
+  or a claim that Studio now covers all companion logic visually.

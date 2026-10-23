@@ -18,7 +18,7 @@ export function inspect(root, lock) {
       const original = file.replace('plus/src/main/', 'app/src/main/');
       if (baseline.has(original)) problems.push(`${file}: shadows an upstream implementation; keep it as an explicit integration edit`);
       extensions.push(file);
-    } else if (file.startsWith('app/src/main/') || file === 'app/build.gradle.kts') {
+    } else if (file.startsWith('app/src/main/') || file === 'app/build.gradle.kts' || file === 'app/proguard-rules.pro') {
       if (!baseline.has(file)) problems.push(`${file}: new Plus implementation belongs in plus/src/main`);
       else if (!lock.integrations[file]) problems.push(`${file}: upstream edit has no recorded integration reason`);
       else hooks.push({file, reason: lock.integrations[file]});

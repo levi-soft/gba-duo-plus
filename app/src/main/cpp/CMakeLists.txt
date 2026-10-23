@@ -95,10 +95,12 @@ target_compile_definitions(rcheevos PUBLIC
     RC_HASH_NO_ZIP)
 
 add_library(gbaduo SHARED core.c script.c memwrite.c achievements.c)
+target_sources(gbaduo PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../../../../plus/src/main/cpp/studio_memory.c")
 
 target_compile_definitions(gbaduo PRIVATE USE_PTHREADS M_CORE_GBA M_CORE_GB)
 
 target_include_directories(gbaduo PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}"
     "${MGBA_DIR}/include"
     "${MGBA_DIR}/src"
     "${CMAKE_CURRENT_BINARY_DIR}/mgba/include"

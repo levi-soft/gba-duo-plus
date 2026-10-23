@@ -50,7 +50,7 @@ Plus is **not an official GBA Duo release** and is not endorsed by its original 
 | Companion interaction | Optional `input.focusUnit(id)` Lua action support for verified Fire Emblem cursor profiles. Navigation uses bounded D-pad input and respects game state and physical input. |
 | Companion rendering | Additional sizing, raster-grid/aspect-fit and retained-snapshot behavior used by complex packs. This does not make every arbitrary pack/device combination automatically compatible. |
 | Daijisho custom player | Add **GBA Duo Plus** as a player to launch ROMs directly. Retains upstream's `LaunchActivity`, with additional path aliases, input validation and session/lifecycle handling. See [player setup and launch arguments](docs/LAUNCHERS.md#add-a-gba-duo-plus-player-in-daijisho). |
-| Studio Connection | Per-session opt-in, read-only local RAM/snapshot bridge for compatible desktop tooling. No LAN listener or memory-write command. The upstream permission-gated pack tap API is separate from this read-only desktop bridge. |
+| Studio Connection | Per-session opt-in, read-only local RAM/snapshot and bounded ROM/VRAM/palette/OAM inspection for compatible desktop tooling. Revision-2 capability discovery retains the existing wire envelope. No LAN listener or memory-write command. The upstream permission-gated pack tap API is separate from this read-only desktop bridge. |
 
 RetroAchievements now uses the official 0.1.7 integration as its foundation. Plus adds encrypted token storage, achievement-list UI, save-state progress and the selected popup presentation to that single official client. The former Plus RA runtime has been removed.
 

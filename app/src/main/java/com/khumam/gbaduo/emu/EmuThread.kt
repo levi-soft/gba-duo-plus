@@ -4,6 +4,7 @@ import android.util.Log
 import com.khumam.gbaduo.BuildConfig
 import com.khumam.gbaduo.debug.BridgeProtocol
 import com.khumam.gbaduo.debug.StudioConnection
+import com.khumam.gbaduo.debug.StudioMemory
 import com.khumam.gbaduo.companion.CompanionSnapshot
 import com.khumam.gbaduo.companion.LuaScript
 import com.khumam.gbaduo.companion.NativeCoreMemoryReader
@@ -120,6 +121,8 @@ class EmuThread(
             .put("inputKeys", input.keys()).put("fastForward", input.fastForward())
             .put("effectiveInputKeys", effectiveInputKeys).put("cursorNavigation", navigatorTarget)
         override fun read(address: Long, length: Int) = NativeCore.readRam(address, length)
+        override fun romSize() = StudioMemory.romSize()
+        override fun inspect(address: Long, length: Int) = StudioMemory.read(address, length)
         override fun data() = latestDebugData?.let { JSONObject(it) }
     })
 

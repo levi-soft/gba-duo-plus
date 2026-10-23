@@ -3,9 +3,10 @@
   "tag": "v0.1.7",
   "commit": "6aa3823b7c4e4c8478b74fe24cf837a19224fc23",
   "integrations": {
+    "app/proguard-rules.pro": "Preserve Plus Studio inspection JNI names",
     "app/build.gradle.kts": "Plus identity, release signing and extension source-set wiring",
     "app/src/main/AndroidManifest.xml": "Plus branding and launcher identity",
-    "app/src/main/cpp/CMakeLists.txt": "Frame-scoped cursor request JNI and RA native progress extension integration",
+    "app/src/main/cpp/CMakeLists.txt": "Native RA integration and Plus-owned read-only Studio inspection source wiring",
     "app/src/main/cpp/achievements.c": "Official RA client extensions: encrypted credentials, list, state sidecars and popup fixes",
     "app/src/main/cpp/core.c": "Frame-scoped cursor request JNI and RA native progress extension integration",
     "app/src/main/cpp/script.c": "Frame-scoped cursor request JNI and RA native progress extension integration",
