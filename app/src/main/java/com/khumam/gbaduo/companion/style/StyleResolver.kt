@@ -19,7 +19,7 @@ class StyleResolver(
     var viewportWidth: Float = 0f,
     var viewportHeight: Float = 0f,
 ) {
-    private class IndexedRule(val origin: Int, val order: Int, val selector: Selector, val declarations: List<Declaration>)
+    private class IndexedRule(val origin: Int, val order: Int, val selector: Selector, val declarations: List<Declaration>, val media: List<MediaQuery>)
 
     private val rules: List<IndexedRule> = buildList {
         var order = 0
@@ -27,7 +27,7 @@ class StyleResolver(
             for (sheet in sheets) {
                 for (rule in sheet.rules) {
                     val ruleOrder = order++
-                    for (selector in rule.selectors) add(IndexedRule(origin, ruleOrder, selector, rule.declarations))
+                    for (selector in rule.selectors) add(IndexedRule(origin, ruleOrder, selector, rule.declarations, rule.media))
                 }
             }
         }
@@ -146,7 +146,7 @@ class StyleResolver(
         candidates += rulesBySubject[node.type].orEmpty()
         node.id?.let { candidates += rulesBySubject["#" + it].orEmpty() }
         for (cls in node.classes) candidates += rulesBySubject["." + cls].orEmpty()
-        val matched = candidates.filter { it.selector.matches(node) }
+        val matched = candidates.filter { it.media.all { query -> query.matches(viewportWidth, viewportHeight) } && it.selector.matches(node) }
         fun sorted(origin: Int) = matched.filter { it.origin == origin }
             .sortedWith(compareBy<IndexedRule> { it.selector.specificity }.thenBy { it.order })
             .flatMap { it.declarations }

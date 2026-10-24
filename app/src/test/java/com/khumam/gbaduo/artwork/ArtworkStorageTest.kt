@@ -1,0 +1,233 @@
+package com.khumam.gbaduo.artwork
+
+import android.graphics.Bitmap
+import android.graphics.Color
+import android.graphics.RectF
+import android.content.Context
+import android.content.ContextWrapper
+import android.net.Uri
+import android.os.Looper
+import com.khumam.gbaduo.library.Platform
+import com.khumam.gbaduo.library.RomEntry
+import com.khumam.gbaduo.library.RomLibrary
+import org.junit.Assert.*
+import org.junit.Rule
+import org.junit.Test
+import org.junit.rules.TemporaryFolder
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
+import org.robolectric.Shadows
+import org.robolectric.annotation.GraphicsMode
+import org.robolectric.annotation.LooperMode
+import java.io.ByteArrayOutputStream
+import java.io.File
+import java.util.concurrent.ThreadPoolExecutor
+import java.util.concurrent.TimeUnit
+import java.util.zip.CRC32
+
+@RunWith(RobolectricTestRunner::class)
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
+@LooperMode(LooperMode.Mode.PAUSED)
+class ArtworkStorageTest {
+    @get:Rule val temporary = TemporaryFolder()
+    private fun isolatedContext(): Context {
+        val files = temporary.newFolder()
+        return object : ContextWrapper(RuntimeEnvironment.getApplication()) {
+            override fun getFilesDir(): File = files
+            override fun getApplicationContext(): Context = this
+        }
+    }
+    private fun png(width: Int = 64, height: Int = 32): ByteArray {
+        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        bitmap.eraseColor(Color.RED)
+        return ByteArrayOutputStream().use { out ->
+            assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, out))
+            bitmap.recycle()
+            out.toByteArray()
+        }
+    }
+
+    private fun identity(crc: Long = 0x32cd990d) = ArtworkIdentity("gba", crc)
+
+    @Test fun identityUsesActualRomPlatformAndCrcRatherThanTitle() {
+        assertEquals("gba-32CD990D", identity().key)
+        assertNotEquals(identity().key, identity(0x32cd990e).key)
+        assertNotEquals(identity().key, ArtworkIdentity("gb", 0x32cd990d).key)
+        assertThrows(IllegalArgumentException::class.java) { ArtworkIdentity("../gba", 1) }
+        assertThrows(IllegalArgumentException::class.java) { ArtworkIdentity("gba", -1) }
+    }
+
+    @Test fun failedReplacementPreservesSelectedCoverAndOfflineMetadata() {
+        val context = isolatedContext()
+        val repository = ArtworkRepository(context)
+        repository.remove(identity())
+        val selected = repository.apply(identity(), png(), ArtworkCandidate(
+            "steamgriddb", "12", "https://cdn.steamgriddb.com/grid/12.png",
+            author = "Artist", sourcePage = "https://www.steamgriddb.com/grid/12?token=private"
+        ), manual = true)
+        assertTrue(repository.has(identity()))
+        assertEquals(64, selected.width)
+        assertEquals(32, selected.height)
+        assertEquals("Artist", repository.record(identity())?.author)
+        assertEquals("https://www.steamgriddb.com/grid/12", repository.record(identity())?.sourcePage)
+        assertTrue(repository.record(identity())!!.manual)
+        assertNull(ArtworkRepository(context).applyIfMissing(identity(), "invalid download".toByteArray()))
+        assertEquals(selected.imageFile, repository.record(identity())?.imageFile)
+        assertThrows(IllegalArgumentException::class.java) {
+            repository.apply(identity(), "not an image".toByteArray())
+        }
+        assertEquals(selected.imageFile, repository.record(identity())?.imageFile)
+        assertEquals(64, repository.loadBitmap(identity())?.width)
+        assertFalse(repository.has(identity(0x32cd990e)))
+        repository.remove(identity())
+        assertNull(repository.record(identity()))
+        assertNull(repository.loadBitmap(identity()))
+    }
+
+    @Test fun largeImagesAreDownsampledAndInvalidInputsFailBeforeAssignment() {
+        val decoded = ArtworkImageStore.decode(png(2048, 1024))
+        assertEquals(1024, decoded.width)
+        assertEquals(512, decoded.height)
+        decoded.recycle()
+        assertThrows(IllegalArgumentException::class.java) {
+            ArtworkImageStore.decode(ByteArray(16 * 1024 * 1024 + 1))
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            ArtworkImageStore.decode("<svg width='100'/>".toByteArray())
+        }
+    }
+
+    @Test fun cancellationBeforeFinalClaimPreservesTheCoverAndCleansStagedFiles() {
+        val context = isolatedContext()
+        val repository = ArtworkRepository(context)
+        val original = repository.apply(identity(), png(), manual = true)
+        val gate = ArtworkRequestGate()
+        val token = gate.begin()
+        val root = File(context.filesDir, "plus-artwork")
+        var staged = false
+        val result = repository.applyIfOwned(identity(), png(80, 40)) {
+            // Both expensive files exist before the final ownership decision.
+            staged = File(root, "images").listFiles()!!.size == 2 &&
+                File(root, "records").listFiles()!!.any { it.extension == "tmp" }
+            gate.close()
+            gate.claim(token)
+        }
+        assertTrue(staged)
+        assertNull(result)
+        assertEquals(original, repository.record(identity()))
+        assertEquals(1, File(root, "images").listFiles()!!.size)
+        assertEquals(1, File(root, "records").listFiles()!!.size)
+        assertEquals(64, repository.loadBitmap(identity())!!.width)
+    }
+
+    @Test fun claimWonBeforeCancellationFinishesOneCoherentReplacement() {
+        val context = isolatedContext()
+        val repository = ArtworkRepository(context)
+        repository.apply(identity(), png(), manual = true)
+        val gate = ArtworkRequestGate()
+        val token = gate.begin()
+        val saved = repository.applyIfOwned(identity(), png(80, 40)) {
+            val claimed = gate.claim(token)
+            gate.close()
+            claimed
+        }
+        assertNotNull(saved)
+        assertEquals(saved, repository.record(identity()))
+        assertEquals(80, repository.loadBitmap(identity())!!.width)
+        assertEquals(1, File(context.filesDir, "plus-artwork/images").listFiles()!!.size)
+        assertEquals(1, File(context.filesDir, "plus-artwork/records").listFiles()!!.size)
+    }
+
+    @Test fun failedAtomicPointerMoveKeepsThePreviousCoverAndRemovesTheNewImage() {
+        val context = isolatedContext()
+        val repository = ArtworkRepository(context)
+        val original = repository.apply(identity(), png(), manual = true)
+        val root = File(context.filesDir, "plus-artwork")
+        assertThrows(java.io.IOException::class.java) {
+            repository.applyIfOwned(identity(), png(80, 40)) {
+                // A deterministic filesystem fault at the publication boundary.
+                val stagedMetadata = File(root, "records").listFiles()!!.single { it.extension == "tmp" }
+                assertTrue(stagedMetadata.delete())
+                true
+            }
+        }
+        assertEquals(original, repository.record(identity()))
+        assertEquals(64, repository.loadBitmap(identity())!!.width)
+        assertEquals(1, File(root, "images").listFiles()!!.size)
+        assertEquals(1, File(root, "records").listFiles()!!.size)
+    }
+
+    @Test fun attributionStripsQueriesFragmentsAndNeverStoresDownloadSecrets() {
+        val repository = ArtworkRepository(isolatedContext())
+        val candidate = ArtworkCandidate("libretro", "42-box", "https://thumbnails.libretro.com/image.png?token=secret",
+            sourcePage = "https://github.com/libretro-thumbnails/example?token=secret#details")
+        val selected = repository.apply(identity(), png(), candidate)
+        assertEquals("https://github.com/libretro-thumbnails/example", selected.sourcePage)
+        assertEquals(selected.sourcePage, repository.record(identity())?.sourcePage)
+        assertFalse(candidate.toString().contains("secret"))
+        assertFalse(candidate.toString().contains("https://"))
+        val ambiguous = candidate.copy(sourcePage = "https://github.com/libretro-thumbnails/example?token=secret&token=other")
+        assertEquals("https://github.com/libretro-thumbnails/example", repository.apply(identity(), png(), ambiguous).sourcePage)
+    }
+
+    @Test fun rendererFitsAWholePortraitIntoASquareCardWithoutStretching() {
+        val square = ArtworkRenderer.squareBounds(RectF(0f, 0f, 300f, 500f), 10f)
+        assertEquals(280f, square.width(), 0.01f)
+        assertEquals(square.width(), square.height(), 0.01f)
+        assertEquals(250f, square.centerY(), 0.01f)
+        val image = ArtworkRenderer.fitRect(square, 600, 900)
+        assertEquals(600f / 900f, image.width() / image.height(), 0.0001f)
+        assertEquals(square.centerX(), image.centerX(), 0.01f)
+        assertEquals(square.centerY(), image.centerY(), 0.01f)
+        assertTrue(square.contains(image))
+    }
+
+    private fun rom(context: Context): Pair<RomEntry, ArtworkIdentity> {
+        val bytes = ByteArray(1024) { (it % 251).toByte() }
+        val file = File(context.filesDir, "fixture.gba").apply { parentFile?.mkdirs(); writeBytes(bytes) }
+        val crc = CRC32().apply { update(bytes) }.value
+        return RomEntry(Uri.fromFile(file), file.name, "Fixture", "TEST", Platform.GBA, file.length(), file.lastModified()) to identity(crc)
+    }
+
+    private fun drain(binder: ArtworkBinder) {
+        val field = ArtworkBinder::class.java.getDeclaredField("worker").apply { isAccessible = true }
+        (field.get(binder) as ThreadPoolExecutor).submit {}.get(5, TimeUnit.SECONDS)
+        Shadows.shadowOf(Looper.getMainLooper()).idle()
+    }
+
+    @Test fun emptyArtworkLibraryDoesNotHashRomsWhileBrowsing() {
+        val context = isolatedContext()
+        val (entry, _) = rom(context)
+        val binder = ArtworkBinder(context, RomLibrary(context))
+        try {
+            val view = com.khumam.gbaduo.library.ui.CartridgeView(context)
+            binder.bind(view, entry)
+            drain(binder)
+            assertFalse(File(context.filesDir, "rom_index.json").exists())
+            assertNull(view.artworkRenderer)
+        } finally { binder.close() }
+    }
+
+    @Test fun recycledViewDoesNotReceiveALateBitmapAndRefreshIgnoresIt() {
+        val context = isolatedContext()
+        val (entry, key) = rom(context)
+        ArtworkRepository(context).apply(key, png(), manual = true)
+        val binder = ArtworkBinder(context, RomLibrary(context))
+        try {
+            val view = com.khumam.gbaduo.library.ui.CartridgeView(context)
+            binder.bind(view, entry)
+            view.tag = null // RecyclerView's actual host hook.
+            view.artworkRenderer = null
+            drain(binder)
+            assertNull(view.artworkRenderer)
+            binder.refresh()
+            drain(binder)
+            assertNull(view.tag)
+            assertNull(view.artworkRenderer)
+            binder.bind(view, entry)
+            drain(binder)
+            assertNotNull(view.artworkRenderer)
+        } finally { binder.close() }
+    }
+}

@@ -4,11 +4,11 @@
 
 GBA Duo made the central idea possible: play Game Boy Advance, Game Boy Color and Game Boy games on one screen of an Android handheld, with an interactive companion on the other. Plus builds on that work rather than replacing its authorship. Thank you to khumam and every upstream contributor for publishing the original application and companion system.
 
-This fork is maintained by [levi-soft](https://github.com/levi-soft). It adds RetroAchievements, additional pixel-art shaders, persistent control preferences, companion cursor navigation for selected games, and an optional local connection to GBA Duo Studio.
+Maintained by [levi-soft](https://github.com/levi-soft), Plus adds automatic companion creation, selectable library covers, additional pixel-art shaders, persistent control preferences, companion navigation for supported games and an optional GBA Duo Studio connection. It extends the official RetroAchievements client from GBA Duo 0.1.7.
 
-**Current source version:** `0.1.6` · **Upstream base:** `v0.1.6` · **License:** [GPL v3](LICENSE)
+**Current source version:** `0.1.7-plus.2` · **Upstream base:** `v0.1.7` · **License:** [GPL v3](LICENSE)
 
-[Features](#features) · [Comparison](docs/FEATURES.md) · [Build](docs/BUILDING.md) · [Launchers](docs/LAUNCHERS.md) · [Studio](docs/STUDIO-CONNECTION.md) · [Credits](CREDITS.md)
+[Tiếng Việt](README.vi.md) · [Features](#features) · [Comparison](docs/FEATURES.md) · [Build](docs/BUILDING.md) · [Launchers](docs/LAUNCHERS.md) · [Studio](docs/STUDIO-CONNECTION.md) · [Credits](CREDITS.md)
 
 ## Project identity
 
@@ -16,7 +16,7 @@ This fork is maintained by [levi-soft](https://github.com/levi-soft). It adds Re
 |---|---|
 | Source | [levi-soft/gba-duo-plus](https://github.com/levi-soft/gba-duo-plus) |
 | Original project | [khumam/gba-duo](https://github.com/khumam/gba-duo) |
-| Exact upstream baseline | [`0c201e9faa224eb1527651ac0ca3e12a3ce0fe5c`](https://github.com/khumam/gba-duo/commit/0c201e9faa224eb1527651ac0ca3e12a3ce0fe5c), tag `v0.1.6` |
+| Exact upstream baseline | [`6aa3823b7c4e4c8478b74fe24cf837a19224fc23`](https://github.com/khumam/gba-duo/commit/6aa3823b7c4e4c8478b74fe24cf837a19224fc23), tag `v0.1.7` |
 | Release application ID | `com.khumam.gbaduo.plus` |
 | Debug application ID | `com.khumam.gbaduo.plus.debug` |
 | Requirements | Android 11/API 30 or later; ARM64; a second Android display for the companion |
@@ -25,6 +25,14 @@ This fork is maintained by [levi-soft](https://github.com/levi-soft). It adds Re
 Plus is **not an official GBA Duo release** and is not endorsed by its original author, RetroAchievements, Libretro or the other credited projects. It installs separately from the official application. Separate package IDs mean separate app-private saves, settings, login sessions and folder permissions; there is no automatic cross-edition migration.
 
 ## Features
+
+### Automatic companions (Plus only)
+
+The library's Companion menu includes **Find and create companion**. Plus downloads a compatible builder profile from the [Companion Builder website](https://levi-soft.github.io/gba-duo-companion-builder/), creates the companion from the player's ROM on the device, and installs and assigns it after successful validation. The ROM is never uploaded. Verified builder downloads are cached for later offline use.
+
+Manual ZIP import remains available. A generated companion receives a separate pack ID; previously installed/custom companions remain available, and cancelling or failing a build preserves the current assignment. Only exact ROM identities listed in the catalogue are supported.
+
+This is a **Plus extension**, not a feature claimed for official GBA Duo. Its implementation lives in `plus/`, connected through a small library-menu hook and private Activity registration. If upstream adds an equivalent complete feature, this extension can be replaced by the official implementation. See [automatic companion architecture and removal steps](docs/AUTOMATIC-COMPANIONS.md).
 
 ### Inherited from GBA Duo
 
@@ -39,14 +47,19 @@ Plus is **not an official GBA Duo release** and is not endorsed by its original 
 
 | Area | Plus behavior |
 |---|---|
-| RetroAchievements | Integrated [rcheevos](https://github.com/RetroAchievements/rcheevos) client, account sign-in, recognized-game progress, achievement list, badge images and queued unlock notifications. |
+| Library artwork | Select square covers from a SteamGridDB gallery, import a local PNG/JPEG/WebP, or use the default no-account Libretro source for lookup and missing-artwork scraping. Covers are stored locally, retain aspect ratio and keep the original cartridge drawing as fallback. [Setup and extension boundary](docs/ARTWORK.md). |
+| RetroAchievements | Retains the official 0.1.7 [rcheevos](https://github.com/RetroAchievements/rcheevos) client and adds encrypted token storage, achievement-list UI and save-state progress sidecars. Account sign-in, ROM recognition and the underlying client come from the official integration. |
 | Achievement presentation | Automatic sign-in/game notices, game image and unlocked/total count; bottom-right unlock popups with a 70% background opacity. Unsupported ROMs show a no-achievements notice. |
 | Pixel-art shaders | **xBRZ, HQ2x and ScaleFX**, adapted from the Libretro GLSL shader collection with original notices retained. |
 | Controls | **Swap A/B is remembered** between game sessions. Existing shader persistence is retained for the expanded preset set. |
 | Companion interaction | Optional `input.focusUnit(id)` Lua action support for verified Fire Emblem cursor profiles. Navigation uses bounded D-pad input and respects game state and physical input. |
 | Companion rendering | Additional sizing, raster-grid/aspect-fit and retained-snapshot behavior used by complex packs. This does not make every arbitrary pack/device combination automatically compatible. |
 | Daijisho custom player | Add **GBA Duo Plus** as a player to launch ROMs directly. Retains upstream's `LaunchActivity`, with additional path aliases, input validation and session/lifecycle handling. See [player setup and launch arguments](docs/LAUNCHERS.md#add-a-gba-duo-plus-player-in-daijisho). |
-| Studio Connection | Per-session opt-in, read-only local RAM/snapshot bridge for compatible desktop tooling. No LAN listener or memory-write command. |
+| Studio Connection | Per-session opt-in, read-only local RAM/snapshot and bounded ROM/VRAM/palette/OAM inspection for compatible desktop tooling. Revision-2 capability discovery retains the existing wire envelope. No LAN listener or memory-write command. The upstream permission-gated pack tap API is separate from this read-only desktop bridge. |
+
+RetroAchievements now uses the official 0.1.7 integration as its foundation. Plus adds encrypted token storage, achievement-list UI, save-state progress and the selected popup presentation to that single official client. The former Plus RA runtime has been removed.
+
+Inherited from 0.1.7: pixel-style library and Settings, readable game titles, external save-folder synchronization, permission-gated RAM writes, ROM sprite/tilemap decoding, responsive CSS and bounded Lua execution.
 
 See [the detailed baseline comparison](docs/FEATURES.md). Credit for algorithms, cores and APIs belongs to their original authors; Plus contributes their Android integration and the changes documented here.
 
@@ -80,6 +93,10 @@ Studio is a separate tool, not an emulator dependency. A normal pack should rema
 
 ## Development
 
+Plus-only implementations live in [`plus/`](plus/README.md), with an explicit
+upstream integration inventory and upgrade checker. This remains a fork with
+official Git history; it is not a patch-only distribution.
+
 ```sh
 git clone --recurse-submodules https://github.com/levi-soft/gba-duo-plus.git
 cd gba-duo-plus
@@ -95,6 +112,11 @@ Report Plus-specific problems in [this repository's issue tracker](https://githu
 ## Acknowledgements and license
 
 The original application, its architecture and companion platform are by **khumam and GBA Duo contributors**. Emulation is provided by **mGBA**, scripting by **Lua**, achievement processing by **rcheevos/RetroAchievements**, and the additional shader algorithms by their credited authors in the **Libretro GLSL shader collection**. AndroidX, Compose, Material Components, Kotlin and the Android build tools provide the application platform.
+
+Library cover lookup is made possible by the **Libretro thumbnail community**,
+**SteamGridDB**, and the artists/uploaders credited by those services. Downloaded
+cover images are not bundled in this source repository; Plus retains provider
+and author attribution when it is available.
 
 Please read [CREDITS.md](CREDITS.md), [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) and the retained file headers. Source history is rooted in the official `v0.1.6` history; this fork does not claim authorship of that work.
 

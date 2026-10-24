@@ -1,5 +1,20 @@
 # Plus changelog
 
+## 0.1.7-plus.2
+
+- Adopt official GBA Duo v0.1.7 as the foundation and retain Plus's dual-display
+  player, achievements extensions, shaders, cursor support and Studio bridge.
+- Create and assign companions locally from verified exact-ROM builder profiles,
+  with cached offline reuse and the existing manual ZIP import retained.
+- Add durable library artwork: no-account Libretro lookup/scraping, optional
+  SteamGridDB gallery and local image import, preserving image proportions.
+- Preserve prior companion assignments when generated-pack writes fail. Keep
+  artwork cancellation responsive and stage replacements before final ownership
+  checks; load artwork credentials off the UI thread.
+- Include the builder/artwork regressions in CI and account for Windows native
+  text rendering in screenshot tests without changing original references or
+  comparison tolerances. See [validation details](docs/VALIDATION.md).
+
 ## 0.1.6
 
 - Align the displayed Plus version with its official v0.1.6 baseline; Android version code increases to 4. Earlier Plus numbers below are local development snapshots, not intervening upstream releases.

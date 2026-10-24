@@ -1,16 +1,24 @@
 # Upstream origin and maintenance boundary
 
+Plus-owned implementations now live under [`plus/src/main`](../plus/README.md).
+The application uses that source set plus explicit upstream integration edits;
+it does not replace official classes with hidden overlay copies. The baseline and
+integration inventory are pinned in [`plus/upstream.json`](../plus/upstream.json).
+Run `node tools/upstream-boundary.mjs check` before committing, and `compare <tag>`
+before the next upgrade. See the extension README for the pristine checkout and
+upgrade procedure.
+
 - Original application: https://github.com/khumam/gba-duo
 - Creator/project owner: **khumam**, with upstream contributors.
-- Plus baseline: **v0.1.6**, commit `0c201e9faa224eb1527651ac0ca3e12a3ce0fe5c`.
+- Plus baseline: **v0.1.7**, commit `6aa3823b7c4e4c8478b74fe24cf837a19224fc23`.
 - Plus repository/maintenance: https://github.com/levi-soft/gba-duo-plus
 - Overall application license: GNU GPL v3, retaining individual component notices.
 
-The publication starts from official v0.1.6 history and commits the Plus source changes on top. Original authorship remains visible in Git history. It does not import the private experimental Dev branch history, local machine configuration, credentials, device data or private companion releases.
+The publication started from official v0.1.6 history. The 0.1.7 upgrade merges the official v0.1.7 tag while retaining the Plus-specific additions. Original authorship remains visible in Git history. It does not import the private experimental Dev branch history, local machine configuration, credentials, device data or private companion releases.
 
 Some Plus work was developed in a local experimental Dev edition before being selected for Plus. Hash-override and translation experiments were deliberately excluded from this edition. Their absence is tested; they are not simply hidden menu items.
 
-When updating the fork, compare the chosen upstream revision first. Do not label an inherited capability as a new Plus feature. For example, external LaunchActivity support and saved shader selection already belong to the official v0.1.6 baseline; Plus adopts/extends them. The comparison in [FEATURES](FEATURES.md) is explicitly pinned to that baseline.
+When updating the fork, compare the chosen upstream revision first. Do not label an inherited capability as a new Plus feature. For example, external LaunchActivity support and saved shader selection already belong to the official v0.1.6 baseline; Plus adopts/extends them. The comparison in [FEATURES](FEATURES.md) is explicitly pinned to the current 0.1.7 baseline.
 
 The `upstream` remote is a local development convenience and is not embedded in GitHub clones. Contributors may add it themselves:
 

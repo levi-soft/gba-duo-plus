@@ -1,14 +1,14 @@
 package com.khumam.gbaduo
 
-import com.khumam.gbaduo.achievements.NativeAchievements
+import com.khumam.gbaduo.achievements.RaNative
 import org.junit.Assert.*
 import org.junit.Test
 
 class PlusFeatureContractTest {
     @Test fun plusHasSeparateIdentityAndRetainsAchievementsWithoutHashSetter() {
-        assertEquals("com.khumam.gbaduo.plus", BuildConfig.APPLICATION_ID)
-        val methods = NativeAchievements::class.java.declaredMethods.map { it.name }.toSet()
-        assertTrue(methods.containsAll(listOf("start", "login", "frame", "achievementList")))
+        assertEquals("com.khumam.gbaduo.plus" + if (BuildConfig.DEBUG) ".debug" else "", BuildConfig.APPLICATION_ID)
+        val methods = RaNative::class.java.declaredMethods.map { it.name }.toSet()
+        assertTrue(methods.containsAll(listOf("init", "loginWithPassword", "doFrame", "achievementList")))
         assertFalse(methods.contains("setHashOverride"))
     }
 

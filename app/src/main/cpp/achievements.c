@@ -1,39 +1,370 @@
+// RetroAchievements: the rcheevos rc_client, bridged to Kotlin
+// (com.khumam.gbaduo.achievements.RaNative / RetroAchievements).
+//
+// One rc_client lives for the whole app so the login survives between games.
+// rcheevos makes no network calls: server_call hands each request to Kotlin, which
+// answers through RaNative.serverResponse(handle, ...). Memory reads go through the
+// loaded mGBA core, so doFrame/loadGame must run on the emulator thread.
+//
+// Softcore only for now: the server demotes hardcore unlocks until RetroAchievements
+// has validated GBADuo's User-Agent, and hardcore would also have to block loading states.
+
 #include <jni.h>
-#include <stdint.h>
 #include <stdlib.h>
-#include <string.h>
 #include <stdio.h>
 #include <stdarg.h>
-#include <time.h>
+#include <string.h>
+#include <android/log.h>
+
 #include <mgba/core/core.h>
-#include "rc_client.h"
-#include "rc_consoles.h"
-#include "rc_hash.h"
+
+#include <rc_client.h>
+#include <rc_consoles.h>
+#include <rc_error.h>
+
+#define LOG_TAG "GBADuoRA"
+#define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
+#define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
 
 extern struct mCore* gbaduo_active_core(void);
-extern const uint8_t* gbaduo_rom_data(size_t* size);
+extern const void* gbaduo_rom(size_t* size);
 
-/* Every entry point and server response runs on the emulation thread. HTTP is
- * performed by Kotlin workers; no network worker ever reads emulator memory. */
-static rc_client_t* client;
-static uint32_t console_id;
-static char game_hash[33];
-static char original_hash[33];
-static char message[512];
-static int closing;
-static uint64_t next_request;
-typedef struct Request {
-    uint64_t id;
-    char *url, *post, *type;
+static JavaVM* g_vm;
+static jclass g_bridge;               // RetroAchievements (callbacks)
+static jmethodID g_serverCall;        // (JLjava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
+static jmethodID g_onLogin;           // (ILjava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;I)V
+static jmethodID g_onGameLoad;        // (ILjava/lang/String;Ljava/lang/String;IIILjava/lang/String;)V
+static jmethodID g_onEvent;           // (ILjava/lang/String;Ljava/lang/String;ILjava/lang/String;)V
+
+static rc_client_t* g_client;
+static uint32_t g_console;            // console id of the loaded game, for memory mapping
+
+// Event types passed to RetroAchievements.onEvent (keep in sync with RetroAchievements.kt).
+enum {
+    EVENT_ACHIEVEMENT = 1,
+    EVENT_GAME_COMPLETED = 2,
+    EVENT_SERVER_ERROR = 3,
+    EVENT_DISCONNECTED = 4,
+    EVENT_RECONNECTED = 5,
+};
+
+// ---- JNI plumbing ---------------------------------------------------------------
+
+static JNIEnv* env_for_thread(void) {
+    JNIEnv* env = NULL;
+    if (!g_vm) {
+        return NULL;
+    }
+    if ((*g_vm)->GetEnv(g_vm, (void**) &env, JNI_VERSION_1_6) == JNI_EDETACHED) {
+        // rc_client calls back on whichever thread delivered the server response; those are
+        // Java threads, but be safe for native ones too.
+        if ((*g_vm)->AttachCurrentThread(g_vm, &env, NULL) != JNI_OK) {
+            return NULL;
+        }
+    }
+    return env;
+}
+
+static jstring jstr(JNIEnv* env, const char* s) {
+    return s ? (*env)->NewStringUTF(env, s) : NULL;
+}
+
+static void clear_exception(JNIEnv* env) {
+    if ((*env)->ExceptionCheck(env)) {
+        (*env)->ExceptionDescribe(env);
+        (*env)->ExceptionClear(env);
+    }
+}
+
+// ---- rc_client callbacks ---------------------------------------------------------
+
+/** RA addresses -> real GBA/GB bus addresses, using rcheevos' own memory map per console. */
+static uint32_t read_memory(uint32_t address, uint8_t* buffer, uint32_t num_bytes, rc_client_t* client) {
+    (void) client;
+    struct mCore* core = gbaduo_active_core();
+    const rc_memory_regions_t* regions = rc_console_memory_regions(g_console);
+    if (!core || !regions) {
+        return 0;
+    }
+    for (uint32_t i = 0; i < num_bytes; i++) {
+        uint32_t ra = address + i;
+        uint32_t j;
+        for (j = 0; j < regions->num_regions; j++) {
+            const rc_memory_region_t* r = &regions->region[j];
+            if (ra >= r->start_address && ra <= r->end_address) {
+                buffer[i] = (uint8_t) core->rawRead8(core, r->real_address + (ra - r->start_address), -1);
+                break;
+            }
+        }
+        if (j == regions->num_regions) {
+            return i; // unmapped: stop, rcheevos treats the rest as unavailable
+        }
+    }
+    return num_bytes;
+}
+
+struct PendingCall {
     rc_client_server_callback_t callback;
-    void* data;
-    int dispatched;
-    struct Request* next;
-} Request;
-static Request* requests;
-typedef struct Event { char* json; struct Event* next; } Event;
-static Event *events, *events_tail;
+    void* callback_data;
+};
 
+static void server_call(const rc_api_request_t* request, rc_client_server_callback_t callback,
+                        void* callback_data, rc_client_t* client) {
+    (void) client;
+    JNIEnv* env = env_for_thread();
+    struct PendingCall* call = malloc(sizeof(*call));
+    if (!env || !call) {
+        free(call);
+        rc_api_server_response_t none = {0};
+        none.http_status_code = RC_API_SERVER_RESPONSE_CLIENT_ERROR;
+        callback(&none, callback_data);
+        return;
+    }
+    call->callback = callback;
+    call->callback_data = callback_data;
+    jstring url = jstr(env, request->url);
+    jstring post = jstr(env, request->post_data);
+    jstring type = jstr(env, request->content_type);
+    (*env)->CallStaticVoidMethod(env, g_bridge, g_serverCall, (jlong) (intptr_t) call, url, post, type);
+    clear_exception(env);
+    (*env)->DeleteLocalRef(env, url);
+    if (post) (*env)->DeleteLocalRef(env, post);
+    if (type) (*env)->DeleteLocalRef(env, type);
+}
+
+static void log_message(const char* message, const rc_client_t* client) {
+    (void) client;
+    LOGI("%s", message);
+}
+
+static void login_callback(int result, const char* error_message, rc_client_t* client, void* userdata) {
+    (void) userdata;
+    JNIEnv* env = env_for_thread();
+    if (!env) {
+        return;
+    }
+    const rc_client_user_t* user = result == RC_OK ? rc_client_get_user_info(client) : NULL;
+    jstring err = jstr(env, error_message);
+    jstring username = jstr(env, user ? user->username : NULL);
+    jstring display = jstr(env, user ? user->display_name : NULL);
+    jstring token = jstr(env, user ? user->token : NULL);
+    (*env)->CallStaticVoidMethod(env, g_bridge, g_onLogin, (jint) result, err, username, display, token,
+                                 (jint) (user ? user->score : 0));
+    clear_exception(env);
+}
+
+static void load_game_callback(int result, const char* error_message, rc_client_t* client, void* userdata) {
+    (void) userdata;
+    JNIEnv* env = env_for_thread();
+    if (!env) {
+        return;
+    }
+    const rc_client_game_t* game = result == RC_OK ? rc_client_get_game_info(client) : NULL;
+    rc_client_user_game_summary_t summary;
+    memset(&summary, 0, sizeof(summary));
+    char image[256] = {0};
+    if (game) {
+        rc_client_get_user_game_summary(client, &summary);
+        rc_client_game_get_image_url(game, image, sizeof(image));
+    }
+    jstring err = jstr(env, error_message);
+    jstring title = jstr(env, game ? game->title : NULL);
+    jstring imageUrl = jstr(env, image[0] ? image : NULL);
+    (*env)->CallStaticVoidMethod(env, g_bridge, g_onGameLoad, (jint) result, err, title,
+                                 (jint) (game ? game->id : 0),
+                                 (jint) summary.num_core_achievements,
+                                 (jint) summary.num_unlocked_achievements, imageUrl);
+    clear_exception(env);
+}
+
+static void send_event(int type, const char* title, const char* description, uint32_t points, const char* badgeUrl) {
+    JNIEnv* env = env_for_thread();
+    if (!env) {
+        return;
+    }
+    jstring t = jstr(env, title);
+    jstring d = jstr(env, description);
+    jstring b = jstr(env, badgeUrl);
+    (*env)->CallStaticVoidMethod(env, g_bridge, g_onEvent, (jint) type, t, d, (jint) points, b);
+    clear_exception(env);
+    if (t) (*env)->DeleteLocalRef(env, t);
+    if (d) (*env)->DeleteLocalRef(env, d);
+    if (b) (*env)->DeleteLocalRef(env, b);
+}
+
+static void event_handler(const rc_client_event_t* event, rc_client_t* client) {
+    switch (event->type) {
+    case RC_CLIENT_EVENT_ACHIEVEMENT_TRIGGERED: {
+        char badge[256] = {0};
+        rc_client_achievement_get_image_url(event->achievement, RC_CLIENT_ACHIEVEMENT_STATE_UNLOCKED, badge, sizeof(badge));
+        send_event(EVENT_ACHIEVEMENT, event->achievement->title, event->achievement->description,
+                   event->achievement->points, badge[0] ? badge : NULL);
+        break;
+    }
+    case RC_CLIENT_EVENT_GAME_COMPLETED: {
+        const rc_client_game_t* game = rc_client_get_game_info(client);
+        send_event(EVENT_GAME_COMPLETED, game ? game->title : NULL, NULL, 0, NULL);
+        break;
+    }
+    case RC_CLIENT_EVENT_SERVER_ERROR:
+        send_event(EVENT_SERVER_ERROR, event->server_error ? event->server_error->api : NULL,
+                   event->server_error ? event->server_error->error_message : NULL, 0, NULL);
+        break;
+    case RC_CLIENT_EVENT_DISCONNECTED:
+        send_event(EVENT_DISCONNECTED, NULL, NULL, 0, NULL);
+        break;
+    case RC_CLIENT_EVENT_RECONNECTED:
+        send_event(EVENT_RECONNECTED, NULL, NULL, 0, NULL);
+        break;
+    default:
+        // Leaderboards, challenge indicators and progress trackers aren't shown yet.
+        break;
+    }
+}
+
+/** RA console id for the loaded core: GBA, or GB/GBC by the cartridge header's CGB flag. */
+static uint32_t console_for_core(struct mCore* core, const uint8_t* rom, size_t size) {
+    if (core->platform(core) == mPLATFORM_GBA) {
+        return RC_CONSOLE_GAMEBOY_ADVANCE;
+    }
+    if (size > 0x143 && (rom[0x143] & 0x80)) {
+        return RC_CONSOLE_GAMEBOY_COLOR;
+    }
+    return RC_CONSOLE_GAMEBOY;
+}
+
+// ---- RaNative ------------------------------------------------------------------------
+
+#define RA_NATIVE(name) Java_com_khumam_gbaduo_achievements_RaNative_##name
+
+JNIEXPORT jboolean JNICALL
+RA_NATIVE(init)(JNIEnv* env, jobject thiz) {
+    if (g_client) {
+        return JNI_TRUE;
+    }
+    (*env)->GetJavaVM(env, &g_vm);
+    jclass bridge = (*env)->FindClass(env, "com/khumam/gbaduo/achievements/RetroAchievements");
+    if (!bridge) {
+        clear_exception(env);
+        return JNI_FALSE;
+    }
+    g_bridge = (*env)->NewGlobalRef(env, bridge);
+    g_serverCall = (*env)->GetStaticMethodID(env, g_bridge, "serverCall",
+        "(JLjava/lang/String;Ljava/lang/String;Ljava/lang/String;)V");
+    g_onLogin = (*env)->GetStaticMethodID(env, g_bridge, "onLogin",
+        "(ILjava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;I)V");
+    g_onGameLoad = (*env)->GetStaticMethodID(env, g_bridge, "onGameLoad",
+        "(ILjava/lang/String;Ljava/lang/String;IIILjava/lang/String;)V");
+    g_onEvent = (*env)->GetStaticMethodID(env, g_bridge, "onEvent",
+        "(ILjava/lang/String;Ljava/lang/String;ILjava/lang/String;)V");
+    if (!g_serverCall || !g_onLogin || !g_onGameLoad || !g_onEvent) {
+        clear_exception(env);
+        LOGE("RetroAchievements callbacks missing");
+        return JNI_FALSE;
+    }
+
+    g_client = rc_client_create(read_memory, server_call);
+    if (!g_client) {
+        return JNI_FALSE;
+    }
+    rc_client_enable_logging(g_client, RC_CLIENT_LOG_LEVEL_INFO, log_message);
+    rc_client_set_event_handler(g_client, event_handler);
+    rc_client_set_hardcore_enabled(g_client, 0);
+    rc_client_set_allow_background_memory_reads(g_client, 0);
+    return JNI_TRUE;
+}
+
+/** "rcheevos/12.5" for the User-Agent header. */
+JNIEXPORT jstring JNICALL
+RA_NATIVE(userAgentClause)(JNIEnv* env, jobject thiz) {
+    char clause[64] = {0};
+    if (g_client) {
+        rc_client_get_user_agent_clause(g_client, clause, sizeof(clause));
+    }
+    return (*env)->NewStringUTF(env, clause);
+}
+
+JNIEXPORT void JNICALL
+RA_NATIVE(loginWithPassword)(JNIEnv* env, jobject thiz, jstring username, jstring password) {
+    if (!g_client) return;
+    const char* u = (*env)->GetStringUTFChars(env, username, NULL);
+    const char* p = (*env)->GetStringUTFChars(env, password, NULL);
+    rc_client_begin_login_with_password(g_client, u, p, login_callback, NULL);
+    (*env)->ReleaseStringUTFChars(env, username, u);
+    (*env)->ReleaseStringUTFChars(env, password, p);
+}
+
+JNIEXPORT void JNICALL
+RA_NATIVE(loginWithToken)(JNIEnv* env, jobject thiz, jstring username, jstring token) {
+    if (!g_client) return;
+    const char* u = (*env)->GetStringUTFChars(env, username, NULL);
+    const char* t = (*env)->GetStringUTFChars(env, token, NULL);
+    rc_client_begin_login_with_token(g_client, u, t, login_callback, NULL);
+    (*env)->ReleaseStringUTFChars(env, username, u);
+    (*env)->ReleaseStringUTFChars(env, token, t);
+}
+
+JNIEXPORT void JNICALL
+RA_NATIVE(logout)(JNIEnv* env, jobject thiz) {
+    if (g_client) rc_client_logout(g_client);
+}
+
+/** Identifies the loaded ROM by its RetroAchievements hash and starts a session. Emu thread. */
+JNIEXPORT jboolean JNICALL
+RA_NATIVE(loadGame)(JNIEnv* env, jobject thiz) {
+    struct mCore* core = gbaduo_active_core();
+    size_t size = 0;
+    const uint8_t* rom = gbaduo_rom(&size);
+    if (!g_client || !core || !rom || !size) {
+        return JNI_FALSE;
+    }
+    g_console = console_for_core(core, rom, size);
+    rc_client_begin_identify_and_load_game(g_client, g_console, NULL, rom, size, load_game_callback, NULL);
+    return JNI_TRUE;
+}
+
+JNIEXPORT void JNICALL
+RA_NATIVE(unloadGame)(JNIEnv* env, jobject thiz) {
+    if (g_client) rc_client_unload_game(g_client);
+    g_console = 0;
+}
+
+/** After each emulated frame, on the emu thread. */
+JNIEXPORT void JNICALL
+RA_NATIVE(doFrame)(JNIEnv* env, jobject thiz) {
+    if (g_client) rc_client_do_frame(g_client);
+}
+
+/** While paused (keeps the session alive, retries queued unlocks). */
+JNIEXPORT void JNICALL
+RA_NATIVE(idle)(JNIEnv* env, jobject thiz) {
+    if (g_client) rc_client_idle(g_client);
+}
+
+/** Kotlin's answer to serverCall: [body] null means the request failed or timed out. */
+JNIEXPORT void JNICALL
+RA_NATIVE(serverResponse)(JNIEnv* env, jobject thiz, jlong handle, jbyteArray body, jint status) {
+    struct PendingCall* call = (struct PendingCall*) (intptr_t) handle;
+    if (!call) {
+        return;
+    }
+    rc_api_server_response_t response;
+    memset(&response, 0, sizeof(response));
+    jbyte* bytes = NULL;
+    if (body) {
+        bytes = (*env)->GetByteArrayElements(env, body, NULL);
+        response.body = (const char*) bytes;
+        response.body_length = (size_t) (*env)->GetArrayLength(env, body);
+    }
+    response.http_status_code = status;
+    call->callback(&response, call->callback_data);
+    if (bytes) {
+        (*env)->ReleaseByteArrayElements(env, body, bytes, JNI_ABORT);
+    }
+    free(call);
+}
+
+/* Plus additions: achievement list and save-state progress on the official client. */
 typedef struct Json { char* text; size_t length, capacity; } Json;
 static void append(Json* j, const char* format, ...) {
     va_list a, copy; va_start(a, format); va_copy(copy, a);
@@ -62,157 +393,20 @@ static jbyteArray bytes(JNIEnv* env, const void* data, size_t size) {
 static jbyteArray json_result(JNIEnv* env, Json* j) {
     jbyteArray result=bytes(env, j->text, j->length); free(j->text); return result;
 }
-static void event_json(Json* j) {
-    if (closing) { free(j->text); return; }
-    Event* e=calloc(1,sizeof(*e)); e->json=j->text;
-    if(events_tail)events_tail->next=e;else events=e;events_tail=e;
-}
-static void notice(const char* text) {
-    Json j={0}; append(&j,"{\"type\":\"notice\",\"text\":");string(&j,text);append(&j,"}");event_json(&j);
-}
-static rc_clock_t now_ms(const rc_client_t* c) {
-    (void)c;struct timespec t;clock_gettime(CLOCK_MONOTONIC,&t);return (rc_clock_t)t.tv_sec*1000+t.tv_nsec/1000000;
-}
-static uint32_t read_memory(uint32_t address,uint8_t* buffer,uint32_t size,rc_client_t* c) {
-    (void)c;struct mCore* core=gbaduo_active_core();if(!core)return 0;
-    uint32_t read=0;
-    while(read<size){
-        uint32_t a=address+read,physical=a;int bank=-1;
-        if(a<address)break;
-        if(console_id==RC_CONSOLE_GAMEBOY_ADVANCE){
-            if(a<0x8000)physical=0x03000000+a;
-            else if(a<0x48000)physical=0x02000000+a-0x8000;
-            else if(a<0x58000)physical=0x0e000000+a-0x48000;
-            else break;
-        }else if(console_id==RC_CONSOLE_GAMEBOY_COLOR){
-            if(a>=0x10000&&a<0x16000){physical=0xd000+(a-0x10000)%0x1000;bank=2+(a-0x10000)/0x1000;}
-            else if(a>=0x16000&&a<0x34000){physical=0xa000+(a-0x16000)%0x2000;bank=1+(a-0x16000)/0x2000;}
-            else if(a>=0x10000)break;
-        }else if(a>=0x10000)break;
-        buffer[read++]=(uint8_t)core->rawRead8(core,physical,bank);
-    }
-    return read;
-}
-static void server_call(const rc_api_request_t* request,rc_client_server_callback_t callback,void* data,rc_client_t* c){
-    (void)c;
-    if(closing){rc_api_server_response_t r={"",0,RC_API_SERVER_RESPONSE_CLIENT_ERROR};callback(&r,data);return;}
-    Request* r=calloc(1,sizeof(*r));r->id=++next_request;r->url=strdup(request->url);
-    r->post=request->post_data?strdup(request->post_data):NULL;r->type=strdup(request->content_type?request->content_type:"application/x-www-form-urlencoded");
-    r->callback=callback;r->data=data;r->next=requests;requests=r;
-}
-static void loaded(int result,const char* error,rc_client_t* c,void* data){
-    (void)data;
-    if(result!=RC_OK){
-        if(result==RC_NO_GAME_LOADED){
-            snprintf(message,sizeof(message),"No achievements found for this ROM.");
-            Json j={0};append(&j,"{\"type\":\"popup\",\"title\":\"No achievements found for this ROM\",\"subtitle\":\"You can keep playing normally.\"}");event_json(&j);
-        }else{snprintf(message,sizeof(message),"%s",error?error:rc_error_str(result));notice(message);}
-        return;
-    }
-    const rc_client_game_t* game=rc_client_get_game_info(c);
-    if(!game||!game->id){
-        snprintf(message,sizeof(message),"No achievements found for this ROM.");
-        Json j={0};append(&j,"{\"type\":\"popup\",\"title\":\"No achievements found for this ROM\",\"subtitle\":\"You can keep playing normally.\"}");event_json(&j);return;
-    }
-    snprintf(message,sizeof(message),"%s",game->title);
-    rc_client_user_game_summary_t summary={0};rc_client_get_user_game_summary(c,&summary);
-    Json j={0};append(&j,"{\"type\":\"popup\",\"title\":");string(&j,game->title);append(&j,",\"badge\":");string(&j,game->badge_url);
-    append(&j,",\"subtitle\":\"%u/%u unlocked\"}",summary.num_unlocked_achievements,summary.num_core_achievements);event_json(&j);
-}
-static void logged_in(int result,const char* error,rc_client_t* c,void* data){
-    (void)data;
-    if(result!=RC_OK){snprintf(message,sizeof(message),"%s",error?error:rc_error_str(result));notice(message);return;}
-    const rc_client_user_t* user=rc_client_get_user_info(c);
-    if(user){Json j={0};append(&j,"{\"type\":\"auth\",\"username\":");string(&j,user->username);append(&j,",\"token\":");string(&j,user->token);append(&j,"}");event_json(&j);}
-    snprintf(message,sizeof(message),"Loading achievements...");
-    rc_client_begin_load_game(c,game_hash,loaded,NULL);
-}
-static void handle_event(const rc_client_event_t* event,rc_client_t* c){
-    (void)c;
-    if(event->type==RC_CLIENT_EVENT_ACHIEVEMENT_TRIGGERED&&event->achievement){
-        const rc_client_achievement_t* a=event->achievement;
-        Json j={0};append(&j,"{\"type\":\"unlock\",\"title\":");string(&j,a->title);
-        append(&j,",\"badge\":");string(&j,a->badge_url);
-        append(&j,",\"points\":%u}",a->points);event_json(&j);
-    }else if(event->type==RC_CLIENT_EVENT_SERVER_ERROR&&event->server_error){
-        notice("RetroAchievements could not confirm a server request. Check the connection.");
-    }else if(event->type==RC_CLIENT_EVENT_DISCONNECTED)notice("RetroAchievements offline: unlocks pending.");
-    else if(event->type==RC_CLIENT_EVENT_RECONNECTED)notice("RetroAchievements reconnected: pending unlocks submitted.");
-    else if(event->type==RC_CLIENT_EVENT_GAME_COMPLETED)notice("All achievements unlocked!");
-}
-static void free_request(Request* r){free(r->url);free(r->post);free(r->type);free(r);}
-static void shutdown_client(void){
-    closing=1;
-    if(client){
-        rc_client_logout(client);
-        while(requests){Request* r=requests;requests=r->next;rc_api_server_response_t response={"",0,RC_API_SERVER_RESPONSE_CLIENT_ERROR};r->callback(&response,r->data);free_request(r);}
-        rc_client_destroy(client);client=NULL;
-    }
-    while(events){Event* e=events;events=e->next;free(e->json);free(e);}events_tail=NULL;
-    closing=0;
-}
-
-#define JNI_METHOD(name) Java_com_khumam_gbaduo_achievements_NativeAchievements_##name
-JNIEXPORT void JNICALL JNI_METHOD(start)(JNIEnv* env,jobject self){
-    (void)env;(void)self;shutdown_client();game_hash[0]=0;original_hash[0]=0;
-    struct mCore* core=gbaduo_active_core();size_t size=0;const uint8_t* rom=gbaduo_rom_data(&size);
-    if(!core||!rom)return;
-    console_id=core->platform(core)==mPLATFORM_GBA?RC_CONSOLE_GAMEBOY_ADVANCE:(size>0x143&&(rom[0x143]&0x80)?RC_CONSOLE_GAMEBOY_COLOR:RC_CONSOLE_GAMEBOY);
-    rc_hash_iterator_t iterator;rc_hash_initialize_iterator(&iterator,"game.gba",rom,size);
-    game_hash[0]=0; original_hash[0]=0;
-    int ok=rc_hash_generate(game_hash,console_id,&iterator);rc_hash_destroy_iterator(&iterator);
-    if(ok)memcpy(original_hash,game_hash,sizeof(original_hash));
-    client=rc_client_create(read_memory,server_call);
-    rc_client_set_host(client,"https://retroachievements.org");
-    rc_client_set_hardcore_enabled(client,0);
-    rc_client_set_event_handler(client,handle_event);
-    rc_client_set_get_time_millisecs_function(client,now_ms);
-    rc_client_set_allow_background_memory_reads(client,0);
-    snprintf(message,sizeof(message),"%s",ok?"Sign in to RetroAchievements":"Could not identify this ROM.");
-}
-JNIEXPORT void JNICALL JNI_METHOD(login)(JNIEnv* env,jobject self,jstring username,jstring secret,jboolean token){
-    (void)self;if(!client)return;
-    const char* u=(*env)->GetStringUTFChars(env,username,NULL);const char* s=(*env)->GetStringUTFChars(env,secret,NULL);
-    snprintf(message,sizeof(message),"Signing in...");
-    if(token)rc_client_begin_login_with_token(client,u,s,logged_in,NULL);else rc_client_begin_login_with_password(client,u,s,logged_in,NULL);
-    (*env)->ReleaseStringUTFChars(env,username,u);(*env)->ReleaseStringUTFChars(env,secret,s);
-}
-JNIEXPORT void JNICALL JNI_METHOD(logout)(JNIEnv* env,jobject self){(void)env;(void)self;if(client)rc_client_logout(client);snprintf(message,sizeof(message),"Signed out");}
-JNIEXPORT void JNICALL JNI_METHOD(frame)(JNIEnv* env,jobject self,jboolean paused){(void)env;(void)self;if(client){if(paused)rc_client_idle(client);else rc_client_do_frame(client);}}
-JNIEXPORT void JNICALL JNI_METHOD(stop)(JNIEnv* env,jobject self){(void)env;(void)self;shutdown_client();}
-JNIEXPORT jbyteArray JNICALL JNI_METHOD(pollRequest)(JNIEnv* env,jobject self){
-    (void)self;for(Request* r=requests;r;r=r->next)if(!r->dispatched){
-        r->dispatched=1;Json j={0};append(&j,"{\"id\":%llu,\"url\":",(unsigned long long)r->id);string(&j,r->url);append(&j,",\"post\":");if(r->post)string(&j,r->post);else append(&j,"null");append(&j,",\"contentType\":");string(&j,r->type);append(&j,"}");return json_result(env,&j);
-    }return NULL;
-}
-JNIEXPORT void JNICALL JNI_METHOD(response)(JNIEnv* env,jobject self,jlong id,jbyteArray body,jint status){
-    (void)self;Request** p=&requests;while(*p&&(*p)->id!=(uint64_t)id)p=&(*p)->next;if(!*p)return;
-    Request* r=*p;*p=r->next;jsize size=(*env)->GetArrayLength(env,body);char* text=malloc((size_t)size+1);
-    (*env)->GetByteArrayRegion(env,body,0,size,(jbyte*)text);text[size]=0;rc_api_server_response_t response={text,(size_t)size,status};r->callback(&response,r->data);free(text);free_request(r);
-}
-JNIEXPORT jbyteArray JNICALL JNI_METHOD(pollEvent)(JNIEnv* env,jobject self){
-    (void)self;if(!events)return NULL;Event* e=events;events=e->next;if(!events)events_tail=NULL;jbyteArray result=bytes(env,e->json,strlen(e->json));free(e->json);free(e);return result;
-}
-JNIEXPORT jbyteArray JNICALL JNI_METHOD(status)(JNIEnv* env,jobject self){
-    (void)self;Json j={0};const rc_client_user_t* user=client?rc_client_get_user_info(client):NULL;const rc_client_game_t* game=client?rc_client_get_game_info(client):NULL;
-    rc_client_user_game_summary_t summary={0};if(client)rc_client_get_user_game_summary(client,&summary);
-    append(&j,"{\"originalHash\":");string(&j,original_hash);append(&j,",\"activeHash\":");string(&j,game_hash);append(&j,",");
-    append(&j,"\"loggedIn\":%s,\"username\":",user?"true":"false");string(&j,user?user->username:"");append(&j,",\"game\":");string(&j,game?game->title:"");append(&j,",\"message\":");string(&j,message);append(&j,",\"unlocked\":%u,\"total\":%u,\"hardcore\":false}",summary.num_unlocked_achievements,summary.num_core_achievements);return json_result(env,&j);
-}
-JNIEXPORT jbyteArray JNICALL JNI_METHOD(achievementList)(JNIEnv* env,jobject self){
+JNIEXPORT jbyteArray JNICALL RA_NATIVE(achievementList)(JNIEnv* env,jobject self){
     (void)self;Json j={0};append(&j,"[");int count=0;
-    rc_client_achievement_list_t* list=client?rc_client_create_achievement_list(client,RC_CLIENT_ACHIEVEMENT_CATEGORY_CORE,RC_CLIENT_ACHIEVEMENT_LIST_GROUPING_LOCK_STATE):NULL;
+    rc_client_achievement_list_t* list=g_client?rc_client_create_achievement_list(g_client,RC_CLIENT_ACHIEVEMENT_CATEGORY_CORE,RC_CLIENT_ACHIEVEMENT_LIST_GROUPING_LOCK_STATE):NULL;
     if(list){for(uint32_t b=0;b<list->num_buckets;b++)for(uint32_t n=0;n<list->buckets[b].num_achievements;n++){
         const rc_client_achievement_t* a=list->buckets[b].achievements[n];if(count++)append(&j,",");append(&j,"{\"title\":");string(&j,a->title);append(&j,",\"description\":");string(&j,a->description);append(&j,",\"progress\":");string(&j,a->measured_progress);append(&j,",\"badge\":");string(&j,a->unlocked?a->badge_url:a->badge_locked_url);append(&j,",\"points\":%u,\"unlocked\":%s}",a->points,a->unlocked?"true":"false");
     }rc_client_destroy_achievement_list(list);}append(&j,"]");return json_result(env,&j);
 }
-JNIEXPORT jbyteArray JNICALL JNI_METHOD(saveProgress)(JNIEnv* env,jobject self){
-    (void)self;if(!client)return NULL;size_t n=rc_client_progress_size(client);uint8_t* data=malloc(n);if(!data)return NULL;
-    int result=rc_client_serialize_progress_sized(client,data,n);jbyteArray output=result==RC_OK?bytes(env,data,n):NULL;free(data);return output;
+JNIEXPORT jbyteArray JNICALL RA_NATIVE(saveProgress)(JNIEnv* env,jobject self){
+    (void)self;if(!g_client)return NULL;size_t n=rc_client_progress_size(g_client);uint8_t* data=malloc(n);if(!data)return NULL;
+    int result=rc_client_serialize_progress_sized(g_client,data,n);jbyteArray output=result==RC_OK?bytes(env,data,n):NULL;free(data);return output;
 }
-JNIEXPORT void JNICALL JNI_METHOD(loadProgress)(JNIEnv* env,jobject self,jbyteArray data){
-    (void)self;if(!client)return;if(!data){rc_client_reset(client);return;}
+JNIEXPORT void JNICALL RA_NATIVE(loadProgress)(JNIEnv* env,jobject self,jbyteArray data){
+    (void)self;if(!g_client)return;if(!data){rc_client_reset(g_client);return;}
     jsize n=(*env)->GetArrayLength(env,data);jbyte* p=(*env)->GetByteArrayElements(env,data,NULL);
-    if(rc_client_deserialize_progress_sized(client,(uint8_t*)p,(size_t)n)!=RC_OK)rc_client_reset(client);
+    if(rc_client_deserialize_progress_sized(g_client,(uint8_t*)p,(size_t)n)!=RC_OK)rc_client_reset(g_client);
     (*env)->ReleaseByteArrayElements(env,data,p,JNI_ABORT);
 }

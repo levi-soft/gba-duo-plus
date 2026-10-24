@@ -1,33 +1,61 @@
-#include <jni.h>
 #include <math.h>
 #include <pthread.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <android/log.h>
+#include <time.h>
 
 #include <lua.h>
 #include <lauxlib.h>
 #include <lualib.h>
 
-#include <mgba/core/core.h>
+#include "bus.h"
+#include "script.h"
+
+/* GBADUO_HOST_TEST builds this file on the desktop for the test harness
+ * (app/src/test/native): no JNI, logs to stderr. */
+#ifdef GBADUO_HOST_TEST
+#define LOG_PRINT(level, tag, ...) (fprintf(stderr, "%s %s: ", level, tag), fprintf(stderr, __VA_ARGS__), fputc('\n', stderr))
+#define LOG_INFO "I"
+#define LOG_ERROR "E"
+#else
+#include <jni.h>
+#include <android/log.h>
+#define LOG_PRINT(level, tag, ...) __android_log_print(level, tag, __VA_ARGS__)
+#define LOG_INFO ANDROID_LOG_INFO
+#define LOG_ERROR ANDROID_LOG_ERROR
+#endif
 
 #define LOG_TAG "GBADuoScript"
-#define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
+#define LOGE(...) LOG_PRINT(LOG_ERROR, LOG_TAG, __VA_ARGS__)
 
 #define SCRIPT_MEMORY_LIMIT (16u * 1024u * 1024u)
-#define INSTRUCTION_BUDGET_PER_TICK 5000000L
-#define HOOK_INSTRUCTION_INTERVAL 10000
+/*
+ * Each update(), action and ui change runs on the emu thread between frames, so it gets
+ * a budget: Lua instructions plus charged C work (charge()), and wall-clock time. The
+ * revamp packs use about 50K and under 1 ms on a desktop; 1M and 25 ms (one or two
+ * frames) leave room for heavier packs while a runaway one costs at most a hitch.
+ * Loading (top level + init(), once per game start) gets more: it parses data tables.
+ */
+#define INSTRUCTION_BUDGET_PER_TICK 1000000L
+#define TIME_BUDGET_PER_TICK_MS 25
+#define INSTRUCTION_BUDGET_LOAD 5000000L
+#define TIME_BUDGET_LOAD_MS 250
+/* How often the count hook checks the budget: often enough that a loop of slow single
+ * instructions (string.rep of megabytes) overshoots the time limit by little. */
+#define HOOK_INSTRUCTION_INTERVAL 200
 #define JSON_MAX_DEPTH 32
-#define IMAGE_CACHE_SIZE 16
+/* Decoded images kept at once, and their total size: a pack showing a full item
+ * grid (each icon its own image) plus a map stays cached instead of re-decoding
+ * every tick, and the pixels stay bounded (4M px = 16 MB). */
+#define IMAGE_CACHE_SIZE 96
+#define IMAGE_CACHE_MAX_PIXELS (4u * 1024u * 1024u)
 /* Caps on pack-controlled sizes: these buffers live outside the Lua memory limit
  * and are filled by C loops the instruction budget doesn't count. */
 #define LZ77_MAX_OUTPUT (1024u * 1024u)
 #define IMAGE_MAX_DIMENSION 256
 
-/** Implemented in core.c; NULL when no ROM is loaded. */
-extern struct mCore* gbaduo_active_core(void);
 
 struct CachedImage {
     bool used;
@@ -41,10 +69,16 @@ struct GbaDuoScript {
     lua_State* L;
     size_t memUsed;
     long instructionsLeft;
+    long instructionBudget; /* what instructionsLeft started at */
+    struct timespec deadline;
     char packDir[1024];
     char lastError[512];
     struct CachedImage images[IMAGE_CACHE_SIZE];
     int nextImageSlot;
+    /* mem.write*: open only for the length of one action call made with may_write
+     * (see gbaduo_script_action); tapBytesLeft is that call's remaining allowance. */
+    bool writeWindow;
+    uint32_t tapBytesLeft;
 };
 
 static struct GbaDuoScript g_script;
@@ -60,9 +94,14 @@ static int l_input_focus_unit(lua_State* L) {
     requested_focus_unit=(int)id;
     return 0;
 }
-JNIEXPORT jint JNICALL Java_com_khumam_gbaduo_emu_NativeCore_takeScriptFocusUnit(JNIEnv* env,jobject self) {
-    (void)env;(void)self;int id=requested_focus_unit;requested_focus_unit=0;return id;
+int gbaduo_script_take_focus_unit(void) {
+    int id=requested_focus_unit;requested_focus_unit=0;return id;
 }
+#ifndef GBADUO_HOST_TEST
+JNIEXPORT jint JNICALL Java_com_khumam_gbaduo_emu_NativeCore_takeScriptFocusUnit(JNIEnv* env,jobject self) {
+    (void)env;(void)self;return gbaduo_script_take_focus_unit();
+}
+#endif
 
 /* Guards g_script.images: gfx.decode/unloadScript run on the emu thread while
  * nativeImage is called from the UI thread. */
@@ -71,6 +110,9 @@ static pthread_mutex_t g_imageLock = PTHREAD_MUTEX_INITIALIZER;
 /* ------------------------------------------------------------------------ */
 /* Capped allocator + instruction-count hook                                */
 /* ------------------------------------------------------------------------ */
+
+static bool past_deadline(void);
+static void instruction_hook(lua_State* L, lua_Debug* ar);
 
 static void* script_alloc(void* ud, void* ptr, size_t osize, size_t nsize) {
     struct GbaDuoScript* s = (struct GbaDuoScript*) ud;
@@ -91,15 +133,73 @@ static void* script_alloc(void* ud, void* ptr, size_t osize, size_t nsize) {
         return NULL;
     }
     s->memUsed = newUsed;
+    /* A big allocation past the deadline (string.rep, table.concat of megabytes): have
+     * the count hook check on the very next instruction rather than up to
+     * HOOK_INSTRUCTION_INTERVAL slow ones later. lua_sethook is safe at any point. */
+    if (nsize >= 65536 && s->L && past_deadline()) {
+        lua_sethook(s->L, instruction_hook, LUA_MASKCOUNT, 1);
+    }
     return newPtr;
+}
+
+/* Starts a call's budget: [instructions] and [ms] of wall-clock time from now. */
+static void start_budget(long instructions, long ms) {
+    if (g_script.L) {
+        lua_sethook(g_script.L, instruction_hook, LUA_MASKCOUNT, HOOK_INSTRUCTION_INTERVAL);
+    }
+    g_script.instructionsLeft = instructions;
+    g_script.instructionBudget = instructions;
+    clock_gettime(CLOCK_MONOTONIC, &g_script.deadline);
+    g_script.deadline.tv_sec += ms / 1000;
+    g_script.deadline.tv_nsec += (ms % 1000) * 1000000L;
+    if (g_script.deadline.tv_nsec >= 1000000000L) {
+        g_script.deadline.tv_sec++;
+        g_script.deadline.tv_nsec -= 1000000000L;
+    }
+}
+
+static bool past_deadline(void) {
+    struct timespec now;
+    clock_gettime(CLOCK_MONOTONIC, &now);
+    return now.tv_sec > g_script.deadline.tv_sec ||
+           (now.tv_sec == g_script.deadline.tv_sec && now.tv_nsec > g_script.deadline.tv_nsec);
+}
+
+static void check_budget(lua_State* L) {
+    if (g_script.instructionsLeft <= 0) {
+        luaL_error(L, "script exceeded its per-tick instruction budget");
+    }
+    if (past_deadline()) {
+        luaL_error(L, "script exceeded its per-tick time limit");
+    }
+}
+
+/* Called by Lua's pattern matcher (lstrlib.c, LUA_PATTERN_STEP_HOOK) on every match
+ * step: a pattern like ".-.-.-.-x" on a long string is one C call that could run for
+ * minutes, out of the count hook's reach. Checks the clock every 1024 steps. */
+void gbaduo_pattern_step(lua_State* L) {
+    static unsigned steps;
+    if ((++steps & 1023u) == 0 && past_deadline()) {
+        luaL_error(L, "script exceeded its per-tick time limit");
+    }
 }
 
 static void instruction_hook(lua_State* L, lua_Debug* ar) {
     (void) ar;
     g_script.instructionsLeft -= HOOK_INSTRUCTION_INTERVAL;
-    if (g_script.instructionsLeft <= 0) {
-        luaL_error(L, "script exceeded its per-tick instruction budget");
-    }
+    check_budget(L);
+}
+
+/*
+ * C work a call does for the script (bytes read, pixels drawn) comes out of the same
+ * budget, one instruction per unit: otherwise a loop of a few Lua instructions around
+ * mem.read(addr, 65536) or an uncached gfx.* call could hold the emu thread for minutes.
+ * Call before allocating anything: on an empty budget this raises a Lua error.
+ */
+static void charge(lua_State* L, size_t units) {
+    long cost = units > (size_t) INSTRUCTION_BUDGET_LOAD ? INSTRUCTION_BUDGET_LOAD : (long) units;
+    g_script.instructionsLeft -= cost;
+    check_budget(L);
 }
 
 /* ------------------------------------------------------------------------ */
@@ -107,56 +207,50 @@ static void instruction_hook(lua_State* L, lua_Debug* ar) {
 /* ------------------------------------------------------------------------ */
 
 static int l_mem_u8(lua_State* L) {
-    struct mCore* core = gbaduo_active_core();
     uint32_t addr = (uint32_t) luaL_checkinteger(L, 1);
-    lua_pushinteger(L, core ? core->rawRead8(core, addr, -1) : 0);
+    lua_pushinteger(L, gbaduo_bus_read8(addr));
     return 1;
 }
 
 static int l_mem_s8(lua_State* L) {
-    struct mCore* core = gbaduo_active_core();
     uint32_t addr = (uint32_t) luaL_checkinteger(L, 1);
-    int8_t v = core ? (int8_t) core->rawRead8(core, addr, -1) : 0;
+    int8_t v = (int8_t) gbaduo_bus_read8(addr);
     lua_pushinteger(L, v);
     return 1;
 }
 
 static int l_mem_u16(lua_State* L) {
-    struct mCore* core = gbaduo_active_core();
     uint32_t addr = (uint32_t) luaL_checkinteger(L, 1);
-    lua_pushinteger(L, core ? core->rawRead16(core, addr, -1) : 0);
+    lua_pushinteger(L, gbaduo_bus_read16(addr));
     return 1;
 }
 
 static int l_mem_s16(lua_State* L) {
-    struct mCore* core = gbaduo_active_core();
     uint32_t addr = (uint32_t) luaL_checkinteger(L, 1);
-    int16_t v = core ? (int16_t) core->rawRead16(core, addr, -1) : 0;
+    int16_t v = (int16_t) gbaduo_bus_read16(addr);
     lua_pushinteger(L, v);
     return 1;
 }
 
 static int l_mem_u32(lua_State* L) {
-    struct mCore* core = gbaduo_active_core();
     uint32_t addr = (uint32_t) luaL_checkinteger(L, 1);
-    lua_pushinteger(L, core ? (lua_Integer) (uint32_t) core->rawRead32(core, addr, -1) : 0);
+    lua_pushinteger(L, (lua_Integer) gbaduo_bus_read32(addr));
     return 1;
 }
 
 static int l_mem_s32(lua_State* L) {
-    struct mCore* core = gbaduo_active_core();
     uint32_t addr = (uint32_t) luaL_checkinteger(L, 1);
-    int32_t v = core ? (int32_t) core->rawRead32(core, addr, -1) : 0;
+    int32_t v = (int32_t) gbaduo_bus_read32(addr);
     lua_pushinteger(L, v);
     return 1;
 }
 
 static int l_mem_read(lua_State* L) {
-    struct mCore* core = gbaduo_active_core();
     uint32_t addr = (uint32_t) luaL_checkinteger(L, 1);
     lua_Integer n = luaL_checkinteger(L, 2);
     if (n < 0) n = 0;
     if (n > 65536) n = 65536;
+    charge(L, (size_t) n);
     if (n == 0) {
         lua_pushliteral(L, "");
         return 1;
@@ -166,11 +260,77 @@ static int l_mem_read(lua_State* L) {
         return luaL_error(L, "mem.read: out of memory");
     }
     for (lua_Integer i = 0; i < n; i++) {
-        buf[i] = core ? (char) core->rawRead8(core, addr + (uint32_t) i, -1) : 0;
+        buf[i] = (char) gbaduo_bus_read8(addr + (uint32_t) i);
     }
     lua_pushlstring(L, buf, (size_t) n);
     free(buf);
     return 1;
+}
+
+/* ------------------------------------------------------------------------ */
+/* mem.write* — only from a tap, only RAM, capped (bus.h, memwrite.c)       */
+/* ------------------------------------------------------------------------ */
+
+/* Every refusal returns false plus why, so a pack can show it on the companion screen. */
+static int write_refused(lua_State* L, const char* why) {
+    lua_pushboolean(L, 0);
+    lua_pushstring(L, why);
+    return 2;
+}
+
+static int write_checked(lua_State* L, lua_Integer address, const uint8_t* bytes, size_t size) {
+    if (!g_script.writeWindow) {
+        return write_refused(L, "writing is only allowed from a tap, with the player's permission");
+    }
+    if (address < 0 || address > (lua_Integer) UINT32_MAX) {
+        return write_refused(L, "address out of range");
+    }
+    if (size == 0 || size > SCRIPT_WRITE_MAX_PER_CALL) {
+        return write_refused(L, "a write must be 1 to 64 bytes");
+    }
+    if (size > g_script.tapBytesLeft) {
+        return write_refused(L, "at most 256 bytes per tap");
+    }
+    if (!gbaduo_write_bytes((uint32_t) address, bytes, size)) {
+        return write_refused(L, "not writable RAM");
+    }
+    g_script.tapBytesLeft -= (uint32_t) size;
+    LOG_PRINT(LOG_INFO, "Companion", "pack wrote %u byte(s) at 0x%08X", (unsigned) size, (unsigned) address);
+    lua_pushboolean(L, 1);
+    return 1;
+}
+
+static int l_mem_write8(lua_State* L) {
+    lua_Integer address = luaL_checkinteger(L, 1);
+    lua_Integer value = luaL_checkinteger(L, 2);
+    uint8_t b[1] = {(uint8_t) value};
+    return write_checked(L, address, b, sizeof(b));
+}
+
+static int l_mem_write16(lua_State* L) {
+    lua_Integer address = luaL_checkinteger(L, 1);
+    lua_Integer value = luaL_checkinteger(L, 2);
+    uint8_t b[2] = {(uint8_t) value, (uint8_t) (value >> 8)};
+    return write_checked(L, address, b, sizeof(b));
+}
+
+static int l_mem_write32(lua_State* L) {
+    lua_Integer address = luaL_checkinteger(L, 1);
+    lua_Integer value = luaL_checkinteger(L, 2);
+    uint8_t b[4] = {(uint8_t) value, (uint8_t) (value >> 8), (uint8_t) (value >> 16), (uint8_t) (value >> 24)};
+    return write_checked(L, address, b, sizeof(b));
+}
+
+/* mem.write(addr, bytes): a short Lua string of raw bytes. */
+static int l_mem_write(lua_State* L) {
+    lua_Integer address = luaL_checkinteger(L, 1);
+    size_t size = 0;
+    const char* bytes = luaL_checklstring(L, 2, &size);
+    return write_checked(L, address, (const uint8_t*) bytes, size);
+}
+
+bool gbaduo_script_writes_open(void) {
+    return g_script.writeWindow;
 }
 
 /* ------------------------------------------------------------------------ */
@@ -179,7 +339,7 @@ static int l_mem_read(lua_State* L) {
 
 static int l_log(lua_State* L) {
     const char* msg = luaL_tolstring(L, 1, NULL);
-    __android_log_print(ANDROID_LOG_INFO, "GBADuoPack", "%s", msg);
+    LOG_PRINT(LOG_INFO, "GBADuoPack", "%s", msg);
     lua_pop(L, 1); /* pop the string luaL_tolstring pushed */
     return 0;
 }
@@ -190,12 +350,12 @@ static int l_log(lua_State* L) {
 
 /** Decompresses GBA LZ77 data starting at [addr]; returns a malloc'd buffer and sets *outSize. */
 static uint8_t* lz77_decompress(uint32_t addr, size_t* outSize) {
-    struct mCore* core = gbaduo_active_core();
+    bool core = gbaduo_bus_platform() != GBADUO_BUS_NONE;
     if (!core) {
         *outSize = 0;
         return NULL;
     }
-    uint32_t header = core->rawRead32(core, addr, -1);
+    uint32_t header = gbaduo_bus_read32(addr);
     if ((header & 0xFF) != 0x10) {
         *outSize = 0;
         return NULL;
@@ -214,13 +374,13 @@ static uint8_t* lz77_decompress(uint32_t addr, size_t* outSize) {
     uint32_t src = addr + 4;
 
     while (outPos < size) {
-        uint8_t flags = (uint8_t) core->rawRead8(core, src++, -1);
+        uint8_t flags = (uint8_t) gbaduo_bus_read8(src++);
         for (int bit = 7; bit >= 0 && outPos < size; bit--) {
             if ((flags & (1 << bit)) == 0) {
-                out[outPos++] = (uint8_t) core->rawRead8(core, src++, -1);
+                out[outPos++] = (uint8_t) gbaduo_bus_read8(src++);
             } else {
-                uint8_t b0 = (uint8_t) core->rawRead8(core, src++, -1);
-                uint8_t b1 = (uint8_t) core->rawRead8(core, src++, -1);
+                uint8_t b0 = (uint8_t) gbaduo_bus_read8(src++);
+                uint8_t b1 = (uint8_t) gbaduo_bus_read8(src++);
                 int length = (b0 >> 4) + 3;
                 size_t disp = (size_t) ((b0 & 0x0F) << 8 | b1) + 1;
                 if (disp > outPos) {
@@ -240,8 +400,17 @@ static uint8_t* lz77_decompress(uint32_t addr, size_t* outSize) {
     return out;
 }
 
+/** The output size an LZ77 block at [addr] claims (capped), 0 if it isn't one: for charge(). */
+static size_t lz77_claimed_size(uint32_t addr) {
+    uint32_t header = gbaduo_bus_read32(addr);
+    if ((header & 0xFF) != 0x10) return 0;
+    size_t size = (header >> 8) & 0xFFFFFF;
+    return size > LZ77_MAX_OUTPUT ? LZ77_MAX_OUTPUT : size;
+}
+
 static int l_lz77(lua_State* L) {
     uint32_t addr = (uint32_t) luaL_checkinteger(L, 1);
+    charge(L, lz77_claimed_size(addr));
     size_t size = 0;
     uint8_t* data = lz77_decompress(addr, &size);
     if (!data) {
@@ -279,6 +448,19 @@ static struct CachedImage* image_cache_find(uint32_t key) {
 }
 
 static struct CachedImage* image_cache_store(uint32_t key, int width, int height, uint32_t* pixels) {
+    /* Over the pixel budget: drop the oldest entries first (the slots after the next one). */
+    size_t total = (size_t) width * height;
+    for (int i = 0; i < IMAGE_CACHE_SIZE; i++) {
+        if (g_script.images[i].used) total += (size_t) g_script.images[i].width * g_script.images[i].height;
+    }
+    for (int k = 0; k < IMAGE_CACHE_SIZE && total > IMAGE_CACHE_MAX_PIXELS; k++) {
+        struct CachedImage* old = &g_script.images[(g_script.nextImageSlot + k) % IMAGE_CACHE_SIZE];
+        if (!old->used) continue;
+        total -= (size_t) old->width * old->height;
+        free(old->pixels);
+        old->used = false;
+        old->pixels = NULL;
+    }
     int slot = g_script.nextImageSlot;
     g_script.nextImageSlot = (slot + 1) % IMAGE_CACHE_SIZE;
     if (g_script.images[slot].used) {
@@ -290,6 +472,21 @@ static struct CachedImage* image_cache_store(uint32_t key, int width, int height
     g_script.images[slot].height = height;
     g_script.images[slot].pixels = pixels;
     return &g_script.images[slot];
+}
+
+/** A GBA BGR555 colour as ARGB8888; [transparent] gives alpha 0. */
+static uint32_t gba_argb(uint16_t entry, bool transparent) {
+    uint32_t r = (entry & 0x1F) << 3;
+    uint32_t g = ((entry >> 5) & 0x1F) << 3;
+    uint32_t b = ((entry >> 10) & 0x1F) << 3;
+    uint32_t a = transparent ? 0 : 0xFFu;
+    return (a << 24) | (r << 16) | (g << 8) | b;
+}
+
+static void push_image_key(lua_State* L, uint32_t key) {
+    char keyStr[32];
+    snprintf(keyStr, sizeof(keyStr), "gfx:%08x", key);
+    lua_pushstring(L, keyStr);
 }
 
 static int l_gfx_decode(lua_State* L) {
@@ -335,10 +532,11 @@ static int l_gfx_decode(lua_State* L) {
         return 1;
     }
 
-    struct mCore* core = gbaduo_active_core();
+    bool core = gbaduo_bus_platform() != GBADUO_BUS_NONE;
     if (!core) {
         return luaL_error(L, "gfx.decode: no ROM loaded");
     }
+    charge(L, (size_t) width * height + (useLz77 ? lz77_claimed_size(tilesAddr) : 0));
 
     int tilesWide = width / 8;
     int tilesHigh = height / 8;
@@ -358,13 +556,13 @@ static int l_gfx_decode(lua_State* L) {
             return luaL_error(L, "gfx.decode: out of memory");
         }
         for (size_t i = 0; i < tileBytes; i++) {
-            tileData[i] = (uint8_t) core->rawRead8(core, tilesAddr + (uint32_t) i, -1);
+            tileData[i] = (uint8_t) gbaduo_bus_read8(tilesAddr + (uint32_t) i);
         }
     }
 
     uint16_t palette[16];
     for (int i = 0; i < 16; i++) {
-        palette[i] = (uint16_t) core->rawRead16(core, paletteAddr + (uint32_t) i * 2, -1);
+        palette[i] = (uint16_t) gbaduo_bus_read16(paletteAddr + (uint32_t) i * 2);
     }
 
     uint32_t* pixels = malloc((size_t) width * height * sizeof(uint32_t));
@@ -385,13 +583,7 @@ static int l_gfx_decode(lua_State* L) {
                     int py = ty * 8 + row;
                     for (int k = 0; k < 2; k++) {
                         int paletteIndex = k == 0 ? lo : hi;
-                        uint16_t entry = palette[paletteIndex];
-                        uint32_t r = (entry & 0x1F) << 3;
-                        uint32_t g = ((entry >> 5) & 0x1F) << 3;
-                        uint32_t b = ((entry >> 10) & 0x1F) << 3;
-                        uint32_t a = paletteIndex == 0 ? 0 : 0xFFu;
-                        uint32_t argb = (a << 24) | (r << 16) | (g << 8) | b;
-                        pixels[(size_t) py * width + (px + k)] = argb;
+                        pixels[(size_t) py * width + (px + k)] = gba_argb(palette[paletteIndex], paletteIndex == 0);
                     }
                 }
             }
@@ -407,6 +599,291 @@ static int l_gfx_decode(lua_State* L) {
     snprintf(keyStr, sizeof(keyStr), "gfx:%08x", key);
     lua_pushstring(L, keyStr);
     return 1;
+}
+
+/* Most tilemap entries per row (a GBA screen block is 32; wider maps exist in ROM data). */
+#define TILEMAP_MAX_STRIDE 256
+
+/*
+ * gfx.tilemap{ tiles, palette, map, stride, x, y, width, height, opaque, lz77 } -> "gfx:..." key.
+ *
+ * Composes a picture the way the GBA draws a 4bpp text background: [map] holds u16
+ * entries ([stride] per row; bits 0-9 tile number, 10 h-flip, 11 v-flip, 12-15 palette
+ * bank), [tiles] the 8x8 tiles (32 bytes each), and [palette] palette bank 0 (bank n is
+ * 32 bytes further each). The picture is [width] x [height] px starting at map cell
+ * ([x], [y]). Colour 0 of every bank is transparent unless [opaque].
+ * Everything is read from emulated memory (normally the ROM), raw, or with [lz77]
+ * both [tiles] and [map] GBA LZ77-compressed (BIOS type 0x10), as many games store them.
+ */
+static int l_gfx_tilemap(lua_State* L) {
+    luaL_checktype(L, 1, LUA_TTABLE);
+    lua_getfield(L, 1, "tiles");
+    uint32_t tilesAddr = (uint32_t) luaL_checkinteger(L, -1);
+    lua_getfield(L, 1, "palette");
+    uint32_t paletteAddr = (uint32_t) luaL_checkinteger(L, -1);
+    lua_getfield(L, 1, "map");
+    uint32_t mapAddr = (uint32_t) luaL_checkinteger(L, -1);
+    lua_getfield(L, 1, "stride");
+    lua_Integer stride = lua_isnil(L, -1) ? 32 : luaL_checkinteger(L, -1);
+    lua_getfield(L, 1, "x");
+    lua_Integer x0 = lua_isnil(L, -1) ? 0 : luaL_checkinteger(L, -1);
+    lua_getfield(L, 1, "y");
+    lua_Integer y0 = lua_isnil(L, -1) ? 0 : luaL_checkinteger(L, -1);
+    lua_getfield(L, 1, "width");
+    lua_Integer width = luaL_checkinteger(L, -1);
+    lua_getfield(L, 1, "height");
+    lua_Integer height = luaL_checkinteger(L, -1);
+    lua_getfield(L, 1, "opaque");
+    bool opaque = lua_toboolean(L, -1);
+    lua_getfield(L, 1, "lz77");
+    bool useLz77 = lua_toboolean(L, -1);
+    lua_pop(L, 10);
+
+    if (width <= 0 || height <= 0 || width % 8 != 0 || height % 8 != 0) {
+        return luaL_error(L, "gfx.tilemap: width/height must be positive multiples of 8");
+    }
+    if (width > IMAGE_MAX_DIMENSION || height > IMAGE_MAX_DIMENSION) {
+        return luaL_error(L, "gfx.tilemap: width/height must be at most %d", IMAGE_MAX_DIMENSION);
+    }
+    if (stride < 1 || stride > TILEMAP_MAX_STRIDE) {
+        return luaL_error(L, "gfx.tilemap: stride must be 1 to %d", TILEMAP_MAX_STRIDE);
+    }
+    if (x0 < 0 || y0 < 0 || x0 + width / 8 > stride || y0 > 4096) {
+        return luaL_error(L, "gfx.tilemap: x/y outside the map");
+    }
+
+    struct {
+        uint32_t tilesAddr, paletteAddr, mapAddr;
+        int32_t stride, x, y, width, height;
+        int32_t opaque, lz77;
+    } descriptor = {tilesAddr, paletteAddr, mapAddr, (int32_t) stride, (int32_t) x0, (int32_t) y0,
+                    (int32_t) width, (int32_t) height, opaque ? 1 : 0, useLz77 ? 1 : 0};
+    /* Distinct from gfx.decode keys: different descriptor size and a salt. */
+    uint32_t key = fnv1a(&descriptor, sizeof(descriptor)) ^ 0x7417u;
+
+    pthread_mutex_lock(&g_imageLock);
+    bool cached = image_cache_find(key) != NULL;
+    pthread_mutex_unlock(&g_imageLock);
+    if (cached) {
+        push_image_key(L, key);
+        return 1;
+    }
+    if (gbaduo_bus_platform() == GBADUO_BUS_NONE) {
+        return luaL_error(L, "gfx.tilemap: no ROM loaded");
+    }
+    charge(L, (size_t) width * height + (useLz77 ? lz77_claimed_size(tilesAddr) + lz77_claimed_size(mapAddr) : 0));
+
+    /* Compressed: unpack both once; a tile or cell past the end reads as 0. */
+    uint8_t* tileData = NULL;
+    uint8_t* mapData = NULL;
+    size_t tileSize = 0, mapSize = 0;
+    if (useLz77) {
+        tileData = lz77_decompress(tilesAddr, &tileSize);
+        mapData = lz77_decompress(mapAddr, &mapSize);
+        if (!tileData || !mapData) {
+            free(tileData);
+            free(mapData);
+            return luaL_error(L, "gfx.tilemap: no valid LZ77 data at tiles or map");
+        }
+        if ((size_t) ((y0 + height / 8) * stride) * 2 > mapSize) {
+            free(tileData);
+            free(mapData);
+            return luaL_error(L, "gfx.tilemap: x/y outside the map");
+        }
+    }
+
+    uint16_t palettes[16][16];
+    for (int bank = 0; bank < 16; bank++) {
+        for (int i = 0; i < 16; i++) {
+            palettes[bank][i] = gbaduo_bus_read16(paletteAddr + (uint32_t) (bank * 32 + i * 2));
+        }
+    }
+
+    int w = (int) width, h = (int) height;
+    uint32_t* pixels = malloc((size_t) w * h * sizeof(uint32_t));
+    if (!pixels) {
+        free(tileData);
+        free(mapData);
+        return luaL_error(L, "gfx.tilemap: out of memory");
+    }
+    for (int ty = 0; ty < h / 8; ty++) {
+        for (int tx = 0; tx < w / 8; tx++) {
+            uint32_t cell = (uint32_t) ((y0 + ty) * stride + x0 + tx);
+            uint16_t entry = mapData ? (uint16_t) (mapData[cell * 2] | mapData[cell * 2 + 1] << 8)
+                                     : (uint16_t) gbaduo_bus_read16(mapAddr + cell * 2);
+            uint32_t tile = entry & 0x3FF;
+            bool hflip = (entry >> 10) & 1;
+            bool vflip = (entry >> 11) & 1;
+            const uint16_t* palette = palettes[(entry >> 12) & 0xF];
+            for (int row = 0; row < 8; row++) {
+                int sy = vflip ? 7 - row : row;
+                uint32_t at = tile * 32 + (uint32_t) sy * 4;
+                uint32_t rowBits;
+                if (tileData) {
+                    rowBits = at + 4 <= tileSize ? (uint32_t) (tileData[at] | tileData[at + 1] << 8 | tileData[at + 2] << 16 |
+                                                               (uint32_t) tileData[at + 3] << 24)
+                                                 : 0;
+                } else {
+                    rowBits = gbaduo_bus_read32(tilesAddr + at);
+                }
+                for (int col = 0; col < 8; col++) {
+                    int sx = hflip ? 7 - col : col;
+                    int index = (int) ((rowBits >> (sx * 4)) & 0xF);
+                    pixels[(size_t) (ty * 8 + row) * w + tx * 8 + col] = gba_argb(palette[index], index == 0 && !opaque);
+                }
+            }
+        }
+    }
+
+    free(tileData);
+    free(mapData);
+    pthread_mutex_lock(&g_imageLock);
+    image_cache_store(key, w, h, pixels);
+    pthread_mutex_unlock(&g_imageLock);
+    push_image_key(L, key);
+    return 1;
+}
+
+#define SPRITE_MAX_PARTS 32
+
+/*
+ * gfx.sprite{ tiles, palette, width, height, parts = { {x, y, w, h, tile, bank, hflip, vflip}, ... } }
+ *
+ * Composes a picture the way the GBA draws a multi-part sprite (OAM objects, 1D tile
+ * mapping): each part is a [w] x [h] px object (8, 16, 32 or 64) placed at ([x], [y])
+ * in the picture, whose 8x8 tiles start at tile number [tile] counted from [tiles] and
+ * run row by row, coloured with palette bank [bank] (32 bytes each from [palette]).
+ * As on the GBA, an earlier part is drawn over a later one. Colour 0 is transparent.
+ */
+static int l_gfx_sprite(lua_State* L) {
+    luaL_checktype(L, 1, LUA_TTABLE);
+    lua_getfield(L, 1, "tiles");
+    uint32_t tilesAddr = (uint32_t) luaL_checkinteger(L, -1);
+    lua_getfield(L, 1, "palette");
+    uint32_t paletteAddr = (uint32_t) luaL_checkinteger(L, -1);
+    lua_getfield(L, 1, "width");
+    lua_Integer width = luaL_checkinteger(L, -1);
+    lua_getfield(L, 1, "height");
+    lua_Integer height = luaL_checkinteger(L, -1);
+    lua_pop(L, 4);
+    if (width <= 0 || height <= 0 || width > IMAGE_MAX_DIMENSION || height > IMAGE_MAX_DIMENSION) {
+        return luaL_error(L, "gfx.sprite: width/height must be 1 to %d", IMAGE_MAX_DIMENSION);
+    }
+
+    struct Part {
+        int32_t x, y, w, h, tile, bank, hflip, vflip;
+    } parts[SPRITE_MAX_PARTS];
+    int count = 0;
+    if (lua_getfield(L, 1, "parts") != LUA_TTABLE) {
+        return luaL_error(L, "gfx.sprite: parts must be a list");
+    }
+    lua_Integer n = (lua_Integer) lua_rawlen(L, -1);
+    if (n < 1 || n > SPRITE_MAX_PARTS) {
+        return luaL_error(L, "gfx.sprite: 1 to %d parts", SPRITE_MAX_PARTS);
+    }
+    for (lua_Integer i = 1; i <= n; i++) {
+        if (lua_rawgeti(L, -1, i) != LUA_TTABLE) {
+            return luaL_error(L, "gfx.sprite: part %d must be a table", (int) i);
+        }
+        struct Part* p = &parts[count++];
+        const char* intFields[] = {"x", "y", "w", "h", "tile", "bank"};
+        int32_t* targets[] = {&p->x, &p->y, &p->w, &p->h, &p->tile, &p->bank};
+        for (int f = 0; f < 6; f++) {
+            lua_getfield(L, -1, intFields[f]);
+            *targets[f] = (f < 2 && lua_isnil(L, -1)) ? 0 : (int32_t) luaL_checkinteger(L, -1);
+            lua_pop(L, 1);
+        }
+        lua_getfield(L, -1, "hflip");
+        p->hflip = lua_toboolean(L, -1);
+        lua_getfield(L, -2, "vflip");
+        p->vflip = lua_toboolean(L, -1);
+        lua_pop(L, 3);
+        bool sizeOk = (p->w == 8 || p->w == 16 || p->w == 32 || p->w == 64) && (p->h == 8 || p->h == 16 || p->h == 32 || p->h == 64);
+        if (!sizeOk || p->tile < 0 || p->tile > 0xFFFF || p->bank < 0 || p->bank > 15 ||
+            p->x < -64 || p->x > IMAGE_MAX_DIMENSION || p->y < -64 || p->y > IMAGE_MAX_DIMENSION) {
+            return luaL_error(L, "gfx.sprite: part %d is invalid (w/h 8-64, tile 0-65535, bank 0-15)", (int) i);
+        }
+    }
+    lua_pop(L, 1);
+
+    struct {
+        uint32_t tilesAddr, paletteAddr;
+        int32_t width, height, count;
+        struct Part parts[SPRITE_MAX_PARTS];
+    } descriptor;
+    memset(&descriptor, 0, sizeof(descriptor));
+    descriptor.tilesAddr = tilesAddr;
+    descriptor.paletteAddr = paletteAddr;
+    descriptor.width = (int32_t) width;
+    descriptor.height = (int32_t) height;
+    descriptor.count = count;
+    memcpy(descriptor.parts, parts, sizeof(struct Part) * (size_t) count);
+    uint32_t key = fnv1a(&descriptor, sizeof(descriptor)) ^ 0x5b17u;
+
+    pthread_mutex_lock(&g_imageLock);
+    bool cached = image_cache_find(key) != NULL;
+    pthread_mutex_unlock(&g_imageLock);
+    if (cached) {
+        push_image_key(L, key);
+        return 1;
+    }
+    if (gbaduo_bus_platform() == GBADUO_BUS_NONE) {
+        return luaL_error(L, "gfx.sprite: no ROM loaded");
+    }
+    size_t work = (size_t) width * height;
+    for (int pi = 0; pi < count; pi++) work += (size_t) parts[pi].w * parts[pi].h;
+    charge(L, work);
+
+    int w = (int) width, h = (int) height;
+    uint32_t* pixels = calloc((size_t) w * h, sizeof(uint32_t));
+    if (!pixels) {
+        return luaL_error(L, "gfx.sprite: out of memory");
+    }
+    for (int pi = 0; pi < count; pi++) {
+        const struct Part* p = &parts[pi];
+        uint16_t palette[16];
+        for (int i = 0; i < 16; i++) palette[i] = gbaduo_bus_read16(paletteAddr + (uint32_t) (p->bank * 32 + i * 2));
+        int tilesWide = p->w / 8;
+        for (int py = 0; py < p->h; py++) {
+            for (int px = 0; px < p->w; px++) {
+                int dx = p->x + (p->hflip ? p->w - 1 - px : px);
+                int dy = p->y + (p->vflip ? p->h - 1 - py : py);
+                if (dx < 0 || dy < 0 || dx >= w || dy >= h) continue;
+                uint32_t* out = &pixels[(size_t) dy * w + dx];
+                if (*out >> 24) continue; /* an earlier part is already here */
+                uint32_t tile = (uint32_t) p->tile + (uint32_t) ((py / 8) * tilesWide + px / 8);
+                uint8_t byte = gbaduo_bus_read8(tilesAddr + tile * 32 + (uint32_t) ((py % 8) * 4 + (px % 8) / 2));
+                int index = (px & 1) ? byte >> 4 : byte & 0xF;
+                if (index) *out = gba_argb(palette[index], false);
+            }
+        }
+    }
+
+    pthread_mutex_lock(&g_imageLock);
+    image_cache_store(key, w, h, pixels);
+    pthread_mutex_unlock(&g_imageLock);
+    push_image_key(L, key);
+    return 1;
+}
+
+/* For tests: a copy of the decoded image for [key] ("gfx:..."), or NULL. Caller frees. */
+uint32_t* gbaduo_script_image(const char* key, int* width, int* height) {
+    if (strncmp(key, "gfx:", 4) != 0) return NULL;
+    uint32_t wanted = (uint32_t) strtoul(key + 4, NULL, 16);
+    pthread_mutex_lock(&g_imageLock);
+    struct CachedImage* image = image_cache_find(wanted);
+    uint32_t* copy = NULL;
+    if (image) {
+        size_t n = (size_t) image->width * image->height;
+        copy = malloc(n * sizeof(uint32_t));
+        if (copy) {
+            memcpy(copy, image->pixels, n * sizeof(uint32_t));
+            *width = image->width;
+            *height = image->height;
+        }
+    }
+    pthread_mutex_unlock(&g_imageLock);
+    return copy;
 }
 
 /* ------------------------------------------------------------------------ */
@@ -690,6 +1167,8 @@ static void register_api(lua_State* L) {
         {"u16", l_mem_u16}, {"s16", l_mem_s16},
         {"u32", l_mem_u32}, {"s32", l_mem_s32},
         {"read", l_mem_read},
+        {"write8", l_mem_write8}, {"write16", l_mem_write16},
+        {"write32", l_mem_write32}, {"write", l_mem_write},
         {NULL, NULL},
     };
     luaL_newlib(L, memFuncs);
@@ -697,6 +1176,8 @@ static void register_api(lua_State* L) {
 
     static const luaL_Reg gfxFuncs[] = {
         {"decode", l_gfx_decode},
+        {"tilemap", l_gfx_tilemap},
+        {"sprite", l_gfx_sprite},
         {NULL, NULL},
     };
     luaL_newlib(L, gfxFuncs);
@@ -766,8 +1247,22 @@ static void free_images(void) {
     pthread_mutex_unlock(&g_imageLock);
 }
 
-JNIEXPORT jboolean JNICALL
-Java_com_khumam_gbaduo_emu_NativeCore_loadScript(JNIEnv* env, jobject thiz, jstring source, jstring packDir) {
+/* ---- the sandbox without JNI (script.h) ---------------------------------- */
+
+static void set_error(const char* message) {
+    strncpy(g_script.lastError, message ? message : "unknown error", sizeof(g_script.lastError) - 1);
+    g_script.lastError[sizeof(g_script.lastError) - 1] = '\0';
+}
+
+const char* gbaduo_script_last_error(void) {
+    return g_script.lastError;
+}
+
+long gbaduo_script_budget_used(void) {
+    return g_script.instructionBudget - g_script.instructionsLeft;
+}
+
+bool gbaduo_script_load(const char* source, const char* packDir) {
     if (g_script.L) {
         lua_close(g_script.L);
         g_script.L = NULL;
@@ -775,27 +1270,22 @@ Java_com_khumam_gbaduo_emu_NativeCore_loadScript(JNIEnv* env, jobject thiz, jstr
     free_images();
     g_script.memUsed = 0;
     g_script.lastError[0] = '\0';
+    g_script.writeWindow = false;
+    g_script.tapBytesLeft = 0;
 
-    const char* packDirChars = (*env)->GetStringUTFChars(env, packDir, NULL);
-    strncpy(g_script.packDir, packDirChars, sizeof(g_script.packDir) - 1);
-    (*env)->ReleaseStringUTFChars(env, packDir, packDirChars);
+    strncpy(g_script.packDir, packDir ? packDir : "", sizeof(g_script.packDir) - 1);
 
     lua_State* L;
     if (!script_setup(&L)) {
-        strncpy(g_script.lastError, "could not create Lua state (out of memory)", sizeof(g_script.lastError) - 1);
-        return JNI_FALSE;
+        set_error("could not create Lua state (out of memory)");
+        return false;
     }
 
-    const char* sourceChars = (*env)->GetStringUTFChars(env, source, NULL);
-    g_script.instructionsLeft = INSTRUCTION_BUDGET_PER_TICK;
-    int loadResult = luaL_loadstring(L, sourceChars);
-    (*env)->ReleaseStringUTFChars(env, source, sourceChars);
-
-    if (loadResult != LUA_OK || lua_pcall(L, 0, 0, 0) != LUA_OK) {
-        const char* err = lua_tostring(L, -1);
-        strncpy(g_script.lastError, err ? err : "unknown script error", sizeof(g_script.lastError) - 1);
+    start_budget(INSTRUCTION_BUDGET_LOAD, TIME_BUDGET_LOAD_MS);
+    if (luaL_loadstring(L, source) != LUA_OK || lua_pcall(L, 0, 0, 0) != LUA_OK) {
+        set_error(lua_tostring(L, -1));
         lua_close(L);
-        return JNI_FALSE;
+        return false;
     }
 
     g_script.L = L;
@@ -803,61 +1293,168 @@ Java_com_khumam_gbaduo_emu_NativeCore_loadScript(JNIEnv* env, jobject thiz, jstr
     /* Optional init(), run once after load. */
     lua_getglobal(L, "init");
     if (lua_isfunction(L, -1)) {
-        g_script.instructionsLeft = INSTRUCTION_BUDGET_PER_TICK;
+        start_budget(INSTRUCTION_BUDGET_LOAD, TIME_BUDGET_LOAD_MS);
         if (lua_pcall(L, 0, 0, 0) != LUA_OK) {
             const char* err = lua_tostring(L, -1);
-            strncpy(g_script.lastError, err ? err : "init() failed", sizeof(g_script.lastError) - 1);
+            set_error(err ? err : "init() failed");
             lua_close(L);
             g_script.L = NULL;
-            return JNI_FALSE;
+            return false;
         }
     } else {
         lua_pop(L, 1);
     }
-
-    return JNI_TRUE;
+    return true;
 }
 
-JNIEXPORT jstring JNICALL
-Java_com_khumam_gbaduo_emu_NativeCore_tickScript(JNIEnv* env, jobject thiz) {
-    if (!g_script.L) {
-        return NULL;
-    }
-    lua_State* L = g_script.L;
-
-    lua_getglobal(L, "update");
-    if (!lua_isfunction(L, -1)) {
-        lua_pop(L, 1);
-        strncpy(g_script.lastError, "pack has no update() function", sizeof(g_script.lastError) - 1);
-        return NULL;
-    }
-
-    lua_getglobal(L, "ui"); /* update(ui): the companion screen's UI state */
-    g_script.instructionsLeft = INSTRUCTION_BUDGET_PER_TICK;
-    if (lua_pcall(L, 1, 1, 0) != LUA_OK) {
-        const char* err = lua_tostring(L, -1);
-        strncpy(g_script.lastError, err ? err : "update() failed", sizeof(g_script.lastError) - 1);
-        lua_pop(L, 1);
-        return NULL;
-    }
-
-    if (!lua_istable(L, -1)) {
-        lua_pop(L, 1);
-        strncpy(g_script.lastError, "update() must return a table", sizeof(g_script.lastError) - 1);
-        return NULL;
-    }
-
+/* The table on top of the stack as malloc'd JSON, popped; NULL (with [what] in the error) if too large. */
+static char* pop_json(lua_State* L, const char* what) {
     struct JsonBuf buf = {0};
     json_serialize(L, -1, &buf, 0);
     lua_pop(L, 1);
     if (buf.failed) {
         free(buf.data);
-        strncpy(g_script.lastError, "update() result too large (out of memory)", sizeof(g_script.lastError) - 1);
+        char message[128];
+        snprintf(message, sizeof(message), "%s result too large (out of memory)", what);
+        set_error(message);
+        return NULL;
+    }
+    if (!buf.data) {
+        char* empty = malloc(3);
+        if (empty) memcpy(empty, "{}", 3);
+        return empty;
+    }
+    return buf.data;
+}
+
+char* gbaduo_script_tick(void) {
+    if (!g_script.L) {
+        return NULL;
+    }
+    lua_State* L = g_script.L;
+    g_script.lastError[0] = '\0';
+
+    lua_getglobal(L, "update");
+    if (!lua_isfunction(L, -1)) {
+        lua_pop(L, 1);
+        set_error("pack has no update() function");
         return NULL;
     }
 
-    jstring result = (*env)->NewStringUTF(env, buf.data ? buf.data : "{}");
-    free(buf.data);
+    lua_getglobal(L, "ui"); /* update(ui): the companion screen's UI state */
+    start_budget(INSTRUCTION_BUDGET_PER_TICK, TIME_BUDGET_PER_TICK_MS);
+    if (lua_pcall(L, 1, 1, 0) != LUA_OK) {
+        const char* err = lua_tostring(L, -1);
+        set_error(err ? err : "update() failed");
+        lua_pop(L, 1);
+        return NULL;
+    }
+    if (!lua_istable(L, -1)) {
+        lua_pop(L, 1);
+        set_error("update() must return a table");
+        return NULL;
+    }
+    return pop_json(L, "update()");
+}
+
+struct ActionCall {
+    const char* name;
+    gbaduo_push_args push;
+    void* userdata;
+    int count;
+};
+
+/* actions[name](args...), returning its first result. */
+static int call_action(lua_State* L) {
+    struct ActionCall* c = (struct ActionCall*) lua_touserdata(L, 1);
+    lua_settop(L, 0);
+    if (lua_getglobal(L, "actions") != LUA_TTABLE) {
+        return luaL_error(L, "pack has no 'actions' table (for '%s')", c->name);
+    }
+    lua_getfield(L, -1, c->name);
+    if (!lua_isfunction(L, -1)) {
+        return luaL_error(L, "pack has no actions.%s() function", c->name);
+    }
+    lua_remove(L, 1); /* actions */
+    luaL_checkstack(L, c->count, "too many action arguments");
+    if (c->push && c->count > 0) {
+        c->push(L, c->userdata);
+    }
+    lua_call(L, c->count, 1);
+    return 1;
+}
+
+char* gbaduo_script_action(const char* name, gbaduo_push_args push, void* userdata, int nargs, bool may_write) {
+    if (!g_script.L) {
+        return NULL;
+    }
+    lua_State* L = g_script.L;
+    g_script.lastError[0] = '\0';
+
+    struct ActionCall c = {name, push, userdata, push ? nargs : 0};
+    lua_pushcfunction(L, call_action);
+    lua_pushlightuserdata(L, &c);
+    start_budget(INSTRUCTION_BUDGET_PER_TICK, TIME_BUDGET_PER_TICK_MS);
+    /* The write window is open for exactly this protected call: lua_pcall returns on
+     * success and on every error (a Lua error, out of memory, the instruction budget),
+     * so it's always closed again below. */
+    g_script.writeWindow = may_write;
+    g_script.tapBytesLeft = SCRIPT_WRITE_MAX_PER_TAP;
+    input_action_active = true;
+    int status = lua_pcall(L, 1, 1, 0);
+    input_action_active = false;
+    g_script.writeWindow = false;
+    g_script.tapBytesLeft = 0;
+
+    if (status != LUA_OK) {
+        requested_focus_unit = 0;
+        const char* err = lua_tostring(L, -1);
+        set_error(err ? err : "action failed");
+        lua_pop(L, 1);
+        return NULL;
+    }
+    if (!lua_istable(L, -1)) {
+        lua_pop(L, 1); /* no UI changes requested */
+        return NULL;
+    }
+    return pop_json(L, "action");
+}
+
+void gbaduo_script_unload(void) {
+    requested_focus_unit = 0;
+    input_action_active = false;
+    if (g_script.L) {
+        lua_close(g_script.L);
+        g_script.L = NULL;
+    }
+    free_images();
+    g_script.memUsed = 0;
+    g_script.writeWindow = false;
+    g_script.tapBytesLeft = 0;
+}
+
+/* ---- JNI entry points (NativeCore) ------------------------------------------ */
+
+#ifndef GBADUO_HOST_TEST
+
+JNIEXPORT jboolean JNICALL
+Java_com_khumam_gbaduo_emu_NativeCore_loadScript(JNIEnv* env, jobject thiz, jstring source, jstring packDir) {
+    const char* packDirChars = (*env)->GetStringUTFChars(env, packDir, NULL);
+    const char* sourceChars = (*env)->GetStringUTFChars(env, source, NULL);
+    bool ok = packDirChars && sourceChars && gbaduo_script_load(sourceChars, packDirChars);
+    if (sourceChars) (*env)->ReleaseStringUTFChars(env, source, sourceChars);
+    if (packDirChars) (*env)->ReleaseStringUTFChars(env, packDir, packDirChars);
+    return ok ? JNI_TRUE : JNI_FALSE;
+}
+
+JNIEXPORT jstring JNICALL
+Java_com_khumam_gbaduo_emu_NativeCore_tickScript(JNIEnv* env, jobject thiz) {
+    char* json = gbaduo_script_tick();
+    if (!json) {
+        return NULL;
+    }
+    jstring result = (*env)->NewStringUTF(env, json);
+    free(json);
     return result;
 }
 
@@ -943,7 +1540,7 @@ Java_com_khumam_gbaduo_emu_NativeCore_setScriptUi(JNIEnv* env, jobject thiz, job
     struct JavaCall c = {env, keys, values, n < nValues ? n : nValues, NULL};
     lua_pushcfunction(L, build_ui);
     lua_pushlightuserdata(L, &c);
-    g_script.instructionsLeft = INSTRUCTION_BUDGET_PER_TICK;
+    start_budget(INSTRUCTION_BUDGET_PER_TICK, TIME_BUDGET_PER_TICK_MS);
     if (lua_pcall(L, 1, 0, 0) != LUA_OK) {
         const char* err = lua_tostring(L, -1);
         LOGE("could not set ui: %s", err ? err : "?");
@@ -951,71 +1548,37 @@ Java_com_khumam_gbaduo_emu_NativeCore_setScriptUi(JNIEnv* env, jobject thiz, job
     }
 }
 
-/* actions[name](args...), returning its first result. */
-static int call_action(lua_State* L) {
-    struct JavaCall* c = (struct JavaCall*) lua_touserdata(L, 1);
-    lua_settop(L, 0);
-    if (lua_getglobal(L, "actions") != LUA_TTABLE) {
-        return luaL_error(L, "pack has no 'actions' table (for '%s')", c->name);
+struct JniArgs {
+    JNIEnv* env;
+    jobjectArray values;
+    jsize count;
+};
+
+static void push_jni_args(lua_State* L, void* userdata) {
+    struct JniArgs* a = (struct JniArgs*) userdata;
+    for (jsize i = 0; i < a->count; i++) {
+        jobject arg = (*a->env)->GetObjectArrayElement(a->env, a->values, i);
+        push_java_value(a->env, L, arg);
+        if (arg) (*a->env)->DeleteLocalRef(a->env, arg);
     }
-    lua_getfield(L, -1, c->name);
-    if (!lua_isfunction(L, -1)) {
-        return luaL_error(L, "pack has no actions.%s() function", c->name);
-    }
-    lua_remove(L, 1); /* actions */
-    luaL_checkstack(L, c->count, "too many action arguments");
-    for (jsize i = 0; i < c->count; i++) {
-        jobject arg = (*c->env)->GetObjectArrayElement(c->env, c->values, i);
-        push_java_value(c->env, L, arg);
-        if (arg) (*c->env)->DeleteLocalRef(c->env, arg);
-    }
-    lua_call(L, c->count, 1);
-    return 1;
 }
 
 JNIEXPORT jstring JNICALL
-Java_com_khumam_gbaduo_emu_NativeCore_callScriptAction(JNIEnv* env, jobject thiz, jstring name, jobjectArray args) {
-    if (!g_script.L) {
-        return NULL;
-    }
-    lua_State* L = g_script.L;
-    g_script.lastError[0] = '\0';
-
+Java_com_khumam_gbaduo_emu_NativeCore_callScriptAction(JNIEnv* env, jobject thiz, jstring name, jobjectArray args,
+                                                      jboolean mayWrite) {
     const char* nameChars = (*env)->GetStringUTFChars(env, name, NULL);
     if (!nameChars) {
         return NULL;
     }
     jsize nargs = args ? (*env)->GetArrayLength(env, args) : 0;
-    struct JavaCall c = {env, NULL, args, nargs < ACTION_MAX_ARGS ? nargs : ACTION_MAX_ARGS, nameChars};
-    lua_pushcfunction(L, call_action);
-    lua_pushlightuserdata(L, &c);
-    g_script.instructionsLeft = INSTRUCTION_BUDGET_PER_TICK;
-    input_action_active=true;
-    int status = lua_pcall(L, 1, 1, 0);
-    input_action_active=false;
+    struct JniArgs a = {env, args, nargs < ACTION_MAX_ARGS ? nargs : ACTION_MAX_ARGS};
+    char* json = gbaduo_script_action(nameChars, push_jni_args, &a, (int) a.count, mayWrite == JNI_TRUE);
     (*env)->ReleaseStringUTFChars(env, name, nameChars);
-    if (status != LUA_OK) {
-        requested_focus_unit=0;
-        const char* err = lua_tostring(L, -1);
-        strncpy(g_script.lastError, err ? err : "action failed", sizeof(g_script.lastError) - 1);
-        lua_pop(L, 1);
+    if (!json) {
         return NULL;
     }
-    if (!lua_istable(L, -1)) {
-        lua_pop(L, 1); /* no UI changes requested */
-        return NULL;
-    }
-
-    struct JsonBuf buf = {0};
-    json_serialize(L, -1, &buf, 0);
-    lua_pop(L, 1);
-    if (buf.failed) {
-        free(buf.data);
-        strncpy(g_script.lastError, "action result too large (out of memory)", sizeof(g_script.lastError) - 1);
-        return NULL;
-    }
-    jstring result = (*env)->NewStringUTF(env, buf.data ? buf.data : "{}");
-    free(buf.data);
+    jstring result = (*env)->NewStringUTF(env, json);
+    free(json);
     return result;
 }
 
@@ -1044,14 +1607,7 @@ Java_com_khumam_gbaduo_emu_NativeCore_lastScriptError(JNIEnv* env, jobject thiz)
 
 JNIEXPORT void JNICALL
 Java_com_khumam_gbaduo_emu_NativeCore_unloadScript(JNIEnv* env, jobject thiz) {
-    requested_focus_unit=0;
-    input_action_active=false;
-    if (g_script.L) {
-        lua_close(g_script.L);
-        g_script.L = NULL;
-    }
-    free_images();
-    g_script.memUsed = 0;
+    gbaduo_script_unload();
 }
 
 JNIEXPORT jintArray JNICALL
@@ -1091,3 +1647,5 @@ Java_com_khumam_gbaduo_emu_NativeCore_nativeImage(JNIEnv* env, jobject thiz, jst
     free(buffer);
     return result;
 }
+
+#endif /* GBADUO_HOST_TEST */

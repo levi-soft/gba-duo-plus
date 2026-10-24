@@ -196,6 +196,125 @@ end
   `navigate`, `back`). It's applied to the screen. Return nothing to leave the
   screen as it is. A returned `call` is ignored; call the Lua function directly.
 - **Timing:** actions run on the emulator thread just before the next
-  `update(ui)`, with the same instruction and memory limits.
+  `update(ui)`, with the same limits as `update`:
+  - **Per call** (`update`, an action): 1M Lua instructions and 25 ms. Reading memory
+    and drawing pictures count too: each byte `mem.read` returns and each pixel
+    `gfx.*` draws (not cached) costs one instruction. Over a limit, the call stops with
+    an error and the screen keeps its last state; the next call starts fresh.
+  - **Loading** (the top level and `init()`, once per game start): 5M instructions and
+    250 ms, for building data tables.
+  - **Memory:** 16 MB for the whole script.
 - **Errors:** an error or a missing function is logged
   (`adb logcat -s EmuThread`) and the screen stays as it was.
+
+## Pictures from the game
+
+A pack can draw the game's own graphics on the companion screen, read from the
+player's ROM at runtime, so the pack doesn't ship them. Each function returns an
+image key (`"gfx:..."`): return it from `update()` and bind it as an `image`'s
+`src` (`"src": "$map.image"`). The image is decoded once and cached; call it
+every tick, the result is the same key.
+
+```lua
+-- One sprite sheet: 4bpp tiles laid out row by row.
+local icon = gfx.decode{ tiles = 0x08ABCDEF, palette = 0x08ABC000, width = 32, height = 32, lz77 = false }
+
+-- A background: tiles placed by a tilemap, like the GBA draws it.
+local map = gfx.tilemap{
+  tiles = 0x08931DB0,    -- 4bpp tiles, 32 bytes each
+  map = 0x08935DB0,      -- u16 entries: tile (bits 0-9), h-flip (10), v-flip (11), palette bank (12-15)
+  palette = 0x085B3910,  -- palette bank 0; bank n is 32 bytes further
+  stride = 32,           -- map entries per row (default 32)
+  x = 5, y = 1,          -- first map cell to draw (default 0, 0)
+  width = 160, height = 128, -- in px, multiples of 8, at most 256
+  opaque = true,         -- draw colour 0 too (default: transparent)
+  lz77 = false,          -- true: tiles and map are both LZ77-compressed (BIOS type 0x10)
+}
+
+-- A sprite: 4bpp tile blocks (OBJ-style, 1D mapping) placed on a canvas.
+local sword = gfx.sprite{
+  tiles = 0x082E5FE0,    -- tile 0; part.tile counts 32-byte tiles from here
+  palette = 0x085A23D0,  -- palette bank 0
+  width = 16, height = 16,
+  parts = {              -- at most 32; an earlier part is drawn over a later one
+    { x = 0, y = 0, w = 16, h = 16, tile = 0x1A0, bank = 3, hflip = false, vflip = false },
+  },
+}
+```
+
+- Everything is read raw from emulated memory, or LZ77-compressed with `lz77 = true`
+  (`gfx.decode`: the tiles; `gfx.tilemap`: tiles and map).
+- Images are at most 256 x 256 px. Up to 96 are kept (fewer when they're large);
+  one dropped from the cache is decoded again when asked for.
+- Colour 0 is transparent in sprites, as on the GBA.
+- Addresses differ between a game's releases: check the game code
+  (`mem.u8(0x080000AC)` onward) and keep a table per release, as
+  `zelda-the-minish-cap-revamp-companion`'s `rom_gfx.lua` does for its world map
+  and item icons (`pokemon-firered-revamp-companion`'s `town_map.lua` draws the
+  compressed Town Map).
+- Call these inside `pcall` and fall back to the pack's own art on failure, so a
+  release you don't know (or a ROM hack) still gets a page.
+
+## Changing the game
+
+A pack's actions can also write to the game's memory: equip an item from the
+companion screen, set a value without opening a menu. Reading needs nothing;
+writing needs a permission, and the player's say-so.
+
+```json
+{
+  "formatVersion": 3,
+  "permissions": ["memory-write"],
+  ...
+}
+```
+
+```lua
+function actions.equip(button, itemId)
+  if mem.u8(SAFE_FLAG) == 1 then
+    local ok, why = mem.write8(B_SLOT, itemId)
+    if not ok then return { set = { message = "Couldn't equip: " .. why } } end
+  end
+end
+```
+
+| Function | Writes |
+|---|---|
+| `mem.write8(addr, value)` | 1 byte (the low 8 bits of `value`) |
+| `mem.write16(addr, value)` | 2 bytes, little-endian |
+| `mem.write32(addr, value)` | 4 bytes, little-endian |
+| `mem.write(addr, bytes)` | a Lua string of raw bytes, 1 to 64 |
+
+Each returns `true` when the write happened, or `false` and a reason when it
+was refused, so the pack can say so on the companion screen. Nothing is written
+when it returns `false`.
+
+The checks live in the app, not in the pack's Lua, so a pack can't skip them:
+
+- **Permission.** Without `"permissions": ["memory-write"]` (formatVersion 3)
+  every write is refused. An unknown permission makes the manifest invalid.
+- **Only from a tap.** Writes work only while an `onClick` action is running.
+  `update()`, `init()` and the script's top level can't write, so a pack can't
+  change the game on its own. A function saved during one tap can't write later.
+- **Only RAM.** GBA EWRAM `0x02000000`-`0x0203FFFF` and IWRAM
+  `0x03000000`-`0x03007FFF`; GB/GBC work RAM `0xC000`-`0xDFFF` and high RAM
+  `0xFF80`-`0xFFFE`. ROM, I/O registers, video memory, the save, and mirrors of
+  RAM are refused. A write must fit entirely inside one region.
+- **Size.** At most 64 bytes per call and 256 bytes per tap.
+- **The player.** Writing is off until the player turns on **Settings > Packs
+  can change games**. Then the first time a pack is about to change a game, the
+  app asks, naming the pack and the game; the answer is kept for that pack and
+  game. If they allow it, a save state is made just before (**Load state >
+  Before pack changes**). The pack picker marks packs that "can modify the game".
+- **Timing.** Writes happen on the emulator thread between frames, so they never
+  race the emulator, and the game sees them on its next frame.
+- **Logged.** Every write is logged with its address and size:
+  `adb logcat -s Companion`.
+
+Writes don't roll back: if an action writes and then errors, what it wrote
+stays. Write last, after every check.
+
+Find real addresses before you write anything, and check a "safe to act"
+condition first: a wrong write can crash the game or spoil the save. See
+[`examples/zelda-items`](examples/zelda-items) and its notes on finding addresses.
+

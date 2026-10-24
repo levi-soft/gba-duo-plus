@@ -9,6 +9,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
+          fetch-depth: 0 # The boundary checker compares against the pinned upstream commit.
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -17,12 +18,18 @@ jobs:
         with:
           node-version: '22'
       - run: node tools/check-public-source.mjs
+      - name: Verify upstream extension boundary
+        run: |
+          node --test tools/upstream-boundary.test.mjs
+          node tools/upstream-boundary.mjs check
       - uses: android-actions/setup-android@v3
         with:
           # The legacy SDK package "tools" is no longer available.
           packages: platform-tools
       - run: sdkmanager "platforms;android-35" "build-tools;35.0.0" "ndk;27.2.12479018" "cmake;3.22.1"
       - uses: gradle/actions/setup-gradle@v4
+      - name: Native sandbox and graphics checks
+        run: app/src/test/native/run.sh
       - name: Focused release tests
         run: >-
           ./gradlew :app:testReleaseUnitTest
@@ -31,6 +38,13 @@ jobs:
           --tests '*ShaderPresetTest' --tests '*LaunchIntentResolverTest'
           --tests '*ExternalRomPathTest' --tests '*RomArchiveTest'
           --tests '*LatestCompanionSnapshotTest' --tests '*CssRasterGridTest'
+          --tests '*ResponsiveCssTest' --tests '*GameTitleTest'
+          --tests '*SaveSyncTest' --tests '*GameStorageTest'
+          --tests '*PackFingerprintTest' --tests '*PackManifestTest'
+          --tests '*RetroAchievementsActivityTest'
+          --tests '*AchievementPopupsTest' --tests '*CompanionTreeTest'
+          --tests '*AutomaticBuilderCoreTest' --tests '*BuilderRomSourceTest'
+          --tests '*BuilderLanguageTest' --tests '*Artwork*Test'
       - run: ./gradlew :app:assembleRelease
       - uses: actions/upload-artifact@v4
         with:
