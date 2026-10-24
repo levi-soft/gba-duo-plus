@@ -1,18 +1,14 @@
 # GBA Duo Plus
 
-Maintenance: Plus-only implementations live in [`plus/`](plus/README.md), with
-an explicit upstream integration inventory and upgrade checker. This remains a
-fork with official Git history; it is not a patch-only distribution.
-
 **A community fork of [GBA Duo](https://github.com/khumam/gba-duo), created by [khumam](https://github.com/khumam).**
 
 GBA Duo made the central idea possible: play Game Boy Advance, Game Boy Color and Game Boy games on one screen of an Android handheld, with an interactive companion on the other. Plus builds on that work rather than replacing its authorship. Thank you to khumam and every upstream contributor for publishing the original application and companion system.
 
-This fork is maintained by [levi-soft](https://github.com/levi-soft). It extends RetroAchievements and adds additional pixel-art shaders, persistent control preferences, companion cursor navigation for selected games, and an optional local connection to GBA Duo Studio.
+Maintained by [levi-soft](https://github.com/levi-soft), Plus adds automatic companion creation, selectable library covers, additional pixel-art shaders, persistent control preferences, companion navigation for supported games and an optional GBA Duo Studio connection. It extends the official RetroAchievements client from GBA Duo 0.1.7.
 
-**Current source version:** `0.1.7` · **Upstream base:** `v0.1.7` · **License:** [GPL v3](LICENSE)
+**Current source version:** `0.1.7-plus.2` · **Upstream base:** `v0.1.7` · **License:** [GPL v3](LICENSE)
 
-[Features](#features) · [Comparison](docs/FEATURES.md) · [Build](docs/BUILDING.md) · [Launchers](docs/LAUNCHERS.md) · [Studio](docs/STUDIO-CONNECTION.md) · [Credits](CREDITS.md)
+[Tiếng Việt](README.vi.md) · [Features](#features) · [Comparison](docs/FEATURES.md) · [Build](docs/BUILDING.md) · [Launchers](docs/LAUNCHERS.md) · [Studio](docs/STUDIO-CONNECTION.md) · [Credits](CREDITS.md)
 
 ## Project identity
 
@@ -30,6 +26,14 @@ Plus is **not an official GBA Duo release** and is not endorsed by its original 
 
 ## Features
 
+### Automatic companions (Plus only)
+
+The library's Companion menu includes **Find and create companion**. Plus downloads a compatible builder profile from the [Companion Builder website](https://levi-soft.github.io/gba-duo-companion-builder/), creates the companion from the player's ROM on the device, and installs and assigns it after successful validation. The ROM is never uploaded. Verified builder downloads are cached for later offline use.
+
+Manual ZIP import remains available. A generated companion receives a separate pack ID; previously installed/custom companions remain available, and cancelling or failing a build preserves the current assignment. Only exact ROM identities listed in the catalogue are supported.
+
+This is a **Plus extension**, not a feature claimed for official GBA Duo. Its implementation lives in `plus/`, connected through a small library-menu hook and private Activity registration. If upstream adds an equivalent complete feature, this extension can be replaced by the official implementation. See [automatic companion architecture and removal steps](docs/AUTOMATIC-COMPANIONS.md).
+
 ### Inherited from GBA Duo
 
 - mGBA-powered GBA, GBC and GB emulation, gamepad input and dual-screen placement.
@@ -43,7 +47,8 @@ Plus is **not an official GBA Duo release** and is not endorsed by its original 
 
 | Area | Plus behavior |
 |---|---|
-| RetroAchievements | Integrated [rcheevos](https://github.com/RetroAchievements/rcheevos) client, account sign-in, recognized-game progress, achievement list, badge images and queued unlock notifications. |
+| Library artwork | Select square covers from a SteamGridDB gallery, import a local PNG/JPEG/WebP, or use the default no-account Libretro source for lookup and missing-artwork scraping. Covers are stored locally, retain aspect ratio and keep the original cartridge drawing as fallback. [Setup and extension boundary](docs/ARTWORK.md). |
+| RetroAchievements | Retains the official 0.1.7 [rcheevos](https://github.com/RetroAchievements/rcheevos) client and adds encrypted token storage, achievement-list UI and save-state progress sidecars. Account sign-in, ROM recognition and the underlying client come from the official integration. |
 | Achievement presentation | Automatic sign-in/game notices, game image and unlocked/total count; bottom-right unlock popups with a 70% background opacity. Unsupported ROMs show a no-achievements notice. |
 | Pixel-art shaders | **xBRZ, HQ2x and ScaleFX**, adapted from the Libretro GLSL shader collection with original notices retained. |
 | Controls | **Swap A/B is remembered** between game sessions. Existing shader persistence is retained for the expanded preset set. |
@@ -88,6 +93,10 @@ Studio is a separate tool, not an emulator dependency. A normal pack should rema
 
 ## Development
 
+Plus-only implementations live in [`plus/`](plus/README.md), with an explicit
+upstream integration inventory and upgrade checker. This remains a fork with
+official Git history; it is not a patch-only distribution.
+
 ```sh
 git clone --recurse-submodules https://github.com/levi-soft/gba-duo-plus.git
 cd gba-duo-plus
@@ -103,6 +112,11 @@ Report Plus-specific problems in [this repository's issue tracker](https://githu
 ## Acknowledgements and license
 
 The original application, its architecture and companion platform are by **khumam and GBA Duo contributors**. Emulation is provided by **mGBA**, scripting by **Lua**, achievement processing by **rcheevos/RetroAchievements**, and the additional shader algorithms by their credited authors in the **Libretro GLSL shader collection**. AndroidX, Compose, Material Components, Kotlin and the Android build tools provide the application platform.
+
+Library cover lookup is made possible by the **Libretro thumbnail community**,
+**SteamGridDB**, and the artists/uploaders credited by those services. Downloaded
+cover images are not bundled in this source repository; Plus retains provider
+and author attribution when it is available.
 
 Please read [CREDITS.md](CREDITS.md), [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) and the retained file headers. Source history is rooted in the official `v0.1.6` history; this fork does not claim authorship of that work.
 

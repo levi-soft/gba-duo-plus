@@ -54,13 +54,14 @@ The optional `tools/package-apk.ps1` audits and copies an already signed APK int
 
 ## Tests
 
-The current publication gate runs the focused release JVM tests:
+The full publication gate is defined in the [CI workflow](../.github/workflows/android.yml).
+This core/features smoke command includes the automatic-builder and artwork suites:
 
 ```sh
-./gradlew :app:testReleaseUnitTest --tests '*PlusFeatureContractTest' --tests '*BridgeProtocolTest' --tests '*Fe7CursorNavigatorTest' --tests '*InputMapperTest' --tests '*ShaderPresetTest' --tests '*LaunchIntentResolverTest' --tests '*ExternalRomPathTest' --tests '*RomArchiveTest' --tests '*LatestCompanionSnapshotTest' --tests '*CssRasterGridTest'
+./gradlew :app:testReleaseUnitTest --tests '*PlusFeatureContractTest' --tests '*BridgeProtocolTest' --tests '*Fe7CursorNavigatorTest' --tests '*InputMapperTest' --tests '*ShaderPresetTest' --tests '*LaunchIntentResolverTest' --tests '*ExternalRomPathTest' --tests '*RomArchiveTest' --tests '*LatestCompanionSnapshotTest' --tests '*CssRasterGridTest' --tests '*AutomaticBuilderCoreTest' --tests '*BuilderRomSourceTest' --tests '*BuilderLanguageTest' --tests '*Artwork*Test'
 ```
 
-Use the release test variant for `PlusFeatureContractTest`, which verifies the release application ID. The 0.1.7 upgrade audit passed 311 JVM tests, excluding the four Compose golden-image cases. The full host suite can be run with `:app:testReleaseUnitTest`; Compose screenshot/raster host-environment limitations are recorded in [VALIDATION](VALIDATION.md), not silently presented as full-suite success.
+Use the release test variant for the publication gate and its application-ID contract. Run the full host suite, including the four Compose screenshot cases, with `:app:testDebugUnitTest`; the debug variant provides the Compose test Activity manifest. The final 2026-10-24 pre-commit Windows run passed all 364 debug tests and 197 tests selected by the CI Release gate. Screenshot references account for Windows native text rendering while retaining the original references and tolerances; see [reference provenance](../app/src/test/screenshots/README.md) and [VALIDATION](VALIDATION.md).
 
 CI is configured to build an unsigned release and run the focused gate. Device installation, real achievement awards, controller behavior and GPU performance require separate testing.
 

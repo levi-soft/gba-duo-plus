@@ -1,3 +1,70 @@
+# Pre-commit review of Plus 0.1.7-plus.2 (2026-10-24)
+
+Current source: `0.1.7-plus.2`, Android code 10, based on official `v0.1.7`
+(`6aa3823b7c4e4c8478b74fe24cf837a19224fc23`). The pristine official reference
+worktree remains clean. The phone/single-screen extension is absent; player,
+input mapper, quick menu and companion controller match the pre-phone baseline.
+
+Independent code, security, test and documentation review found and corrected:
+
+- Artwork request locking could make UI cancellation/navigation wait for image
+  encoding and disk writes. Preparation now precedes a nonblocking final claim;
+  cancelled/stale requests before that point retain the old cover and clean up
+  staged files. A claim accepted before cancellation may finish atomically.
+- SteamGridDB key/provider loading ran on the UI thread; it now runs with the
+  request on the artwork worker, with missing-key setup delivered on the UI thread.
+- A failed generated-pack assignment could truncate the old `pack.json` and also
+  fail its rollback write. The replacement now uses a synced sibling file and
+  atomic move; the injected partial-write failure leaves prior bytes intact and
+  removes the new generated pack.
+- CI omitted the new builder/artwork suites. Its Release filters now include
+  them. Historical test failures, screenshot inference boundaries and moved
+  third-party asset paths are documented accurately.
+
+Final local gates:
+
+- **364 debug tests in 49 suites passed**, including all four screenshot cases;
+  zero failures, errors or skips.
+- **197 Release tests in 27 suites passed**, using the exact 23 test filters
+  extracted from the checked-in CI workflow; zero failures, errors or skips.
+- The combined builder/artwork gate passed **48 tests**, including seven new
+  regressions for the review fixes.
+- Unsigned `:app:assembleRelease` and Release lint passed without signing
+  environment variables, matching the public-source build arrangement.
+- Upstream-boundary checker and its fixture, staged whitespace checks and the
+  source-publication pattern scan passed. The scan includes all newly staged
+  artwork sources/tests, documentation and the Windows reference image.
+- At preparation time, origin was fetched and the branch contained `origin/main`
+  as an ancestor, with 11 existing unpublished commits including the official
+  0.1.7 merge before the newly staged changes. No commit, push, PR or release
+  upload was performed at that preparation stage.
+
+The archived signed `.2` APK was preserved and predates these review fixes; the
+fresh unsigned APK under `app/build/outputs/apk/release/` is built from the
+reviewed source. No device installation or new device acceptance run occurred.
+Linux ASan/UBSan harness execution and hosted GitHub CI remain separate from
+this Windows verification; earlier native/device observations below are historical.
+
+# Windows screenshot validation (2026-10-24)
+
+- The full `:app:testDebugUnitTest` run passed **357 tests in 48 suites**, with
+  zero failures, errors or skipped tests, including all four pack screenshots.
+- The former `cssPackDetailPage` mismatch was reproduced with the original
+  `CompanionScreen.kt` composable from the reference-producing commit `5adb992`,
+  retaining the current layout/model: its Windows capture was byte-identical to
+  the current composable's capture. Text rasterization and
+  advances differ from the original reference; its recording host is unknown.
+- The detail case now selects an explicitly Windows-specific reference on
+  Windows. All four original references and both comparison tolerances remain
+  unchanged. Recording uses the same host-specific path as verification.
+- See [reference provenance and recording instructions](../app/src/test/screenshots/README.md).
+  Independent review found no blocking issues. Production rendering was not
+  changed; no new APK installation, Linux run or physical-device rendering
+  validation was performed for this test fix.
+
+The earlier failing screenshot results below are historical observations,
+superseded by this Windows run.
+
 # Plus 0.1.7 upgrade validation
 
 Date: **2026-10-23**. Upstream: tag **v0.1.7**, commit `6aa3823b7c4e4c8478b74fe24cf837a19224fc23`.

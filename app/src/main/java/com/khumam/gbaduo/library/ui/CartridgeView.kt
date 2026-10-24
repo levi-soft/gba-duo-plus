@@ -28,6 +28,10 @@ class CartridgeView @JvmOverloads constructor(
     attrs: AttributeSet? = null,
 ) : View(context, attrs) {
 
+    /** Optional extension drawing; false keeps the original cartridge unchanged. */
+    var artworkRenderer: ((Canvas, RectF, Boolean) -> Boolean)? = null
+        set(value) { field = value; invalidate() }
+
     var title: String = ""
         set(value) { field = value; labelLayout = null; invalidate() }
     var gameCode: String = ""
@@ -79,6 +83,7 @@ class CartridgeView @JvmOverloads constructor(
     }
 
     override fun onDraw(canvas: Canvas) {
+        if (artworkRenderer?.invoke(canvas, RectF(0f, 0f, width.toFloat(), height.toFloat()), selectedCart) == true) return
         val shadow = if (selectedCart) dp(9f) else dp(6f)
         val pad = ring + dp(2f)
         val availW = width - pad * 2 - shadow

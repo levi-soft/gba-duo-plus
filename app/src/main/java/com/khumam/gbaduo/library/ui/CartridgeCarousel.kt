@@ -23,6 +23,7 @@ class CartridgeCarousel(
     private val recycler: RecyclerView,
     private val onSelected: (Int) -> Unit,
     private val onPlay: (Int) -> Unit,
+    private val bindArtwork: ((CartridgeView, RomEntry) -> Unit)? = null,
 ) {
     private val context = recycler.context
     private val itemWidth = Pixel.dp(context, ITEM_WIDTH_DP).roundToInt()
@@ -168,6 +169,13 @@ class CartridgeCarousel(
                 selectedCart = position == selected
                 contentDescription = title
             }
+            bindArtwork?.invoke(holder.cart, entry)
+        }
+
+        override fun onViewRecycled(holder: Holder) {
+            holder.cart.tag = null
+            holder.cart.artworkRenderer = null
+            super.onViewRecycled(holder)
         }
     }
 

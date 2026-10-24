@@ -1,4 +1,4 @@
-﻿# Plus 0.1.7 compared with official GBA Duo v0.1.7
+# Plus 0.1.7 compared with official GBA Duo v0.1.7
 
 Baseline: official tag `v0.1.7`, commit `6aa3823b7c4e4c8478b74fe24cf837a19224fc23`.
 This is a source comparison; runtime validation limits are in [VALIDATION](VALIDATION.md).
@@ -21,6 +21,8 @@ This is a source comparison; runtime validation limits are in [VALIDATION](VALID
 | Permission-gated pack RAM writes | Present | Adopted | Opt-in setting and per-pack/game consent, bounded work RAM writes, safety state. Plus refuses writes if that safety save fails. |
 | Tap a supported FE unit to move the cursor | No Plus `input.focusUnit` API | Retained | Tap-only ID requests, bounded D-pad navigation and cancellation on physical input; not raw cursor RAM writes. |
 | USB Studio Connection | No Plus bridge | Expanded | Per-session read-only RAM, ROM and graphics inspection with capability discovery. Abstract socket forwarded with ADB; pack RAM-write permission does not authorize bridge writes. |
+| Automatic companion creation | Not part of this pinned baseline | Plus-only addition | Discover exact-ROM profiles, download/cache a verified builder, create locally, then install/assign. Manual ZIP import remains available. Replacement/removal path is documented separately. |
+| ROM artwork | Drawn cartridge placeholders | Plus-only selectable square covers | Manual image import, SteamGridDB gallery, default no-account Libretro lookup and missing-artwork queue; local storage with original cartridge fallback. |
 | Hardcore / hash override / translation | No Hardcore in this release | Not included | Keep Plus's existing scope. Actual ROM identity is used for achievements. |
 
 ## Upgrade choices

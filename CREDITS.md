@@ -6,7 +6,14 @@ Our first and most important thanks go to **[khumam](https://github.com/khumam)*
 
 Plus is a derivative community fork, not an independently invented replacement. The public history is based on upstream tag **v0.1.6**, commit **0c201e9faa224eb1527651ac0ca3e12a3ce0fe5c**. The current 0.1.7 upgrade also merges official tag v0.1.7, commit 6aa3823b7c4e4c8478b74fe24cf837a19224fc23, including the new library, Settings, graphics/CSS APIs, sandbox limits and save synchronization. Original commits and source notices are retained. The inherited `art/banner.png`, original application artwork and format examples come from the upstream project; they are not presented as new Plus artwork.
 
-Plus development is maintained by **[levi-soft](https://github.com/levi-soft)**. Its contributions include the Android RetroAchievements integration/presentation, integration of additional shader pipelines, persistent Swap A/B, companion navigation and rendering changes, opt-in Studio connectivity, and the fork's packaging/documentation. The shader algorithms and achievement rules themselves are not claimed as Plus inventions.
+Plus development is maintained by **[levi-soft](https://github.com/levi-soft)**. Its contributions include local automatic companion creation, library artwork integration, extensions to the official RetroAchievements client/presentation, additional shader pipelines, persistent Swap A/B, companion navigation and rendering changes, opt-in Studio connectivity, and the fork's packaging/documentation. The current RetroAchievements foundation is the official GBA Duo 0.1.7 implementation; Plus does not claim that client, the emulator core, shader algorithms or achievement rules as its inventions.
+
+The original [companion collection](https://github.com/khumam/gba-duo-companions)
+and [companion simulator](https://github.com/khumam/gba-duo-companion-simulator)
+are also credited to their upstream authors and contributors. Plus's visual
+authoring and builder tools build on the pack format and workflow that the
+original project made available. Pack authors retain credit for their layouts,
+scripts and other original contributions.
 
 ## Emulation
 
@@ -34,6 +41,19 @@ Source collection: **[Libretro GLSL shaders](https://github.com/libretro/glsl-sh
 | ScaleFX passes 0-4 | **Sp00kyFox** | MIT |
 
 Plus adapts loading and execution to Android GLES3, including shader-stage selection, pipeline targets and output orientation. The original algorithm bodies/notices are retained. Source filenames and the UI's shorter display names do not change authorship.
+
+## Library artwork sources
+
+- **[Libretro thumbnails](https://github.com/libretro-thumbnails/libretro-thumbnails)**
+  and its contributors provide the public platform box-art indexes used by the
+  default no-account artwork source.
+- **[SteamGridDB](https://www.steamgriddb.com/)** provides its artwork catalogue
+  and API; its community's artists and uploaders create and share the images.
+- Plus implements Android search, selection, local storage and display. It does
+  not claim ownership of the supplied images. Provider, source-page and author
+  attribution are retained when available. Downloaded covers are not included
+  in this source tree; original image files selected by users are not modified
+  or moved.
 
 ## Android and development platform
 

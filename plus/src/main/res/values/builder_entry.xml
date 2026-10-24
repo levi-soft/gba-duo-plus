@@ -1,0 +1,9 @@
+<resources>
+    <string name="plus_builder_title">Automatic companion · Plus</string>
+    <string name="plus_builder_create">Find and create companion</string>
+    <string name="plus_builder_cancel">Cancel</string>
+    <string name="plus_builder_copying">Preparing your ROM on this device…</string>
+    <string name="plus_builder_existing">A new companion will be selected only after creation succeeds. Your current companion stays installed and remains selected if you cancel or creation fails.</string>
+    <string name="plus_builder_gba_only">Automatic creation currently supports GBA games.</string>
+    <string name="plus_builder_failed">Could not create companion: %1$s</string>
+</resources>

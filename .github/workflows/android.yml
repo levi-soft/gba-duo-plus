@@ -43,6 +43,8 @@ jobs:
           --tests '*PackFingerprintTest' --tests '*PackManifestTest'
           --tests '*RetroAchievementsActivityTest'
           --tests '*AchievementPopupsTest' --tests '*CompanionTreeTest'
+          --tests '*AutomaticBuilderCoreTest' --tests '*BuilderRomSourceTest'
+          --tests '*BuilderLanguageTest' --tests '*Artwork*Test'
       - run: ./gradlew :app:assembleRelease
       - uses: actions/upload-artifact@v4
         with:

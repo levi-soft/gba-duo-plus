@@ -23,6 +23,17 @@ changes from review. Small host calls connect lifecycle/input/rendering to these
 implementations. Some existing RA, renderer and native changes still require
 direct integration; they are visible in the inventory and Git diff.
 
+`companion/builder/` owns automatic companion discovery, the verified offline
+builder cache, local WebView execution, ROM staging and safe installation.
+The host only delegates its menu option and registers the private Activity.
+Manual companion ZIP import is retained. Removal/replacement when upstream
+provides equivalent support is documented in [AUTOMATIC-COMPANIONS](../docs/AUTOMATIC-COMPANIONS.md).
+
+`artwork/` owns cover storage, square image rendering, asynchronous binding,
+provider clients, source credentials, the image picker and batch lookup. The
+official carousel only invokes optional bind/draw delegates and opens the Plus
+entry. See [ARTWORK](../docs/ARTWORK.md) for provider setup and removal steps.
+
 ## Review and upgrade
 
 ```sh

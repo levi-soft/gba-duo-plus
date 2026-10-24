@@ -5,6 +5,7 @@ import android.content.Intent
 import android.os.Bundle
 import android.widget.TextView
 import com.khumam.gbaduo.R
+import com.khumam.gbaduo.artwork.ArtworkSettingsActivity
 import com.khumam.gbaduo.achievements.RetroAchievements
 import com.khumam.gbaduo.companion.CompanionSettings
 import com.khumam.gbaduo.library.RomLibrary
@@ -47,6 +48,9 @@ class SettingsActivity : PixelPage() {
             getString(R.string.ra_title), getString(R.string.ra_logged_out)) {
             startActivity(Intent(this, RetroAchievementsActivity::class.java))
         }.second
+        menuCard(R.drawable.ic_settings, Pixel.PURPLE_LIGHT, "Artwork sources", "Choose cover images, configure sources and find missing artwork") {
+            startActivity(Intent(this, ArtworkSettingsActivity::class.java))
+        }
         menuCard(R.drawable.ic_info, Pixel.PINK, getString(R.string.about_title), getString(R.string.about_tagline)) {
             startActivity(Intent(this, AboutActivity::class.java))
         }

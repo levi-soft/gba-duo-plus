@@ -1,16 +1,22 @@
 package com.khumam.gbaduo.companion
 
+import android.app.Activity
+import android.content.ContextWrapper
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Color
+import android.graphics.Rect
+import android.os.Handler
+import android.os.Looper
+import android.view.PixelCopy
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.asAndroidBitmap
-import androidx.compose.ui.test.captureToImage
+import androidx.compose.ui.platform.ViewRootForTest
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onRoot
+import androidx.test.platform.graphics.HardwareRendererCompat
 import com.khumam.gbaduo.companion.android.AndroidCompanionPlatform
 import com.khumam.gbaduo.companion.style.CssParser
 import com.khumam.gbaduo.companion.tree.CompanionTree
@@ -25,6 +31,7 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import java.io.File
 import kotlin.math.abs
+import kotlin.math.roundToInt
 import androidx.compose.ui.graphics.Color as ComposeColor
 
 /**
@@ -72,11 +79,50 @@ class PackScreenshotTest {
         compose.runOnUiThread { afterBuild(tree) }
         compose.waitForIdle()
         assertTrue("$name: style warnings ${tree.warnings}", tree.warnings.isEmpty())
-        return compose.onRoot().captureToImage().asAndroidBitmap()
+        return captureRobolectricRoot()
+    }
+
+    /**
+     * Same window region and PixelCopy path as Compose captureToImage, without its
+     * hardware frame-commit wait: Robolectric has no RenderThread/VSYNC to complete it.
+     * ShadowPixelCopy draws the hierarchy synchronously. AndroidX fixed this upstream:
+     * https://android.googlesource.com/platform/frameworks/support/+/bcef06da086866f7389fdb8e8d5a80cff2ea2808
+     */
+    private fun captureRobolectricRoot(): Bitmap {
+        val node = compose.onRoot().fetchSemanticsNode()
+        val view = (node.root as ViewRootForTest).view
+        val bounds = node.boundsInRoot
+        val rect = Rect(bounds.left.roundToInt(), bounds.top.roundToInt(), bounds.right.roundToInt(), bounds.bottom.roundToInt())
+        val location = IntArray(2)
+        view.getLocationInWindow(location)
+        rect.offset(location[0], location[1])
+        var context = view.context
+        while (context is ContextWrapper && context !is Activity) context = context.baseContext
+        val window = (context as Activity).window
+        val bitmap = Bitmap.createBitmap(rect.width(), rect.height(), Bitmap.Config.ARGB_8888)
+        val drawingEnabled = HardwareRendererCompat.isDrawingEnabled()
+        try {
+            HardwareRendererCompat.setDrawingEnabled(true)
+            var result = -1
+            compose.runOnUiThread {
+                PixelCopy.request(window, rect, bitmap, { result = it }, Handler(Looper.getMainLooper()))
+            }
+            compose.waitForIdle()
+            assertTrue("PixelCopy failed: $result", result == PixelCopy.SUCCESS)
+            return bitmap
+        } finally {
+            HardwareRendererCompat.setDrawingEnabled(drawingEnabled)
+        }
     }
 
     private fun verify(name: String, actual: Bitmap) {
-        val reference = File(references, "$name.png")
+        // Windows native text advances differ for the detail page's multiplier
+        // chips. Keep the upstream reference for other hosts and the same strict
+        // comparison on Windows; see src/test/screenshots/README.md for provenance.
+        val directory = if (name == "party-css-detail" && System.getProperty("os.name").orEmpty().startsWith("Windows", ignoreCase = true)) {
+            File(references, "windows")
+        } else references
+        val reference = File(directory, "$name.png")
         if (record) {
             reference.parentFile?.mkdirs()
             reference.outputStream().use { actual.compress(Bitmap.CompressFormat.PNG, 100, it) }

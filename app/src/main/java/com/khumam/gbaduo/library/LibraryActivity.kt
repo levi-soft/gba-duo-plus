@@ -18,10 +18,14 @@ import android.widget.Toast
 import androidx.recyclerview.widget.RecyclerView
 import com.khumam.gbaduo.R
 import com.khumam.gbaduo.BuildConfig
+import com.khumam.gbaduo.artwork.ArtworkBinder
+import com.khumam.gbaduo.artwork.ArtworkEntry
+import com.khumam.gbaduo.artwork.ArtworkLibraryControls
 import com.khumam.gbaduo.achievements.RetroAchievements
 import com.khumam.gbaduo.companion.PackInstaller
 import com.khumam.gbaduo.companion.PackManifest
 import com.khumam.gbaduo.companion.PackStore
+import com.khumam.gbaduo.companion.builder.AutomaticCompanionEntry
 import com.khumam.gbaduo.library.ui.CartridgeCarousel
 import com.khumam.gbaduo.library.ui.DialogBoxDrawable
 import com.khumam.gbaduo.library.ui.Fonts
@@ -49,6 +53,7 @@ class LibraryActivity : Activity() {
 
     private lateinit var library: RomLibrary
     private lateinit var carousel: CartridgeCarousel
+    private lateinit var artwork: ArtworkBinder
 
     private lateinit var recycler: RecyclerView
     private lateinit var pointer: TextView
@@ -98,7 +103,9 @@ class LibraryActivity : Activity() {
         forwardLegacyLaunch(intent)
         styleViews()
 
-        carousel = CartridgeCarousel(recycler, onSelected = ::showSelected, onPlay = { play() })
+        artwork = ArtworkBinder(this, library)
+        carousel = CartridgeCarousel(recycler, onSelected = ::showSelected, onPlay = { play() }, bindArtwork = artwork::bind)
+        ArtworkLibraryControls.attach(actions as LinearLayout) { selectedEntry()?.let { ArtworkEntry.launch(this, it, library) } }
 
         findViewById<PixelButton>(R.id.open_settings).setOnClickListener { openSettings() }
         findViewById<PixelButton>(R.id.play).setOnClickListener { play() }
@@ -216,6 +223,7 @@ class LibraryActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
+        artwork.refresh()
         refresh()
         if (motion) blink.postDelayed(blinkStep, BLINK_MS)
     }
@@ -227,6 +235,7 @@ class LibraryActivity : Activity() {
     }
 
     override fun onDestroy() {
+        artwork.close()
         io.shutdownNow()
         super.onDestroy()
     }
@@ -248,6 +257,7 @@ class LibraryActivity : Activity() {
                 }
             }
             KeyEvent.KEYCODE_BUTTON_Y -> if (event.repeatCount == 0) selectedEntry()?.let(::showCompanionMenu)
+            KeyEvent.KEYCODE_BUTTON_X -> if (event.repeatCount == 0) selectedEntry()?.let { ArtworkEntry.launch(this, it, library) }
             KeyEvent.KEYCODE_BUTTON_START, KeyEvent.KEYCODE_MENU -> if (event.repeatCount == 0) openSettings()
             else -> return super.onKeyDown(keyCode, event)
         }
@@ -363,6 +373,7 @@ class LibraryActivity : Activity() {
             hint("◀ ▶", getString(R.string.hint_browse))
             hint("A", getString(R.string.play))
             hint("Y", getString(R.string.hint_pack))
+            if (!compact) hint("X", "Artwork")
             if (!compact) hint("L R", getString(R.string.hint_jump))
         } else if (canAddFolder) {
             hint("A", getString(R.string.add_rom_folder))
@@ -402,19 +413,21 @@ class LibraryActivity : Activity() {
                 Triple(crc, storage, packStore.matching(entry.gameCode, crc))
             },
             onResult = { result ->
-                result.onSuccess { (_, storage, matches) -> showCompanionDialog(storage, matches) }
+                result.onSuccess { (crc, storage, matches) -> showCompanionDialog(entry, crc, storage, matches) }
                     .onFailure { Toast.makeText(this, getString(R.string.load_failed, entry.fileName), Toast.LENGTH_SHORT).show() }
             },
         )
     }
 
-    private fun showCompanionDialog(storage: GameStorage, matches: List<PackManifest>) {
+    private fun showCompanionDialog(entry: RomEntry, crc32: Long, storage: GameStorage, matches: List<PackManifest>) {
         val assignedId = storage.packId
         val labels = mutableListOf(getString(R.string.no_pack))
         labels += matches.map { pack ->
             val name = if (pack.id == assignedId) "✓ ${pack.name}" else pack.name
             if (pack.canWriteMemory) "$name · ${getString(R.string.pack_modifies_game)}" else name
         }
+        val automaticIndex = labels.size
+        labels += getString(R.string.plus_builder_create)
         labels += getString(R.string.import_pack)
 
         AlertDialog.Builder(this)
@@ -422,6 +435,7 @@ class LibraryActivity : Activity() {
             .setItems(labels.toTypedArray()) { _, which ->
                 when (which) {
                     0 -> storage.packId = null
+                    automaticIndex -> AutomaticCompanionEntry.launch(this, entry, storage, crc32)
                     labels.size - 1 -> {
                         pickPackFor = storage
                         pickPackZip()
