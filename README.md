@@ -8,6 +8,12 @@ Maintained by [levi-soft](https://github.com/levi-soft), Plus adds automatic com
 
 **Current source version:** `0.1.7-plus.2` · **Upstream base:** `v0.1.7` · **License:** [GPL v3](LICENSE)
 
+**[Download GBA Duo Plus 0.1.7-plus.2 — APK and release notes](https://github.com/levi-soft/gba-duo-plus/releases/tag/v0.1.7-plus.2)**
+
+**Companion tools:** [GBA Duo Companion Builder — build from your ROM](https://levi-soft.github.io/gba-duo-companion-builder/) · [Builder source](https://github.com/levi-soft/gba-duo-companion-builder) · [GBA Duo Studio — visual pack editor](https://github.com/levi-soft/gba-duo-studio)
+
+**[Full Plus feature guide in Vietnamese](docs/PLUS-FEATURES.vi.md)** · [0.1.7-plus.2 release details](docs/RELEASE-0.1.7-plus.2.md)
+
 [Tiếng Việt](README.vi.md) · [Features](#features) · [Comparison](docs/FEATURES.md) · [Build](docs/BUILDING.md) · [Launchers](docs/LAUNCHERS.md) · [Studio](docs/STUDIO-CONNECTION.md) · [Credits](CREDITS.md)
 
 ## Project identity
@@ -26,11 +32,23 @@ Plus is **not an official GBA Duo release** and is not endorsed by its original 
 
 ## Features
 
-### Automatic companions (Plus only)
+### GBA Duo Companion Builder and automatic companions (Plus only)
 
 The library's Companion menu includes **Find and create companion**. Plus downloads a compatible builder profile from the [Companion Builder website](https://levi-soft.github.io/gba-duo-companion-builder/), creates the companion from the player's ROM on the device, and installs and assigns it after successful validation. The ROM is never uploaded. Verified builder downloads are cached for later offline use.
 
 Manual ZIP import remains available. A generated companion receives a separate pack ID; previously installed/custom companions remain available, and cancelling or failing a build preserves the current assignment. Only exact ROM identities listed in the catalogue are supported.
+
+**GBA Duo Companion Builder is also a separate [website](https://levi-soft.github.io/gba-duo-companion-builder/) and [open-source project](https://github.com/levi-soft/gba-duo-companion-builder).** Choose a ROM in Chrome/Edge, build locally, and download a companion ZIP for manual import or a project JSON for GBA Duo Studio. The website offers English and Vietnamese. Both the website and Plus use the same builder core; ROM bytes, extracted images and game text stay on your device, and the original ROM is unchanged.
+
+The published builder **0.9.7** currently supports these exact profiles:
+
+| Companion profile | ROM game code | ROM CRC32 | Generated companion version |
+|---|---|---|---|
+| FE7 Vietnamese | `AE7E` | `32CD990D` | `0.7.15` |
+| FE6 Vietnamese Remastered, built on FE8 | `BE8E` | `BD53D5F3` | `0.4.16` |
+| FE8 Vietnamese | `BE8E` | `3CD932D7` | `0.6.7` |
+
+The FE6 Remastered profile is for the FE8-based project, not an original FE6 ROM. Other revisions need their own supported profile. Keep generated packs containing game assets private; share the builder website instead. See [the complete Builder guide](https://github.com/levi-soft/gba-duo-companion-builder#use-the-website).
 
 This is a **Plus extension**, not a feature claimed for official GBA Duo. Its implementation lives in `plus/`, connected through a small library-menu hook and private Activity registration. If upstream adds an equivalent complete feature, this extension can be replaced by the official implementation. See [automatic companion architecture and removal steps](docs/AUTOMATIC-COMPANIONS.md).
 
@@ -73,10 +91,10 @@ See [the detailed baseline comparison](docs/FEATURES.md). Credit for algorithms,
 
 ## Getting started
 
-1. Obtain a **Plus** build from this repository's [Releases page](https://github.com/levi-soft/gba-duo-plus/releases) when a maintainer publishes one, or [build from source](docs/BUILDING.md). Upstream APKs are the official edition, not Plus.
+1. Download the signed **[0.1.7-plus.2 APK](https://github.com/levi-soft/gba-duo-plus/releases/tag/v0.1.7-plus.2)**, or [build from source](docs/BUILDING.md). Upstream APKs are the official edition, not Plus.
 2. Open Plus and grant access to your own ROM folder using Android's folder picker. Supported inputs include `.gba`, `.gbc`, `.gb` and supported ZIP archives.
 3. Choose a game. Open the in-game menu with L2/BACK for save states, shader selection, Swap A/B and RetroAchievements.
-4. Import a compatible companion ZIP from the library menu and assign it to the game. Packs remain separate from the emulator.
+4. Open the game's Companion menu and choose **Find and create companion**, or import and assign a compatible ZIP. The [Builder website](https://levi-soft.github.io/gba-duo-companion-builder/) can also create ZIPs locally. Packs remain separate from the emulator.
 5. For desktop authoring tools, enable **Studio Connection** only for the current session and connect using USB debugging/ADB.
 
 No APK is committed into the source tree. Release signing requires the maintainer's own key; the public build no longer silently signs release APKs using a local debug key. Existing locally signed installations may require matching signatures to update. Back up your saves before changing installation/signing arrangements.

@@ -2,6 +2,12 @@
 
 ## 0.1.7-plus.2
 
+[Download the signed APK and release notes](https://github.com/levi-soft/gba-duo-plus/releases/tag/v0.1.7-plus.2) · [Full Vietnamese feature guide](docs/PLUS-FEATURES.vi.md)
+
+- Publish the GBA Duo Companion Builder website/source, supported exact-ROM
+  profiles and Studio project workflow prominently in both READMEs, with a
+  complete Plus feature guide and original-author/component acknowledgements.
+
 - Adopt official GBA Duo v0.1.7 as the foundation and retain Plus's dual-display
   player, achievements extensions, shaders, cursor support and Studio bridge.
 - Create and assign companions locally from verified exact-ROM builder profiles,

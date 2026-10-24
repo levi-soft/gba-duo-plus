@@ -15,6 +15,19 @@ authoring and builder tools build on the pack format and workflow that the
 original project made available. Pack authors retain credit for their layouts,
 scripts and other original contributions.
 
+## Plus companion tools
+
+**[GBA Duo Companion Builder](https://github.com/levi-soft/gba-duo-companion-builder)**
+and its [public website](https://levi-soft.github.io/gba-duo-companion-builder/)
+are maintained by levi-soft. The browser website and Plus automatic-creation
+flow share the builder core, exact-ROM preparation profiles, compiler and ZIP
+writer. **[GBA Duo Studio](https://github.com/levi-soft/gba-duo-studio)** supplies
+visual authoring and the compiler used by the builder. These tools depend on
+the companion format created by khumam/GBA Duo; they do not claim ownership of
+the games, extracted ROM artwork or game text. Builder component and profile
+credits are retained in its own
+[CREDITS](https://github.com/levi-soft/gba-duo-companion-builder/blob/main/CREDITS.md).
+
 ## Emulation
 
 **[mGBA](https://mgba.io/)** by **Vicki Pfau (endrift) and the mGBA contributors** supplies the emulation core. Source: [mgba-emu/mgba](https://github.com/mgba-emu/mgba), pinned to `26b7884bc25a5933960f3cdcd98bac1ae14d42e2` (`0.10.5`). The core and its existing filter adaptations retain their **MPL-2.0** terms and original file notices. Thank you for making accurate, portable emulation available to projects like this one.

@@ -1,5 +1,19 @@
 # Pre-commit review of Plus 0.1.7-plus.2 (2026-10-24)
 
+## Publication follow-up
+
+The reviewed code was published through [PR #1](https://github.com/levi-soft/gba-duo-plus/pull/1),
+merged as `025e111bde6aad947f7839af2aa2447ccf29c273`.
+Both PR/push checks passed, and the resulting main-branch
+[CI run](https://github.com/levi-soft/gba-duo-plus/actions/runs/40114281819)
+also passed, including the Linux native sandbox/graphics checks, focused Release
+tests and unsigned release build. The publication follow-up changes documentation
+only and rebuilds the signed APK from the published source; the previously
+archived APK remains a historical artifact. There has been no additional device
+installation or device acceptance run for that rebuild.
+
+## Pre-commit evidence
+
 Current source: `0.1.7-plus.2`, Android code 10, based on official `v0.1.7`
 (`6aa3823b7c4e4c8478b74fe24cf837a19224fc23`). The pristine official reference
 worktree remains clean. The phone/single-screen extension is absent; player,

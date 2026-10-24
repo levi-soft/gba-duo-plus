@@ -13,6 +13,12 @@ hành chính thức hay dự án được tác giả gốc bảo trợ.
 
 **Phiên bản mã nguồn:** `0.1.7-plus.2` · **Giấy phép:** [GPL v3](LICENSE)
 
+**[Tải GBA Duo Plus 0.1.7-plus.2 — APK và thông tin phát hành](https://github.com/levi-soft/gba-duo-plus/releases/tag/v0.1.7-plus.2)**
+
+**[GBA Duo Companion Builder — tạo companion từ ROM](https://levi-soft.github.io/gba-duo-companion-builder/)** · [Mã nguồn Builder](https://github.com/levi-soft/gba-duo-companion-builder) · [GBA Duo Studio — thiết kế companion trực quan](https://github.com/levi-soft/gba-duo-studio)
+
+**[Giới thiệu đầy đủ tính năng Plus và hướng dẫn sử dụng](docs/PLUS-FEATURES.vi.md)** · [Chi tiết bản 0.1.7-plus.2](docs/RELEASE-0.1.7-plus.2.md)
+
 [English](README.md) · [So sánh tính năng](docs/FEATURES.md) · [Hướng dẫn build](docs/BUILDING.md) · [Tri ân và tác giả](CREDITS.md)
 
 ## Plus bổ sung những gì?
@@ -37,6 +43,32 @@ hành chính thức hay dự án được tác giả gốc bảo trợ.
 - **Launcher và bảo trì:** hỗ trợ cấu hình player Daijisho; mã mở rộng Plus
   được đặt trong `plus/`, có danh mục các điểm nối với mã chính thức để phục vụ
   việc cập nhật upstream.
+
+## GBA Duo Companion Builder
+
+[Mở website Builder](https://levi-soft.github.io/gba-duo-companion-builder/) để tạo
+companion ngay trong Chrome/Edge: chọn ROM, bấm **Build companion**, tải ZIP để
+nhập vào ứng dụng hoặc tải project JSON để mở trong GBA Duo Studio. Website có
+giao diện tiếng Việt/Anh. Plus dùng chung bộ builder này để tạo, cài và gán pack
+ngay trong ứng dụng qua **Companion → Find and create companion**.
+
+ROM, hình ảnh và văn bản trích từ game được xử lý trên máy, không gửi lên máy chủ.
+ROM gốc không bị sửa. Builder đã tải và kiểm tra được lưu để dùng lại ngoại tuyến.
+
+Builder **0.9.7** hiện công bố các profile chính xác sau:
+
+| Profile | Game code | CRC32 của ROM | Phiên bản companion |
+|---|---|---|---|
+| FE7 Việt | `AE7E` | `32CD990D` | `0.7.15` |
+| FE6 Việt Remastered, dựng trên FE8 | `BE8E` | `BD53D5F3` | `0.4.16` |
+| FE8 Việt | `BE8E` | `3CD932D7` | `0.6.7` |
+
+FE6 Remastered ở đây là dự án dựng trên FE8, không phải ROM FE6 gốc. ROM khác
+phiên bản cần profile tương ứng. Pack tạo ra có thể chứa tài nguyên từ ROM của
+bạn; hãy giữ riêng và chia sẻ đường dẫn Builder thay cho pack chứa tài nguyên game.
+
+Xem [hướng dẫn và mã nguồn Builder](https://github.com/levi-soft/gba-duo-companion-builder/blob/main/README.vi.md)
+và [toàn bộ tính năng Plus](docs/PLUS-FEATURES.vi.md).
 
 ## Những gì được kế thừa từ bản chính thức
 
