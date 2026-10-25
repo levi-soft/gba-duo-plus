@@ -116,6 +116,49 @@ class AutomaticBuilderCoreTest {
         assertEquals(result.id, storage.packId); assertEquals("keep", marker.readText())
     }
 
+    @Test fun repeatedBuildReplacesOneAutomaticPackWithoutAccumulatingCopies() {
+        val root = createTempDir(); val packs = File(root, "packs")
+        val storage = GameStorage.forGame(root, Platform.GBA, "Game", "AE7E", 0x32cd990d)
+        val first = GeneratedPackTransaction.install(generated(root), packs, storage, "AE7E", 0x32cd990d, null, BuildCancellation())
+        File(packs, "${first.id}/obsolete.txt").writeText("old")
+        val second = GeneratedPackTransaction.install(generated(root), packs, storage, "AE7E", 0x32cd990d, first.id, BuildCancellation())
+        assertEquals(first.id, second.id)
+        assertEquals(listOf(first.id), packs.listFiles()!!.map { it.name })
+        assertFalse(File(packs, "${first.id}/obsolete.txt").exists())
+        assertEquals(second.id, storage.packId)
+    }
+
+    @Test fun failedAutomaticReplacementRestoresPreviousPackAndAssignment() {
+        val root = createTempDir(); val packs = File(root, "packs")
+        val storage = GameStorage.forGame(root, Platform.GBA, "Game", "AE7E", 0x32cd990d)
+        val first = GeneratedPackTransaction.install(generated(root), packs, storage, "AE7E", 0x32cd990d, null, BuildCancellation())
+        File(packs, "${first.id}/keep.txt").writeText("previous pack")
+        val original = File(storage.dir, "pack.json").readBytes()
+        assertThrows(IOException::class.java) {
+            GeneratedPackTransaction.install(generated(root), packs, storage, "AE7E", 0x32cd990d, first.id, BuildCancellation(),
+                writeAssignmentTemporary = { _, _ -> throw IOException("disk full") })
+        }
+        assertEquals("previous pack", File(packs, "${first.id}/keep.txt").readText())
+        assertArrayEquals(original, File(storage.dir, "pack.json").readBytes())
+        assertEquals(listOf(first.id), packs.listFiles()!!.map { it.name })
+    }
+
+    @Test fun legacyUuidAutomaticPackIsUpdatedInPlace() {
+        val root = createTempDir(); val packs = File(root, "packs")
+        val storage = GameStorage.forGame(root, Platform.GBA, "Game", "AE7E", 0x32cd990d)
+        val first = GeneratedPackTransaction.install(generated(root), packs, storage, "AE7E", 0x32cd990d, null, BuildCancellation())
+        val legacyId = "auto-12345678-1234-1234-1234-123456789abc"
+        val old = File(packs, first.id); val legacy = File(packs, legacyId)
+        assertTrue(old.renameTo(legacy))
+        val file = File(legacy, "manifest.json")
+        file.writeText(JSONObject(file.readText()).put("id", legacyId).toString())
+        File(legacy, ".plus-generated-source").delete()
+        storage.packId = legacyId
+        val updated = GeneratedPackTransaction.install(generated(root), packs, storage, "AE7E", 0x32cd990d, legacyId, BuildCancellation())
+        assertEquals(legacyId, updated.id)
+        assertEquals(listOf(legacyId), packs.listFiles()!!.map { it.name })
+    }
+
     @Test fun wrongRomWritePermissionAndStaleAssignmentNeverReplaceExistingChoice() {
         val root = createTempDir(); val packs = File(root, "packs")
         val storage = GameStorage.forGame(root, Platform.GBA, "Game", "AE7E", 0x32cd990d)

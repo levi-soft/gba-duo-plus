@@ -17,4 +17,15 @@ class BuilderLanguageTest {
         assertEquals("Automatic companion · Plus", context.getString(R.string.plus_builder_title))
         assertEquals("Cancel", context.getString(R.string.plus_builder_cancel))
     }
+
+    @Test fun packManagementRemainsEnglishOnVietnameseAndroid() {
+        val context = RuntimeEnvironment.getApplication()
+        assertEquals("Manage installed packs…", context.getString(R.string.plus_packs_manage))
+        assertEquals("Delete pack", context.getString(R.string.plus_packs_delete))
+        assertEquals("Cancel", context.getString(R.string.plus_packs_cancel))
+        assertEquals("No companion packs installed for this game", context.getString(R.string.plus_packs_empty))
+        assertEquals("Companion pack deleted", context.getString(R.string.plus_packs_deleted))
+        assertEquals("Delete FE7 (v1.0.0)?\n\nThis removes the installed pack and unassigns it from every game using it. Your ROMs, saves and original ZIP files are kept.",
+            context.getString(R.string.plus_packs_delete_confirm, "FE7", "1.0.0"))
+    }
 }

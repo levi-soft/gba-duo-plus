@@ -6,15 +6,19 @@ GBA Duo made the central idea possible: play Game Boy Advance, Game Boy Color an
 
 Maintained by [levi-soft](https://github.com/levi-soft), Plus adds automatic companion creation, selectable library covers, additional pixel-art shaders, persistent control preferences, companion navigation for supported games and an optional GBA Duo Studio connection. It extends the official RetroAchievements client from GBA Duo 0.1.7.
 
-**Current source version:** `0.1.7-plus.2` · **Upstream base:** `v0.1.7` · **License:** [GPL v3](LICENSE)
+**Current source version:** `0.1.7-plus.3` · **Upstream base:** `v0.1.7` · **License:** [GPL v3](LICENSE)
 
-**[Download GBA Duo Plus 0.1.7-plus.2 — APK and release notes](https://github.com/levi-soft/gba-duo-plus/releases/tag/v0.1.7-plus.2)**
+**[Download GBA Duo Plus 0.1.7-plus.3 — APK and release notes](https://github.com/levi-soft/gba-duo-plus/releases/tag/v0.1.7-plus.3)**
 
 **Companion tools:** [GBA Duo Companion Builder — build from your ROM](https://levi-soft.github.io/gba-duo-companion-builder/) · [Builder source](https://github.com/levi-soft/gba-duo-companion-builder) · [GBA Duo Studio — visual pack editor](https://github.com/levi-soft/gba-duo-studio)
 
-**[Full Plus feature guide in Vietnamese](docs/PLUS-FEATURES.vi.md)** · [0.1.7-plus.2 release details](docs/RELEASE-0.1.7-plus.2.md)
+**[Full Plus feature guide in Vietnamese](docs/PLUS-FEATURES.vi.md)** · [0.1.7-plus.3 release details](docs/RELEASE-0.1.7-plus.3.md)
 
 [Tiếng Việt](README.vi.md) · [Features](#features) · [Comparison](docs/FEATURES.md) · [Build](docs/BUILDING.md) · [Launchers](docs/LAUNCHERS.md) · [Studio](docs/STUDIO-CONNECTION.md) · [Credits](CREDITS.md)
+
+## New in 0.1.7-plus.3
+
+Automatic companions update in place instead of accumulating copies. The Companion menu now shows versions, distinguishes duplicate names and includes **Manage installed packs…** with confirmed deletion. ROMs, saves and original ZIPs are retained. Management and deletion controls use English even on Vietnamese Android. See the [release notes](docs/RELEASE-0.1.7-plus.3.md).
 
 ## Project identity
 
@@ -36,7 +40,7 @@ Plus is **not an official GBA Duo release** and is not endorsed by its original 
 
 The library's Companion menu includes **Find and create companion**. Plus downloads a compatible builder profile from the [Companion Builder website](https://levi-soft.github.io/gba-duo-companion-builder/), creates the companion from the player's ROM on the device, and installs and assigns it after successful validation. The ROM is never uploaded. Verified builder downloads are cached for later offline use.
 
-Manual ZIP import remains available. A generated companion receives a separate pack ID; previously installed/custom companions remain available, and cancelling or failing a build preserves the current assignment. Only exact ROM identities listed in the catalogue are supported.
+Manual ZIP import remains available. Rebuilding the same automatic companion updates its existing copy; a failed update restores the previous pack and assignment. Custom/manual IDs stay separate. Use **Manage installed packs…** to delete old duplicates. Only exact ROM identities listed in the catalogue are supported.
 
 **GBA Duo Companion Builder is also a separate [website](https://levi-soft.github.io/gba-duo-companion-builder/) and [open-source project](https://github.com/levi-soft/gba-duo-companion-builder).** Choose a ROM in Chrome/Edge, build locally, and download a companion ZIP for manual import or a project JSON for GBA Duo Studio. The website offers English and Vietnamese. Both the website and Plus use the same builder core; ROM bytes, extracted images and game text stay on your device, and the original ROM is unchanged.
 
@@ -91,7 +95,7 @@ See [the detailed baseline comparison](docs/FEATURES.md). Credit for algorithms,
 
 ## Getting started
 
-1. Download the signed **[0.1.7-plus.2 APK](https://github.com/levi-soft/gba-duo-plus/releases/tag/v0.1.7-plus.2)**, or [build from source](docs/BUILDING.md). Upstream APKs are the official edition, not Plus.
+1. Download the signed **[0.1.7-plus.3 APK](https://github.com/levi-soft/gba-duo-plus/releases/tag/v0.1.7-plus.3)**, or [build from source](docs/BUILDING.md). Upstream APKs are the official edition, not Plus.
 2. Open Plus and grant access to your own ROM folder using Android's folder picker. Supported inputs include `.gba`, `.gbc`, `.gb` and supported ZIP archives.
 3. Choose a game. Open the in-game menu with L2/BACK for save states, shader selection, Swap A/B and RetroAchievements.
 4. Open the game's Companion menu and choose **Find and create companion**, or import and assign a compatible ZIP. The [Builder website](https://levi-soft.github.io/gba-duo-companion-builder/) can also create ZIPs locally. Packs remain separate from the emulator.

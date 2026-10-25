@@ -1,0 +1,8 @@
+<resources>
+    <string name="plus_packs_manage">Manage installed packs…</string>
+    <string name="plus_packs_empty">No companion packs installed for this game</string>
+    <string name="plus_packs_delete">Delete pack</string>
+    <string name="plus_packs_cancel">Cancel</string>
+    <string name="plus_packs_delete_confirm">Delete %1$s (v%2$s)?\n\nThis removes the installed pack and unassigns it from every game using it. Your ROMs, saves and original ZIP files are kept.</string>
+    <string name="plus_packs_deleted">Companion pack deleted</string>
+</resources>

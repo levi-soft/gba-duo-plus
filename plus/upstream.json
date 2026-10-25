@@ -29,7 +29,7 @@
     "app/src/main/java/com/khumam/gbaduo/emu/ShaderPreset.kt": "Plus shader pipeline selection and GLES3 host",
     "app/src/main/java/com/khumam/gbaduo/library/LaunchActivity.kt": "External launcher path compatibility and existing-session routing",
     "app/src/main/java/com/khumam/gbaduo/library/LaunchIntentResolver.kt": "External launcher path compatibility and existing-session routing",
-    "app/src/main/java/com/khumam/gbaduo/library/LibraryActivity.kt": "External launcher compatibility, automatic-companion delegation and optional Plus artwork binding/action lifecycle",
+    "app/src/main/java/com/khumam/gbaduo/library/LibraryActivity.kt": "External launcher compatibility, automatic-companion delegation, installed-pack management delegation/version labels and optional Plus artwork binding/action lifecycle",
     "app/src/main/java/com/khumam/gbaduo/library/ui/CartridgeCarousel.kt": "Optional artwork bind callback and recycled-view cleanup; original carousel/navigation retained",
     "app/src/main/java/com/khumam/gbaduo/library/ui/CartridgeView.kt": "Optional artwork draw delegate with unchanged official cartridge fallback",
     "app/src/main/java/com/khumam/gbaduo/settings/SettingsActivity.kt": "Single entry point to Plus artwork source settings",

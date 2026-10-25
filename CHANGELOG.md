@@ -1,5 +1,19 @@
 # Plus changelog
 
+## 0.1.7-plus.3
+
+[Signed APK and release notes](https://github.com/levi-soft/gba-duo-plus/releases/tag/v0.1.7-plus.3) · [What's new](docs/RELEASE-0.1.7-plus.3.md)
+
+- Rebuild the same automatic companion in place instead of adding a new UUID
+  every time. Selected legacy automatic packs are updated in place; failures
+  restore the prior pack and assignment. Manual/custom pack IDs stay separate.
+- Add **Manage installed packs…** with explicit deletion confirmation and clear
+  references from all games, preserving ROMs, saves and original ZIP files.
+- Show companion versions and distinguish identical names/versions by ID.
+- Keep large pack extraction and deleted-file cleanup off the library UI thread.
+- Keep management, deletion confirmations, status messages and Cancel buttons
+  in English, including on Vietnamese Android.
+
 ## 0.1.7-plus.2
 
 [Download the signed APK and release notes](https://github.com/levi-soft/gba-duo-plus/releases/tag/v0.1.7-plus.2) · [Full Vietnamese feature guide](docs/PLUS-FEATURES.vi.md)

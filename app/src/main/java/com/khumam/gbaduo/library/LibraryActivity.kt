@@ -25,6 +25,8 @@ import com.khumam.gbaduo.achievements.RetroAchievements
 import com.khumam.gbaduo.companion.PackInstaller
 import com.khumam.gbaduo.companion.PackManifest
 import com.khumam.gbaduo.companion.PackStore
+import com.khumam.gbaduo.companion.management.CompanionPackManagement
+import com.khumam.gbaduo.companion.management.InstalledPackStorage
 import com.khumam.gbaduo.companion.builder.AutomaticCompanionEntry
 import com.khumam.gbaduo.library.ui.CartridgeCarousel
 import com.khumam.gbaduo.library.ui.DialogBoxDrawable
@@ -422,8 +424,8 @@ class LibraryActivity : Activity() {
     private fun showCompanionDialog(entry: RomEntry, crc32: Long, storage: GameStorage, matches: List<PackManifest>) {
         val assignedId = storage.packId
         val labels = mutableListOf(getString(R.string.no_pack))
-        labels += matches.map { pack ->
-            val name = if (pack.id == assignedId) "✓ ${pack.name}" else pack.name
+        labels += matches.zip(InstalledPackStorage.labels(matches)).map { (pack, label) ->
+            val name = if (pack.id == assignedId) "✓ $label" else label
             if (pack.canWriteMemory) "$name · ${getString(R.string.pack_modifies_game)}" else name
         }
         val automaticIndex = labels.size
@@ -432,6 +434,9 @@ class LibraryActivity : Activity() {
 
         AlertDialog.Builder(this)
             .setTitle(R.string.companion_pack)
+            .setNeutralButton(R.string.plus_packs_manage) { _, _ ->
+                CompanionPackManagement.show(this, entry.gameCode, crc32) { showCompanionMenu(entry) }
+            }
             .setItems(labels.toTypedArray()) { _, which ->
                 when (which) {
                     0 -> storage.packId = null

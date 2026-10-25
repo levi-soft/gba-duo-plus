@@ -44,6 +44,7 @@ jobs:
           --tests '*RetroAchievementsActivityTest'
           --tests '*AchievementPopupsTest' --tests '*CompanionTreeTest'
           --tests '*AutomaticBuilderCoreTest' --tests '*BuilderRomSourceTest'
+          --tests '*InstalledPackStorageTest'
           --tests '*BuilderLanguageTest' --tests '*Artwork*Test'
       - run: ./gradlew :app:assembleRelease
       - uses: actions/upload-artifact@v4

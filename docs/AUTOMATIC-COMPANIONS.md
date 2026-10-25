@@ -8,7 +8,17 @@ In the library, select a game, open its Companion menu and choose **Find and cre
 
 Your ROM is never uploaded. The downloaded builder is cached and verified again before offline reuse. Only exact ROM profiles in the catalogue are supported; an unsupported ROM can still use manual ZIP import. The [website](https://levi-soft.github.io/gba-duo-companion-builder/) offers the same builder with ZIP/project downloads for manual use and [GBA Duo Studio](https://github.com/levi-soft/gba-duo-studio).
 
-A previously installed companion remains installed. A new generated companion has a distinct pack ID. Cancelling or failing creation leaves the previous assignment in place; selecting an existing custom pack is not silently replaced in the background.
+Automatic packs use a stable ID for each source profile and exact ROM. Creating
+the same companion again updates its installed copy, with the old pack and
+assignment restored if commit fails. A selected automatic pack made by older
+Plus versions (UUID ID) is updated in place. Custom/manual IDs stay separate.
+Cancelling or failing creation leaves the previous assignment in place.
+
+The Companion menu shows versions and disambiguates identical names/versions by
+ID. Choose **Manage installed packs…**, select a pack, then confirm **Delete pack**
+to remove an old duplicate. Deletion clears all current and legacy assignments
+to that pack, retaining ROMs, saves, other packs and the original imported ZIP.
+Existing duplicates are not silently deleted merely because their names match.
 
 The new assignment is written and synchronized in a sibling temporary file,
 then atomically replaces `pack.json`. A partial write or failed replacement
@@ -55,3 +65,22 @@ The later Windows screenshot-reference fix brought the combined builder/artwork
 debug suite to 357/357 passing, including all four screenshot cases, with the
 original references and comparison tolerances retained. Current pre-commit
 verification and subsequent fixes are recorded in [VALIDATION](VALIDATION.md).
+
+## Plus 0.1.7-plus.3 regression checks
+
+The full Debug host suite passed 371 tests, including duplicate-build replacement,
+legacy automatic ID reuse, rollback after assignment-write failure, deletion
+across current/legacy assignments, version/ID labels and the real confirmation
+dialog. The confirmation test verifies Cancel preserves the pack before testing
+Delete. These host checks do not establish live device acceptance.
+
+The focused Release gate passed 203 tests and assembleRelease succeeded.
+The signed 0.1.7-plus.3 APK (Android code 11) matched the installed signing
+certificate and updated Thor using adb install -r. On-device inspection confirmed
+version labels, the management entry and deletion confirmation. No installed
+user pack was deleted during this check; a full real-device repeated build
+remains separate from the automated transaction regressions above.
+
+Pack management, deletion confirmations, status messages and Cancel buttons use
+English consistently with Plus, including on Vietnamese Android. The Vietnamese
+overrides were removed; BuilderLanguageTest verifies the locale fallback.

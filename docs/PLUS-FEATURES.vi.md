@@ -1,13 +1,17 @@
 # GBA Duo Plus: tính năng và bộ công cụ companion
 
-**GBA Duo Plus 0.1.7-plus.2** là bản fork cộng đồng do [levi-soft](https://github.com/levi-soft)
+**GBA Duo Plus 0.1.7-plus.3** là bản fork cộng đồng do [levi-soft](https://github.com/levi-soft)
 duy trì trên nền [GBA Duo v0.1.7 của khumam](https://github.com/khumam/gba-duo).
 Ứng dụng dành cho thiết bị Android hai màn hình, Android 11 trở lên, ARM64.
 Thiết bị phát triển chính là AYN Thor; các máy hai màn hình khác cần kiểm tra riêng.
 
-**[Tải APK và đọc ghi chú phát hành](https://github.com/levi-soft/gba-duo-plus/releases/tag/v0.1.7-plus.2)** ·
+**[Tải APK và đọc ghi chú phát hành](https://github.com/levi-soft/gba-duo-plus/releases/tag/v0.1.7-plus.3)** ·
 [Website Companion Builder](https://levi-soft.github.io/gba-duo-companion-builder/) ·
 [GBA Duo Studio](https://github.com/levi-soft/gba-duo-studio)
+
+## Mới ở 0.1.7-plus.3: cập nhật và quản lý pack
+
+Trong menu Companion, **Manage installed packs…** cho chọn và xóa pack cũ sau khi xác nhận. Menu hiển thị phiên bản; các bản cùng tên/phiên bản được phân biệt bằng ID. Tạo lại cùng companion cập nhật bản tự động hiện có, kể cả ID UUID của bản Plus cũ đang chọn. Lỗi cập nhật giữ pack và liên kết cũ; ROM/save/ZIP gốc được giữ. Giao diện giả lập dùng tiếng Anh, tài liệu này là hướng dẫn tiếng Việt. [Ghi chú phát hành](RELEASE-0.1.7-plus.3.md).
 
 ## 1. Tạo companion tự động ngay trong Plus
 
@@ -19,7 +23,7 @@ tra kích thước/SHA-256, tạo pack ngay trên thiết bị, rồi cài và g
 - Hình ảnh, sprite và văn bản cần cho pack được chuẩn bị từ ROM trên thiết bị.
 - Builder đã xác minh được lưu cục bộ để dùng lại khi ngoại tuyến.
 - Có thể hủy quá trình tạo. Lỗi hoặc hủy trước khi hoàn tất gán giữ nguyên lựa chọn cũ.
-- Pack mới có ID riêng; pack đã cài và pack tùy chỉnh vẫn được giữ.
+- Tạo lại cùng companion tự động sẽ cập nhật pack cũ; lỗi cập nhật khôi phục pack và lựa chọn trước đó. Pack thủ công/tùy chỉnh giữ ID riêng.
 - Nhập và gán ZIP thủ công vẫn có sẵn cho companion khác.
 
 Chỉ ROM khớp profile trong catalogue mới tạo tự động được. Đây là chức năng của
@@ -135,7 +139,7 @@ Bản này không có chế độ chơi trên điện thoại một màn hình �
 
 ## 9. Bản phát hành và kiểm chứng
 
-[Release 0.1.7-plus.2](https://github.com/levi-soft/gba-duo-plus/releases/tag/v0.1.7-plus.2)
+[Release 0.1.7-plus.3](https://github.com/levi-soft/gba-duo-plus/releases/tag/v0.1.7-plus.3)
 cung cấp APK ARM64 đã ký và SHA-256. APK được build từ source công bố, bao gồm
 các sửa lỗi hủy/tạo pack và ảnh bìa từ đợt rà soát cuối. Mã phiên bản Android là `10`.
 

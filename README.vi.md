@@ -11,15 +11,22 @@ Plus do [levi-soft](https://github.com/levi-soft) duy trì, phát triển thêm 
 nền GBA Duo chính thức **v0.1.7**. Đây là bản fork độc lập, không phải bản phát
 hành chính thức hay dự án được tác giả gốc bảo trợ.
 
-**Phiên bản mã nguồn:** `0.1.7-plus.2` · **Giấy phép:** [GPL v3](LICENSE)
+**Phiên bản mã nguồn:** `0.1.7-plus.3` · **Giấy phép:** [GPL v3](LICENSE)
 
-**[Tải GBA Duo Plus 0.1.7-plus.2 — APK và thông tin phát hành](https://github.com/levi-soft/gba-duo-plus/releases/tag/v0.1.7-plus.2)**
+**[Tải GBA Duo Plus 0.1.7-plus.3 — APK và thông tin phát hành](https://github.com/levi-soft/gba-duo-plus/releases/tag/v0.1.7-plus.3)**
 
 **[GBA Duo Companion Builder — tạo companion từ ROM](https://levi-soft.github.io/gba-duo-companion-builder/)** · [Mã nguồn Builder](https://github.com/levi-soft/gba-duo-companion-builder) · [GBA Duo Studio — thiết kế companion trực quan](https://github.com/levi-soft/gba-duo-studio)
 
-**[Giới thiệu đầy đủ tính năng Plus và hướng dẫn sử dụng](docs/PLUS-FEATURES.vi.md)** · [Chi tiết bản 0.1.7-plus.2](docs/RELEASE-0.1.7-plus.2.md)
+**[Giới thiệu đầy đủ tính năng Plus và hướng dẫn sử dụng](docs/PLUS-FEATURES.vi.md)** · [Chi tiết bản 0.1.7-plus.3](docs/RELEASE-0.1.7-plus.3.md)
 
 [English](README.md) · [So sánh tính năng](docs/FEATURES.md) · [Hướng dẫn build](docs/BUILDING.md) · [Tri ân và tác giả](CREDITS.md)
+
+## Mới trong 0.1.7-plus.3
+
+Tạo lại companion tự động sẽ cập nhật pack cũ, không tạo bản sao mỗi lần.
+Menu hiển thị phiên bản, phân biệt pack trùng tên và thêm **Manage installed packs…**
+để xóa bản cũ có xác nhận. ROM, save và ZIP gốc được giữ lại. Giao diện quản lý/xóa
+dùng tiếng Anh, kể cả trên Android tiếng Việt. Xem [ghi chú phát hành](docs/RELEASE-0.1.7-plus.3.md).
 
 ## Plus bổ sung những gì?
 
