@@ -11,22 +11,19 @@ Plus do [levi-soft](https://github.com/levi-soft) duy trì, phát triển thêm 
 nền GBA Duo chính thức **v0.1.7**. Đây là bản fork độc lập, không phải bản phát
 hành chính thức hay dự án được tác giả gốc bảo trợ.
 
-**Phiên bản mã nguồn:** `0.1.7-plus.3` · **Giấy phép:** [GPL v3](LICENSE)
+**Phiên bản mã nguồn:** `0.1.7-plus.4` · **Giấy phép:** [GPL v3](LICENSE)
 
-**[Tải GBA Duo Plus 0.1.7-plus.3 — APK và thông tin phát hành](https://github.com/levi-soft/gba-duo-plus/releases/tag/v0.1.7-plus.3)**
+**[Tải GBA Duo Plus 0.1.7-plus.4 — APK và thông tin phát hành](https://github.com/levi-soft/gba-duo-plus/releases/tag/v0.1.7-plus.4)**
 
 **[GBA Duo Companion Builder — tạo companion từ ROM](https://levi-soft.github.io/gba-duo-companion-builder/)** · [Mã nguồn Builder](https://github.com/levi-soft/gba-duo-companion-builder) · [GBA Duo Studio — thiết kế companion trực quan](https://github.com/levi-soft/gba-duo-studio)
 
-**[Giới thiệu đầy đủ tính năng Plus và hướng dẫn sử dụng](docs/PLUS-FEATURES.vi.md)** · [Chi tiết bản 0.1.7-plus.3](docs/RELEASE-0.1.7-plus.3.md)
+**[Giới thiệu đầy đủ tính năng Plus và hướng dẫn sử dụng](docs/PLUS-FEATURES.vi.md)** · [Chi tiết bản 0.1.7-plus.4](docs/RELEASE-0.1.7-plus.4.md)
 
 [English](README.md) · [So sánh tính năng](docs/FEATURES.md) · [Hướng dẫn build](docs/BUILDING.md) · [Tri ân và tác giả](CREDITS.md)
 
-## Mới trong 0.1.7-plus.3
+## Mới trong 0.1.7-plus.4
 
-Tạo lại companion tự động sẽ cập nhật pack cũ, không tạo bản sao mỗi lần.
-Menu hiển thị phiên bản, phân biệt pack trùng tên và thêm **Manage installed packs…**
-để xóa bản cũ có xác nhận. ROM, save và ZIP gốc được giữ lại. Giao diện quản lý/xóa
-dùng tiếng Anh, kể cả trên Android tiếng Việt. Xem [ghi chú phát hành](docs/RELEASE-0.1.7-plus.3.md).
+Companion có thể gửi các nút GB/GBA tiêu chuẩn cho game khớp profile. Chọn unit trên Map dùng metadata của pack, giúp thêm ROM tương thích mà không cần thêm whitelist APK. Khi một lượt Lua lỗi, Plus giữ dữ liệu hợp lệ gần nhất và ghi rõ trạng thái cũ/lỗi trong dữ liệu chẩn đoán, tránh làm trắng companion. [Ghi chú phát hành](docs/RELEASE-0.1.7-plus.4.md).
 
 ## Plus bổ sung những gì?
 
@@ -62,20 +59,25 @@ ngay trong ứng dụng qua **Companion → Find and create companion**.
 ROM, hình ảnh và văn bản trích từ game được xử lý trên máy, không gửi lên máy chủ.
 ROM gốc không bị sửa. Builder đã tải và kiểm tra được lưu để dùng lại ngoại tuyến.
 
-Builder **0.9.7** hiện công bố các profile chính xác sau:
+### Builder 1.1.0 — mười profile ROM chính xác
 
-| Profile | Game code | CRC32 của ROM | Phiên bản companion |
+Bảy companion tiếng Anh được chốt **1.0.0**, cùng ba companion Việt hóa **1.0.0**. Builder **1.1.0** bổ sung bảy profile cho website và chức năng tạo tự động trong Plus. Sau này chỉ tăng Builder khi thêm profile; sửa companion dùng phiên bản riêng.
+
+| Profile | Game code | CRC32 | Companion |
 |---|---|---|---|
-| FE7 Việt | `AE7E` | `32CD990D` | `0.7.15` |
-| FE6 Việt Remastered, dựng trên FE8 | `BE8E` | `BD53D5F3` | `0.4.16` |
-| FE8 Việt | `BE8E` | `3CD932D7` | `0.6.7` |
+| FE7 Vietnamese | `AE7E` | `32CD990D` | 1.0.0 |
+| FE6 Vietnamese | `BE8E` | `BD53D5F3` | 1.0.0 |
+| FE8 Vietnamese | `BE8E` | `3CD932D7` | 1.0.0 |
+| FE7 English | `AE7E` | `2A524221` | 1.0.0 |
+| FE8 Europe | `BE8P` | `B3005195` | 1.0.0 |
+| FE8 English - USA/Australia | `BE8E` | `A47246AE` | 1.0.0 |
+| FE6 T-EN | `AFEJ` | `197DE10B` | 1.0.0 |
+| Project Ember | `AFEJ` | `636F7B05` | 1.0.0 |
+| Project Ember Reverse Recruitment | `AFEJ` | `29BC2257` | 1.0.0 |
+| Void's Blitzarre Adventure | `BE8E` | `9D22107C` | 1.0.0 |
 
-FE6 Remastered ở đây là dự án dựng trên FE8, không phải ROM FE6 gốc. ROM khác
-phiên bản cần profile tương ứng. Pack tạo ra có thể chứa tài nguyên từ ROM của
-bạn; hãy giữ riêng và chia sẻ đường dẫn Builder thay cho pack chứa tài nguyên game.
+FE6 T-EN là FE6 gốc; FE6 Việt hóa Remastered là ROM hack trên nền FE8. ROM khác hoặc bản vá khác cần profile riêng. Các profile tiếng Anh dùng UI, Growth và Analysis tiếng Anh. Void hỗ trợ sáu ô skill và Talk; lớp phủ phạm vi trên Map hiện chưa tính skill thay đổi tầm/di chuyển. Xem [phạm vi và kiểm chứng](https://github.com/levi-soft/gba-duo-companion-builder/blob/main/docs/RELEASE-1.1.0.md).
 
-Xem [hướng dẫn và mã nguồn Builder](https://github.com/levi-soft/gba-duo-companion-builder/blob/main/README.vi.md)
-và [toàn bộ tính năng Plus](docs/PLUS-FEATURES.vi.md).
 
 ## Những gì được kế thừa từ bản chính thức
 

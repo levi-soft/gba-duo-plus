@@ -40,6 +40,8 @@ const char* gbaduo_script_last_error(void);
 void gbaduo_script_unload(void);
 /** Consumes the last valid Plus cursor request; 0 means none. No game memory writes. */
 int gbaduo_script_take_focus_unit(void);
+/** Consumes a tap's standard-key pulse: keys in bits 0..9, frames in bits 10+. */
+int gbaduo_script_take_buttons(void);
 
 /** For tests: a malloc'd copy of the ARGB8888 image for a "gfx:..." key, or NULL. */
 uint32_t* gbaduo_script_image(const char* key, int* width, int* height);

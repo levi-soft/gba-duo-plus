@@ -6,19 +6,19 @@ GBA Duo made the central idea possible: play Game Boy Advance, Game Boy Color an
 
 Maintained by [levi-soft](https://github.com/levi-soft), Plus adds automatic companion creation, selectable library covers, additional pixel-art shaders, persistent control preferences, companion navigation for supported games and an optional GBA Duo Studio connection. It extends the official RetroAchievements client from GBA Duo 0.1.7.
 
-**Current source version:** `0.1.7-plus.3` · **Upstream base:** `v0.1.7` · **License:** [GPL v3](LICENSE)
+**Current source version:** `0.1.7-plus.4` · **Upstream base:** `v0.1.7` · **License:** [GPL v3](LICENSE)
 
-**[Download GBA Duo Plus 0.1.7-plus.3 — APK and release notes](https://github.com/levi-soft/gba-duo-plus/releases/tag/v0.1.7-plus.3)**
+**[Download GBA Duo Plus 0.1.7-plus.4 — APK and release notes](https://github.com/levi-soft/gba-duo-plus/releases/tag/v0.1.7-plus.4)**
 
 **Companion tools:** [GBA Duo Companion Builder — build from your ROM](https://levi-soft.github.io/gba-duo-companion-builder/) · [Builder source](https://github.com/levi-soft/gba-duo-companion-builder) · [GBA Duo Studio — visual pack editor](https://github.com/levi-soft/gba-duo-studio)
 
-**[Full Plus feature guide in Vietnamese](docs/PLUS-FEATURES.vi.md)** · [0.1.7-plus.3 release details](docs/RELEASE-0.1.7-plus.3.md)
+**[Full Plus feature guide in Vietnamese](docs/PLUS-FEATURES.vi.md)** · [0.1.7-plus.4 release details](docs/RELEASE-0.1.7-plus.4.md)
 
 [Tiếng Việt](README.vi.md) · [Features](#features) · [Comparison](docs/FEATURES.md) · [Build](docs/BUILDING.md) · [Launchers](docs/LAUNCHERS.md) · [Studio](docs/STUDIO-CONNECTION.md) · [Credits](CREDITS.md)
 
-## New in 0.1.7-plus.3
+## New in 0.1.7-plus.4
 
-Automatic companions update in place instead of accumulating copies. The Companion menu now shows versions, distinguishes duplicate names and includes **Manage installed packs…** with confirmed deletion. ROMs, saves and original ZIPs are retained. Management and deletion controls use English even on Vietnamese Android. See the [release notes](docs/RELEASE-0.1.7-plus.3.md).
+Companions can request standard GB/GBA button pulses for matching games. FE Map focus reads exact-ROM navigation metadata from the pack, allowing compatible new profiles without adding an APK whitelist entry. Transient Lua errors retain the last complete companion view and expose stale/error diagnostics instead of blanking the screen. [Release notes](docs/RELEASE-0.1.7-plus.4.md).
 
 ## Project identity
 
@@ -44,17 +44,24 @@ Manual ZIP import remains available. Rebuilding the same automatic companion upd
 
 **GBA Duo Companion Builder is also a separate [website](https://levi-soft.github.io/gba-duo-companion-builder/) and [open-source project](https://github.com/levi-soft/gba-duo-companion-builder).** Choose a ROM in Chrome/Edge, build locally, and download a companion ZIP for manual import or a project JSON for GBA Duo Studio. The website offers English and Vietnamese. Both the website and Plus use the same builder core; ROM bytes, extracted images and game text stay on your device, and the original ROM is unchanged.
 
-The published builder **0.9.7** currently supports these exact profiles:
+### Builder 1.1.0 — ten exact ROM profiles
 
-| Companion profile | ROM game code | ROM CRC32 | Generated companion version |
+Seven English companions are now finalized at **1.0.0**, alongside the three Vietnamese companions at **1.0.0**. Builder **1.1.0** adds the seven profiles to both the website and Plus automatic creation. Future companion fixes keep the builder version; only adding profiles advances it.
+
+| Profile | Game code | CRC32 | Companion |
 |---|---|---|---|
-| FE7 Vietnamese | `AE7E` | `32CD990D` | `0.7.15` |
-| FE6 Vietnamese Remastered, built on FE8 | `BE8E` | `BD53D5F3` | `0.4.16` |
-| FE8 Vietnamese | `BE8E` | `3CD932D7` | `0.6.7` |
+| FE7 Vietnamese | `AE7E` | `32CD990D` | 1.0.0 |
+| FE6 Vietnamese | `BE8E` | `BD53D5F3` | 1.0.0 |
+| FE8 Vietnamese | `BE8E` | `3CD932D7` | 1.0.0 |
+| FE7 English | `AE7E` | `2A524221` | 1.0.0 |
+| FE8 Europe | `BE8P` | `B3005195` | 1.0.0 |
+| FE8 English - USA/Australia | `BE8E` | `A47246AE` | 1.0.0 |
+| FE6 T-EN | `AFEJ` | `197DE10B` | 1.0.0 |
+| Project Ember | `AFEJ` | `636F7B05` | 1.0.0 |
+| Project Ember Reverse Recruitment | `AFEJ` | `29BC2257` | 1.0.0 |
+| Void's Blitzarre Adventure | `BE8E` | `9D22107C` | 1.0.0 |
 
-The FE6 Remastered profile is for the FE8-based project, not an original FE6 ROM. Other revisions need their own supported profile. Keep generated packs containing game assets private; share the builder website instead. See [the complete Builder guide](https://github.com/levi-soft/gba-duo-companion-builder#use-the-website).
-
-This is a **Plus extension**, not a feature claimed for official GBA Duo. Its implementation lives in `plus/`, connected through a small library-menu hook and private Activity registration. If upstream adds an equivalent complete feature, this extension can be replaced by the official implementation. See [automatic companion architecture and removal steps](docs/AUTOMATIC-COMPANIONS.md).
+FE6 T-EN is original FE6; Vietnamese Remastered is an FE8-based hack. Other ROM revisions and patches need independent profiles. English profiles use English Growth/Analysis and shared UI. Void includes six skill slots and Talk; its Map range overlays still use base movement/weapon ranges and do not include range-changing skills. See [release scope and validation](https://github.com/levi-soft/gba-duo-companion-builder/blob/main/docs/RELEASE-1.1.0.md).
 
 ### Inherited from GBA Duo
 
@@ -74,7 +81,7 @@ This is a **Plus extension**, not a feature claimed for official GBA Duo. Its im
 | Achievement presentation | Automatic sign-in/game notices, game image and unlocked/total count; bottom-right unlock popups with a 70% background opacity. Unsupported ROMs show a no-achievements notice. |
 | Pixel-art shaders | **xBRZ, HQ2x and ScaleFX**, adapted from the Libretro GLSL shader collection with original notices retained. |
 | Controls | **Swap A/B is remembered** between game sessions. Existing shader persistence is retained for the expanded preset set. |
-| Companion interaction | Optional `input.focusUnit(id)` Lua action support for verified Fire Emblem cursor profiles. Navigation uses bounded D-pad input and respects game state and physical input. |
+| Companion interaction | Tap-scoped `input.press` sends standard buttons for any matching game. Optional `input.focusUnit(id)` uses pack-owned exact-ROM FE map contracts, with legacy-pack fallback. Input is bounded and physical input cancels it. [Authoring and compatibility](docs/CURSOR-FOCUS.md). |
 | Companion rendering | Additional sizing, raster-grid/aspect-fit and retained-snapshot behavior used by complex packs. This does not make every arbitrary pack/device combination automatically compatible. |
 | Daijisho custom player | Add **GBA Duo Plus** as a player to launch ROMs directly. Retains upstream's `LaunchActivity`, with additional path aliases, input validation and session/lifecycle handling. See [player setup and launch arguments](docs/LAUNCHERS.md#add-a-gba-duo-plus-player-in-daijisho). |
 | Studio Connection | Per-session opt-in, read-only local RAM/snapshot and bounded ROM/VRAM/palette/OAM inspection for compatible desktop tooling. Revision-2 capability discovery retains the existing wire envelope. No LAN listener or memory-write command. The upstream permission-gated pack tap API is separate from this read-only desktop bridge. |
@@ -95,7 +102,7 @@ See [the detailed baseline comparison](docs/FEATURES.md). Credit for algorithms,
 
 ## Getting started
 
-1. Download the signed **[0.1.7-plus.3 APK](https://github.com/levi-soft/gba-duo-plus/releases/tag/v0.1.7-plus.3)**, or [build from source](docs/BUILDING.md). Upstream APKs are the official edition, not Plus.
+1. Download the signed **[0.1.7-plus.4 APK](https://github.com/levi-soft/gba-duo-plus/releases/tag/v0.1.7-plus.4)**, or [build from source](docs/BUILDING.md). Upstream APKs are the official edition, not Plus.
 2. Open Plus and grant access to your own ROM folder using Android's folder picker. Supported inputs include `.gba`, `.gbc`, `.gb` and supported ZIP archives.
 3. Choose a game. Open the in-game menu with L2/BACK for save states, shader selection, Swap A/B and RetroAchievements.
 4. Open the game's Companion menu and choose **Find and create companion**, or import and assign a compatible ZIP. The [Builder website](https://levi-soft.github.io/gba-duo-companion-builder/) can also create ZIPs locally. Packs remain separate from the emulator.

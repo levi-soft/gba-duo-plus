@@ -46,6 +46,8 @@ object NativeCore {
     external fun frameCounter(): Long
     /** Consumes the pack's latest input.focusUnit request; zero when none. */
     external fun takeScriptFocusUnit(): Int
+    /** Consumes one bounded standard-button pulse from a successful Lua tap action. */
+    external fun takeScriptButtons(): Int
 
     /**
      * Replaces any currently-loaded pack script with [source], run in a sandboxed Lua

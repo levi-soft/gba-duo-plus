@@ -83,6 +83,7 @@ struct GbaDuoScript {
 
 static struct GbaDuoScript g_script;
 static int requested_focus_unit;
+static int requested_buttons;
 static bool input_action_active;
 
 /* Input requests contain only a deployment ID. The host validates the ROM,
@@ -92,7 +93,35 @@ static int l_input_focus_unit(lua_State* L) {
     lua_Integer id=luaL_checkinteger(L,1);
     if(id<1 || id>178) return luaL_error(L,"unit ID out of range");
     requested_focus_unit=(int)id;
+    requested_buttons=0;
     return 0;
+}
+
+/* Standard GBA keys only. A tap can request one pulse of at most half a second.
+ * The emulator owns timing/cancellation; Lua never sleeps or writes input RAM. */
+static int input_button(lua_State* L, int index) {
+    static const char* names[] = {"A","B","SELECT","START","RIGHT","LEFT","UP","DOWN","R","L",NULL};
+    const char* name=luaL_checkstring(L,index);
+    for(int i=0;names[i];i++) if(strcmp(name,names[i])==0) return 1<<i;
+    return luaL_error(L,"unknown GBA button: %s",name);
+}
+static int l_input_press(lua_State* L) {
+    if(!input_action_active) return luaL_error(L,"input.press is only available from a tap action");
+    int keys=0;
+    if(lua_istable(L,1)) {
+        size_t count=lua_rawlen(L,1);
+        if(count<1 || count>10) return luaL_error(L,"expected 1 to 10 GBA buttons");
+        for(size_t i=1;i<=count;i++) { lua_rawgeti(L,1,(lua_Integer)i);keys|=input_button(L,-1);lua_pop(L,1); }
+    } else keys=input_button(L,1);
+    lua_Integer frames=luaL_optinteger(L,2,1);
+    if(frames<1 || frames>30 || (keys&0x30)==0x30 || (keys&0xC0)==0xC0)
+        return luaL_error(L,"invalid input pulse");
+    requested_buttons=keys|((int)frames<<10);
+    requested_focus_unit=0;
+    return 0;
+}
+int gbaduo_script_take_buttons(void) {
+    int command=requested_buttons;requested_buttons=0;return command;
 }
 int gbaduo_script_take_focus_unit(void) {
     int id=requested_focus_unit;requested_focus_unit=0;return id;
@@ -100,6 +129,9 @@ int gbaduo_script_take_focus_unit(void) {
 #ifndef GBADUO_HOST_TEST
 JNIEXPORT jint JNICALL Java_com_khumam_gbaduo_emu_NativeCore_takeScriptFocusUnit(JNIEnv* env,jobject self) {
     (void)env;(void)self;return gbaduo_script_take_focus_unit();
+}
+JNIEXPORT jint JNICALL Java_com_khumam_gbaduo_emu_NativeCore_takeScriptButtons(JNIEnv* env,jobject self) {
+    (void)env;(void)self;return gbaduo_script_take_buttons();
 }
 #endif
 
@@ -1159,7 +1191,8 @@ static void remove_global(lua_State* L, const char* name) {
 
 static void register_api(lua_State* L) {
     requested_focus_unit=0;
-    static const luaL_Reg inputFuncs[]={{"focusUnit",l_input_focus_unit},{NULL,NULL}};
+    requested_buttons=0;
+    static const luaL_Reg inputFuncs[]={{"focusUnit",l_input_focus_unit},{"press",l_input_press},{NULL,NULL}};
     luaL_newlib(L,inputFuncs);
     lua_setglobal(L,"input");
     static const luaL_Reg memFuncs[] = {
@@ -1408,6 +1441,7 @@ char* gbaduo_script_action(const char* name, gbaduo_push_args push, void* userda
 
     if (status != LUA_OK) {
         requested_focus_unit = 0;
+        requested_buttons = 0;
         const char* err = lua_tostring(L, -1);
         set_error(err ? err : "action failed");
         lua_pop(L, 1);
@@ -1422,6 +1456,7 @@ char* gbaduo_script_action(const char* name, gbaduo_push_args push, void* userda
 
 void gbaduo_script_unload(void) {
     requested_focus_unit = 0;
+    requested_buttons = 0;
     input_action_active = false;
     if (g_script.L) {
         lua_close(g_script.L);

@@ -109,6 +109,7 @@ class EmuThread(
     private var debugCrc = ""
     private var latestDebugData: Map<String, Any?>? = null
     private var latestDebugFrame: Long? = null
+    private val retainedScriptSnapshot = com.khumam.gbaduo.companion.RetainedScriptSnapshot()
     private var effectiveInputKeys = 0
     private var navigatorTarget = 0
     private val studioConnection = StudioConnection(object : BridgeProtocol.Backend {
@@ -142,9 +143,10 @@ class EmuThread(
 
         debugGameCode = NativeCore.gameCode().removePrefix("AGB-")
         debugCrc = "%08X".format(NativeCore.crc32())
-        val cursorProfile = CursorProfile.forRom(debugGameCode,debugCrc)
-        val cursorNavigator = Fe7CursorNavigator(NativeCore::rawRead8, NativeCore::rawRead16, NativeCore::rawRead32,cursorProfile ?: CursorProfile.FE7)
-        val supportsCursor = cursorProfile != null
+        val romCrc = NativeCore.crc32()
+        var inputPack: PackManifest? = null
+        var cursorNavigator: FeMapCursorNavigator? = null
+        val buttonInput = CompanionButtonInput()
 
         try {
         gameView.setVideoSize(NativeCore.videoWidth(), NativeCore.videoHeight())
@@ -155,31 +157,48 @@ class EmuThread(
         var nextFrameAt = System.nanoTime()
         while (running) {
             studioConnection.service(BuildConfig.DEBUG || studioConnectionEnabled)
-            if (activePack !== scriptLoadedForPack) cursorNavigator.cancel()
+            val pack = activePack
+            if (pack !== inputPack) {
+                cursorNavigator?.cancel()
+                buttonInput.cancel()
+                NativeCore.takeScriptFocusUnit()
+                NativeCore.takeScriptButtons()
+                inputPack = pack
+                cursorNavigator = CompanionCursorProfile.resolve(pack, debugGameCode, romCrc)?.let {
+                    FeMapCursorNavigator(NativeCore::rawRead8, NativeCore::rawRead16, NativeCore::rawRead32, it)
+                }
+            }
             RetroAchievements.serviceCommands()
             if (paused) {
-                cursorNavigator.cancel()
+                cursorNavigator?.cancel()
+                buttonInput.cancel()
                 // Taps on the companion screen still get their data while the game is paused.
                 if (snapshotRequested) serviceCompanion(activePack)
                 NativeCore.takeScriptFocusUnit() // discard taps made while paused
+                NativeCore.takeScriptButtons()
                 RetroAchievements.paused()
                 Thread.sleep(16)
                 nextFrameAt = System.nanoTime()
                 continue
             }
-            if (pendingSaveState.get() != null) cursorNavigator.cancel()
+            val changingState = pendingSaveState.get() != null
+            if (changingState) { cursorNavigator?.cancel(); buttonInput.cancel(); retainedScriptSnapshot.clear() }
             servicePendingStateRequest()
             val focusUnit = NativeCore.takeScriptFocusUnit()
-            if (focusUnit != 0) cursorNavigator.focus(focusUnit, supportsCursor)
+            val buttons = NativeCore.takeScriptButtons()
+            if (!changingState && pack === scriptLoadedForPack && pack?.matches(debugGameCode, romCrc) == true) {
+                if (focusUnit != 0) { buttonInput.cancel(); cursorNavigator?.focus(focusUnit, true) }
+                if (buttons != 0) { cursorNavigator?.cancel(); buttonInput.request(buttons) }
+            }
 
             val fastForward = input.fastForward()
             val speed = if (fastForward) ffMultiplier.coerceAtLeast(2) else 1
 
             repeat(speed) {
                 val physical = input.keys()
-                val effective = cursorNavigator.keys(physical)
-                if (BuildConfig.DEBUG && effective != effectiveInputKeys) android.util.Log.d("GbaDuoInput", "frame=" + NativeCore.frameCounter() + " physical=" + physical + " effective=" + effective + " target=" + cursorNavigator.activeTarget + " ff=" + input.fastForward())
-                effectiveInputKeys = effective; navigatorTarget = cursorNavigator.activeTarget
+                val effective = if (buttonInput.active) buttonInput.keys(physical) else cursorNavigator?.keys(physical) ?: physical
+                if (BuildConfig.DEBUG && effective != effectiveInputKeys) android.util.Log.d("GbaDuoInput", "frame=" + NativeCore.frameCounter() + " physical=" + physical + " effective=" + effective + " target=" + (cursorNavigator?.activeTarget ?: 0) + " ff=" + input.fastForward())
+                effectiveInputKeys = effective; navigatorTarget = cursorNavigator?.activeTarget ?: 0
                 NativeCore.runFrame(effective)
                 RetroAchievements.frame()
             }
@@ -273,7 +292,9 @@ class EmuThread(
         if (due || framesSinceSnapshot >= interval) {
             framesSinceSnapshot = 0
             val snapshotStarted = System.nanoTime()
-            val snapshot = CompanionSnapshot.build(pack, NativeCoreMemoryReader, NativeCore.frameCounter(), scriptActive)
+            val snapshot = retainedScriptSnapshot.accept(
+                CompanionSnapshot.build(pack, NativeCoreMemoryReader, NativeCore.frameCounter(), scriptActive)
+            )
             if (BuildConfig.DEBUG) android.util.Log.d("GbaDuoPerf", "snapshotMs=" + (System.nanoTime() - snapshotStarted) / 1_000_000)
             latestDebugData = snapshot
             latestDebugFrame = NativeCore.frameCounter()
@@ -309,6 +330,7 @@ class EmuThread(
     /** Loads/unloads the pack's Lua script (if any) exactly once per pack change, on this thread. */
     private fun syncScriptForPack(pack: PackManifest?) {
         if (pack === scriptLoadedForPack) return
+        retainedScriptSnapshot.clear()
         scriptLoadedForPack = pack
         scriptActive = false
         LuaScript.unload()

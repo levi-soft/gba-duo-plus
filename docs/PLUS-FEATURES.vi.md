@@ -1,17 +1,17 @@
 # GBA Duo Plus: tính năng và bộ công cụ companion
 
-**GBA Duo Plus 0.1.7-plus.3** là bản fork cộng đồng do [levi-soft](https://github.com/levi-soft)
+**GBA Duo Plus 0.1.7-plus.4** là bản fork cộng đồng do [levi-soft](https://github.com/levi-soft)
 duy trì trên nền [GBA Duo v0.1.7 của khumam](https://github.com/khumam/gba-duo).
 Ứng dụng dành cho thiết bị Android hai màn hình, Android 11 trở lên, ARM64.
 Thiết bị phát triển chính là AYN Thor; các máy hai màn hình khác cần kiểm tra riêng.
 
-**[Tải APK và đọc ghi chú phát hành](https://github.com/levi-soft/gba-duo-plus/releases/tag/v0.1.7-plus.3)** ·
+**[Tải APK và đọc ghi chú phát hành](https://github.com/levi-soft/gba-duo-plus/releases/tag/v0.1.7-plus.4)** ·
 [Website Companion Builder](https://levi-soft.github.io/gba-duo-companion-builder/) ·
 [GBA Duo Studio](https://github.com/levi-soft/gba-duo-studio)
 
-## Mới ở 0.1.7-plus.3: cập nhật và quản lý pack
+## Mới ở 0.1.7-plus.4
 
-Trong menu Companion, **Manage installed packs…** cho chọn và xóa pack cũ sau khi xác nhận. Menu hiển thị phiên bản; các bản cùng tên/phiên bản được phân biệt bằng ID. Tạo lại cùng companion cập nhật bản tự động hiện có, kể cả ID UUID của bản Plus cũ đang chọn. Lỗi cập nhật giữ pack và liên kết cũ; ROM/save/ZIP gốc được giữ. Giao diện giả lập dùng tiếng Anh, tài liệu này là hướng dẫn tiếng Việt. [Ghi chú phát hành](RELEASE-0.1.7-plus.3.md).
+Điều khiển companion dùng nút GB/GBA tiêu chuẩn và metadata con trỏ trong pack. Dữ liệu UI hợp lệ gần nhất được giữ khi một lượt Lua lỗi, kèm cờ stale và thông tin lỗi để chẩn đoán. Quản lý/xóa pack, cập nhật tại chỗ, artwork, shader, Studio và các tính năng Plus trước đó tiếp tục được giữ. [Ghi chú phát hành](RELEASE-0.1.7-plus.4.md).
 
 ## 1. Tạo companion tự động ngay trong Plus
 
@@ -42,18 +42,22 @@ Builder và Plus dùng chung bộ tạo companion. Trên website Chrome/Edge:
 3. Bấm **Build companion** và chờ xử lý cục bộ.
 4. Tải Local ZIP để nhập vào Plus, hoặc project JSON để chỉnh sửa trong Studio.
 
-Các profile công bố trong builder **0.9.7**:
+Builder **1.1.0** hỗ trợ mười profile sau; tất cả companion là **1.0.0**.
 
-| Profile | Game code | CRC32 ROM | Phiên bản companion |
+| Profile | Game code | CRC32 | Companion |
 |---|---|---|---|
-| FE7 Việt | `AE7E` | `32CD990D` | `0.7.15` |
-| FE6 Việt Remastered, dựng trên FE8 | `BE8E` | `BD53D5F3` | `0.4.16` |
-| FE8 Việt | `BE8E` | `3CD932D7` | `0.6.7` |
+| FE7 Vietnamese | `AE7E` | `32CD990D` | 1.0.0 |
+| FE6 Vietnamese | `BE8E` | `BD53D5F3` | 1.0.0 |
+| FE8 Vietnamese | `BE8E` | `3CD932D7` | 1.0.0 |
+| FE7 English | `AE7E` | `2A524221` | 1.0.0 |
+| FE8 Europe | `BE8P` | `B3005195` | 1.0.0 |
+| FE8 English - USA/Australia | `BE8E` | `A47246AE` | 1.0.0 |
+| FE6 T-EN | `AFEJ` | `197DE10B` | 1.0.0 |
+| Project Ember | `AFEJ` | `636F7B05` | 1.0.0 |
+| Project Ember Reverse Recruitment | `AFEJ` | `29BC2257` | 1.0.0 |
+| Void's Blitzarre Adventure | `BE8E` | `9D22107C` | 1.0.0 |
 
-FE6 Remastered ở đây không phải ROM FE6 gốc. Builder không tự suy ra bố cục bộ nhớ
-của mọi game, bản dịch hoặc ROM hack. Danh sách trên là catalogue tại thời điểm
-phát hành; catalogue có thể được cập nhật độc lập với APK.
-Pack được tạo có tài nguyên từ ROM nên cần giữ riêng; hãy chia sẻ website Builder.
+FE6 T-EN là FE6 gốc; FE6 Remastered Việt hóa là mod trên nền FE8. Void có sáu ô skill và Talk, nhưng phạm vi Map chưa tính skill thay đổi tầm/di chuyển. [Phạm vi và kiểm chứng](https://github.com/levi-soft/gba-duo-companion-builder/blob/main/docs/RELEASE-1.1.0.md).
 
 ## 3. Ảnh bìa thư viện game
 
@@ -139,7 +143,7 @@ Bản này không có chế độ chơi trên điện thoại một màn hình �
 
 ## 9. Bản phát hành và kiểm chứng
 
-[Release 0.1.7-plus.3](https://github.com/levi-soft/gba-duo-plus/releases/tag/v0.1.7-plus.3)
+[Release 0.1.7-plus.4](https://github.com/levi-soft/gba-duo-plus/releases/tag/v0.1.7-plus.4)
 cung cấp APK ARM64 đã ký và SHA-256. APK được build từ source công bố, bao gồm
 các sửa lỗi hủy/tạo pack và ảnh bìa từ đợt rà soát cuối. Mã phiên bản Android là `10`.
 

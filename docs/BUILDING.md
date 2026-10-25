@@ -58,7 +58,7 @@ The full publication gate is defined in the [CI workflow](../.github/workflows/a
 This core/features smoke command includes the automatic-builder and artwork suites:
 
 ```sh
-./gradlew :app:testReleaseUnitTest --tests '*PlusFeatureContractTest' --tests '*BridgeProtocolTest' --tests '*Fe7CursorNavigatorTest' --tests '*InputMapperTest' --tests '*ShaderPresetTest' --tests '*LaunchIntentResolverTest' --tests '*ExternalRomPathTest' --tests '*RomArchiveTest' --tests '*LatestCompanionSnapshotTest' --tests '*CssRasterGridTest' --tests '*AutomaticBuilderCoreTest' --tests '*BuilderRomSourceTest' --tests '*BuilderLanguageTest' --tests '*Artwork*Test'
+./gradlew :app:testReleaseUnitTest --tests '*PlusFeatureContractTest' --tests '*BridgeProtocolTest' --tests '*FeMapCursorNavigatorTest' --tests '*CompanionInputTest' --tests '*InputMapperTest' --tests '*ShaderPresetTest' --tests '*LaunchIntentResolverTest' --tests '*ExternalRomPathTest' --tests '*RomArchiveTest' --tests '*LatestCompanionSnapshotTest' --tests '*CssRasterGridTest' --tests '*AutomaticBuilderCoreTest' --tests '*BuilderRomSourceTest' --tests '*BuilderLanguageTest' --tests '*Artwork*Test'
 ```
 
 Use the release test variant for the publication gate and its application-ID contract. Run the full host suite, including the four Compose screenshot cases, with `:app:testDebugUnitTest`; the debug variant provides the Compose test Activity manifest. The final 2026-10-24 pre-commit Windows run passed all 364 debug tests and 197 tests selected by the CI Release gate. Screenshot references account for Windows native text rendering while retaining the original references and tolerances; see [reference provenance](../app/src/test/screenshots/README.md) and [VALIDATION](VALIDATION.md).

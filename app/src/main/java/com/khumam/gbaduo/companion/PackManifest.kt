@@ -1,6 +1,8 @@
 package com.khumam.gbaduo.companion
 
 import org.json.JSONObject
+import com.khumam.gbaduo.emu.CursorProfile
+import com.khumam.gbaduo.emu.CursorProfileParser
 
 data class ValueSpec(
     val addr: Long?,
@@ -27,6 +29,8 @@ data class PackManifest(
     val styleFiles: List<String> = emptyList(),
     /** What the pack may do beyond reading the game: see [PERMISSIONS]. */
     val permissions: Set<String> = emptySet(),
+    /** Optional exact-ROM map navigation contract, interpreted by Plus. */
+    val cursorNavigation: CursorProfile? = null,
 ) {
     /** The pack's actions may change the game's RAM (`mem.write*`), once the player allows it. */
     val canWriteMemory: Boolean get() = MEMORY_WRITE in permissions
@@ -102,6 +106,16 @@ data class PackManifest(
                 throw InvalidManifestException("Unknown permission ${unknown.joinToString()}")
             }
 
+            val cursorNavigation = if (root.has("cursorNavigation")) {
+                try {
+                    require(gameCodes.isNotEmpty() && crc32s.isNotEmpty()) { "cursorNavigation requires exact ROM matches" }
+                    require(gameCodes.all { it.matches(Regex("[A-Z0-9]{4}")) } && crc32s.all { it in 0..0xFFFFFFFFL }) { "Invalid cursorNavigation ROM match" }
+                    CursorProfileParser.parse(root.getJSONObject("cursorNavigation"))
+                } catch (e: Exception) {
+                    throw InvalidManifestException(e.message ?: "Invalid cursorNavigation")
+                }
+            } else null
+
             return PackManifest(
                 id = id,
                 name = root.optString("name", id),
@@ -116,6 +130,7 @@ data class PackManifest(
                 values = values,
                 styleFiles = styleFiles,
                 permissions = permissions,
+                cursorNavigation = cursorNavigation,
             )
         }
     }

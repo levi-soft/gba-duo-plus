@@ -500,6 +500,30 @@ static void cache_keeps_many_small_images(void) {
     CHECK(found == 40);
 }
 
+static void plus_button_requests_stay_tap_scoped(void) {
+    fake_reset(GBADUO_BUS_GBA);
+    load("actions={} function update() return {ok=pcall(input.press,'A')} end "
+         "function actions.press() input.press({'A','RIGHT'},3);return {} end "
+         "function actions.fail() input.press('B');error('test') end "
+         "function actions.bad() input.press('X');return {} end "
+         "function actions.long() input.press('A',31);return {} end "
+         "function actions.opposite() input.press({'LEFT','RIGHT'});return {} end "
+         "function actions.buttons() for _,key in ipairs({'A','B','SELECT','START','RIGHT','LEFT','UP','DOWN','R','L'}) do input.press(key,30) end;return {} end "
+         "function actions.replace() input.focusUnit(2);input.press('START');return {} end "
+         "function actions.focus() input.press('A');input.focusUnit(2);return {} end");
+    char* result=gbaduo_script_tick();CHECK(json_has(result,"false"));free(result);
+    CHECK(gbaduo_script_take_buttons()==0);
+    result=action("press",0);CHECK(result!=NULL);free(result);
+    CHECK(gbaduo_script_take_buttons()==((3<<10)|0x11));CHECK(gbaduo_script_take_buttons()==0);
+    result=action("buttons",0);CHECK(result!=NULL);free(result);CHECK(gbaduo_script_take_buttons()==((30<<10)|512));
+    const char* bad[]={"fail","bad","long","opposite"};
+    for(int i=0;i<4;i++) { result=action(bad[i],0);CHECK(result==NULL);free(result);CHECK(gbaduo_script_take_buttons()==0); }
+    result=action("replace",0);free(result);CHECK(gbaduo_script_take_focus_unit()==0);CHECK(gbaduo_script_take_buttons()==((1<<10)|8));
+    result=action("focus",0);free(result);CHECK(gbaduo_script_take_buttons()==0);CHECK(gbaduo_script_take_focus_unit()==2);
+    result=action("press",0);free(result);gbaduo_script_unload();CHECK(gbaduo_script_take_buttons()==0);
+    CHECK(fake_writes==0);
+}
+
 static void plus_cursor_requests_stay_tap_scoped(void) {
     fake_reset(GBADUO_BUS_GBA);
     load("actions={} function update() local ok=pcall(input.focusUnit,1);return {ok=ok} end "
@@ -535,6 +559,7 @@ int main(void) {
     CHECK(!plus_studio_range_valid(0x08000000, 65537, 0x1000000));
     CHECK(!plus_studio_range_valid(0x08000000, 0, 0x1000000));
     plus_cursor_requests_stay_tap_scoped();
+    plus_button_requests_stay_tap_scoped();
     refused_outside_an_action();
     refused_without_permission();
     ram_writes_succeed_and_read_back();
