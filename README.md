@@ -14,6 +14,12 @@ Maintained by [levi-soft](https://github.com/levi-soft), Plus adds automatic com
 
 **[Full Plus feature guide in Vietnamese](docs/PLUS-FEATURES.vi.md)** · [0.1.7-plus.4 release details](docs/RELEASE-0.1.7-plus.4.md)
 
+**Single Screen edition:** [GBA Duo Plus SS](docs/SINGLE-SCREEN.md)
+embeds game and companion on one display, with portrait/landscape touch controls.
+It is a separate installable build in the same [Plus.4 release](https://github.com/levi-soft/gba-duo-plus/releases/tag/v0.1.7-plus.4).
+The default Plus build retains dual-screen behavior. See the SS guide for device
+validation and known startup limits.
+
 [Tiếng Việt](README.vi.md) · [Features](#features) · [Comparison](docs/FEATURES.md) · [Build](docs/BUILDING.md) · [Launchers](docs/LAUNCHERS.md) · [Studio](docs/STUDIO-CONNECTION.md) · [Credits](CREDITS.md)
 
 ## New in 0.1.7-plus.4

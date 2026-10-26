@@ -4,6 +4,7 @@ import android.app.Activity
 import android.app.ActivityOptions
 import android.app.AlertDialog
 import android.content.Intent
+import android.content.res.Configuration
 import android.hardware.display.DisplayManager
 import android.net.Uri
 import android.os.Bundle
@@ -31,6 +32,12 @@ import com.khumam.gbaduo.library.GameTitle
 import com.khumam.gbaduo.library.RomArchive
 import com.khumam.gbaduo.library.RomHeader
 import com.khumam.gbaduo.library.RomIndex
+import com.khumam.gbaduo.library.Platform
+import com.khumam.gbaduo.companion.PreparedCompanion
+import com.khumam.gbaduo.player.singlescreen.SingleScreenPlayerHost
+import com.khumam.gbaduo.player.singlescreen.SingleScreenQuickActions
+import com.khumam.gbaduo.player.singlescreen.SingleScreenWindows
+import com.khumam.gbaduo.player.singlescreen.StartupTasks
 import com.khumam.gbaduo.storage.GameStorage
 import com.khumam.gbaduo.storage.LegacyMigration
 import com.khumam.gbaduo.storage.SaveMirror
@@ -48,6 +55,9 @@ class PlayerActivity : Activity() {
     private var resumed = false
     private var achievementPopups: AchievementPopups? = null
     private var saveMirror: SaveMirror? = null
+    private var singleScreen: SingleScreenPlayerHost? = null
+    private var startupTasks: StartupTasks? = null
+    private var singleScreenActions: SingleScreenQuickActions? = null
 
     /**
      * Whether this is Android's top resumed activity: the one on the top focused display,
@@ -75,7 +85,21 @@ class PlayerActivity : Activity() {
                 View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN or
                 View.SYSTEM_UI_FLAG_FULLSCREEN
             )
-        setContentView(R.layout.activity_player)
+        if (BuildConfig.SINGLE_SCREEN) {
+            window.setDecorFitsSystemWindows(false)
+            val surface = GameView(this).apply { id = R.id.game_view; preserveEGLContextOnPause = true }
+            singleScreen = SingleScreenPlayerHost(this, surface, onKeys = { keys ->
+                if (::input.isInitialized) {
+                    input.setTouchKeys(keys)
+                    if (input.keys() and directionMask == 0) requestCompanionDraw()
+                }
+            }, onMenu = ::showQuickMenu,
+                onQuickSave = { singleScreen?.releaseControls(); singleScreenActions?.save() },
+                onQuickLoad = { singleScreen?.releaseControls(); singleScreenActions?.load() },
+                onFastForward = { enabled -> if (::input.isInitialized) input.setTouchFastForward(enabled) }
+            ).also { setContentView(it) }
+            startupTasks = StartupTasks(post = { action -> companionHandler.post { action() } })
+        } else setContentView(R.layout.activity_player)
 
         val romUriString = intent.getStringExtra(EXTRA_ROM_URI)
         val romFileName = intent.getStringExtra(EXTRA_ROM_FILE_NAME)
@@ -84,45 +108,85 @@ class PlayerActivity : Activity() {
             return
         }
 
-        // A zip is unpacked here: the core gets the ROM's own bytes either way.
-        val rom = runCatching {
-            contentResolver.openInputStream(Uri.parse(romUriString))?.use { RomArchive.readRom(romFileName, it) }
-        }.getOrNull()
-        if (rom == null) {
-            Toast.makeText(this, getString(R.string.load_failed, romFileName), Toast.LENGTH_SHORT).show()
-            finish()
-            return
+        val ready: (Result<GameSource>) -> Unit = { result ->
+            result.onSuccess(::startGame).onFailure {
+                Toast.makeText(this, getString(R.string.load_failed, romFileName), Toast.LENGTH_LONG).show()
+                finish()
+            }
         }
-        val romBytes = rom.bytes
+        if (BuildConfig.SINGLE_SCREEN) startupTasks?.submit({ readGameSource(romUriString, romFileName) }, ready)
+        else ready(runCatching { readGameSource(romUriString, romFileName) })
+    }
 
-        // Everything about this game lives in one folder keyed by platform + ROM CRC.
-        // mGBA's own CRC32 is over the same bytes, so this matches NativeCore.crc32().
-        val header = RomHeader.parse(rom.fileName, romBytes.copyOf(minOf(romBytes.size, RomHeader.SIZE)))
-        val crc32 = RomIndex.crc32Of(romBytes)
+    private data class GameSource(val rom: RomArchive.Rom, val header: RomHeader, val crc32: Long, val storage: GameStorage)
+
+    private fun readGameSource(uri: String, fileName: String): GameSource {
+        val started = android.os.SystemClock.elapsedRealtime()
+        val rom = contentResolver.openInputStream(Uri.parse(uri))?.use { stream ->
+            // ZipInputStream otherwise makes 512-byte reads across a document provider.
+            val input = if (BuildConfig.SINGLE_SCREEN) stream.buffered(64 * 1024) else stream
+            RomArchive.readRom(fileName, input)
+        }
+            ?: error("No readable ROM")
+        if (BuildConfig.SINGLE_SCREEN) android.util.Log.i("SSStartup", "ROM read: ${android.os.SystemClock.elapsedRealtime() - started} ms")
+        val header = RomHeader.parse(rom.fileName, rom.bytes.copyOf(minOf(rom.bytes.size, RomHeader.SIZE)))
+        val crc32 = RomIndex.crc32Of(rom.bytes)
         val storage = GameStorage.forGame(filesDir, header.platform, header.title, header.gameCode, crc32)
-        LegacyMigration.migrate(filesDir, romFileName, crc32, storage)
+        LegacyMigration.migrate(filesDir, fileName, crc32, storage)
         storage.ensureDirs()
+        if (BuildConfig.SINGLE_SCREEN) android.util.Log.i("SSStartup", "ROM preparation: ${android.os.SystemClock.elapsedRealtime() - started} ms")
+        return GameSource(rom, header, crc32, storage)
+    }
+
+    private fun startGame(source: GameSource) {
+        if (isFinishing || isDestroyed) return
+        val mirror = SaveMirror.forGame(this, source.storage)?.also {
+            it.onUnavailable = {
+                runOnUiThread {
+                    if (!isFinishing) Toast.makeText(this, R.string.save_folder_unavailable, Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+        if (BuildConfig.SINGLE_SCREEN) {
+            startupTasks?.submit({ mirror?.syncIn() }) {
+                saveMirror = mirror
+                startEmulation(source)
+            }
+        } else {
+            mirror?.syncIn()
+            saveMirror = mirror
+            startEmulation(source)
+        }
+    }
+
+    private fun startEmulation(source: GameSource) {
+        val (rom, header, crc32, storage) = source
 
         // With a save folder set, take in newer saves from it (another device) before the
         // core opens game.sav, then mirror changes out while playing.
-        saveMirror = SaveMirror.forGame(this, storage)?.also { mirror ->
-            mirror.onUnavailable = {
-                runOnUiThread { Toast.makeText(this, R.string.save_folder_unavailable, Toast.LENGTH_LONG).show() }
-            }
-            mirror.syncIn()
-        }
-
         input = InputMapper().apply { swapAb = savedSwapAb }
         audioOut = AudioOut()
         val gameView = findViewById<GameView>(R.id.game_view)
         gameView.setShader(savedShader)
         RetroAchievements.init(this)
         achievementPopups = AchievementPopups(findViewById(android.R.id.content) as android.widget.FrameLayout).also { it.attach() }
-        emu = EmuThread(romBytes, storage.saveFile.absolutePath, gameView, audioOut, input)
+        singleScreen?.setGameAspect(if (header.platform == Platform.GBA) 1.5f else 160f / 144f)
+        emu = EmuThread(rom.bytes, storage.saveFile.absolutePath, gameView, audioOut, input)
+        if (singleScreen != null) singleScreenActions = SingleScreenQuickActions(
+            ready = { emu.loaded }, submit = { path, save, done -> emu.requestState(path, save, done) },
+            path = SaveStates(storage).slotPath(0)
+        ) { message ->
+            if (!isFinishing && !isDestroyed) Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
+        }
+        if (BuildConfig.SINGLE_SCREEN) emu.paused = !resumed
         saveMirror?.let { mirror ->
             emu.onSaveDataChanged = mirror::requestOut
-            // After the core is unloaded, so the save it writes on the way out is included.
-            emu.onStopped = { mirror.finish() }
+        }
+        // SS also releases audio here: destruction must not release a track while a slow
+        // native startup is still using it. Both resources belong to this one session.
+        emu.onStopped = {
+            saveMirror?.finish()
+            if (BuildConfig.SINGLE_SCREEN) audioOut.release()
         }
         emu.start()
 
@@ -143,7 +207,13 @@ class PlayerActivity : Activity() {
     private fun waitForLoadThenSetUp(gameView: GameView, header: RomHeader, crc32: Long, storage: GameStorage) {
         gameView.post(object : Runnable {
             override fun run() {
-                if (!emu.isAlive) return
+                if (!emu.isAlive) {
+                    if (singleScreen != null && !isFinishing && !isDestroyed) {
+                        Toast.makeText(this@PlayerActivity, getString(R.string.load_failed, header.title), Toast.LENGTH_LONG).show()
+                        finish()
+                    }
+                    return
+                }
                 if (emu.loaded) {
                     quickMenu = QuickMenu(
                         context = this@PlayerActivity,
@@ -157,6 +227,7 @@ class PlayerActivity : Activity() {
                         onQuit = { finish() },
                         onAchievements = { done -> RetroAchievements.show(this@PlayerActivity, done) },
                     )
+                    singleScreen?.gameLoaded()
                     setUpCompanion(header, crc32, storage)
                 } else {
                     gameView.postDelayed(this, 16)
@@ -171,10 +242,32 @@ class PlayerActivity : Activity() {
      * main screen when the game was opened on the second one.
      */
     private fun setUpCompanion(header: RomHeader, crc32: Long, storage: GameStorage) {
+        val controller = CompanionController(this, header.title, header.gameCode, crc32)
+        if (singleScreen != null) {
+            companionScreen = controller
+            startupTasks?.submit({
+                val packsDir = File(filesDir, "packs")
+                val manifest = storage.packId?.let { PackStore(packsDir).byId(it) }
+                manifest?.let { pack ->
+                    val directory = File(packsDir, pack.id)
+                    Triple(pack, directory, runCatching { PreparedCompanion.load(this, pack, directory) })
+                }
+            }) { result ->
+                singleScreen?.showCompanion(controller)
+                result.onSuccess { assignment ->
+                    if (assignment != null) {
+                        val (manifest, directory, prepared) = assignment
+                        prepared.onSuccess { sources ->
+                            if (controller.showPreparedPack(manifest, directory, sources)) bindCompanion(controller, manifest, directory, header, storage)
+                        }.onFailure { controller.showLoadError(manifest, it) }
+                    }
+                }.onFailure { android.util.Log.e("SingleScreen", "Could not resolve assigned companion", it) }
+            }
+            return
+        }
         val displayManager = getSystemService(DisplayManager::class.java)
         val gameDisplay = display?.displayId ?: CompanionPlacement.MAIN_DISPLAY
         val presentationDisplays = displayManager.getDisplays(DisplayManager.DISPLAY_CATEGORY_PRESENTATION).map { it.displayId }
-        val controller = CompanionController(this, header.title, header.gameCode, crc32)
         when (val target = CompanionPlacement.choose(gameDisplay, presentationDisplays)) {
             is CompanionPlacement.Target.Presentation -> {
                 val display = displayManager.getDisplay(target.displayId) ?: return
@@ -193,6 +286,10 @@ class PlayerActivity : Activity() {
         val packDir = File(packsDir, manifest.id)
         if (!controller.showPack(manifest, packDir)) return
 
+        bindCompanion(controller, manifest, packDir, header, storage)
+    }
+
+    private fun bindCompanion(controller: CompanionController, manifest: PackManifest, packDir: File, header: RomHeader, storage: GameStorage) {
         emu.activePackDir = packDir
         // What the pack's code is now: a write permission given to other code doesn't count.
         val fingerprint = if (manifest.canWriteMemory) PackFingerprint.of(packDir) else ""
@@ -295,7 +392,7 @@ class PlayerActivity : Activity() {
             else -> return false
         }
         if (event.keyCode == KeyEvent.KEYCODE_BUTTON_L2 || event.keyCode == KeyEvent.KEYCODE_BACK) {
-            if (down && event.repeatCount == 0) quickMenu?.show()
+            if (down && event.repeatCount == 0) showQuickMenu()
             return true
         }
         if (!::input.isInitialized) return false
@@ -311,21 +408,48 @@ class PlayerActivity : Activity() {
     override fun onKeyUp(keyCode: Int, event: KeyEvent): Boolean =
         handleKeyEvent(event) || super.onKeyUp(keyCode, event)
 
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean =
+        (singleScreen != null && handleKeyEvent(event)) || super.dispatchKeyEvent(event)
+
     override fun onTopResumedActivityChanged(isTopResumedActivity: Boolean) {
         super.onTopResumedActivityChanged(isTopResumedActivity)
         topResumed = isTopResumedActivity
+    }
+
+    private fun showQuickMenu() {
+        // A slow document provider must not trap the player on the loading screen.
+        if (singleScreen != null && quickMenu == null) {
+            finish()
+            return
+        }
+        if (quickMenu?.isShowing == true) return
+        singleScreen?.releaseControls()
+        quickMenu?.show()
+    }
+
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        singleScreen?.releaseControls()
+        singleScreen?.requestLayout()
+        singleScreen?.post { if (!isDestroyed) SingleScreenWindows.hideBars(this) }
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
         // A key released after focus moved elsewhere would never reach us and stay held.
         if (!hasFocus && ::input.isInitialized) input.releaseAll()
+        if (!hasFocus) singleScreen?.releaseControls()
     }
 
     override fun onPause() {
         resumed = false
         super.onPause()
         if (::emu.isInitialized) emu.paused = true
+        singleScreen?.releaseControls()
+        if (singleScreen != null) {
+            if (::input.isInitialized) input.releaseAll()
+            findViewById<GameView>(R.id.game_view).onPause()
+        }
         saveMirror?.requestOut()
     }
 
@@ -333,16 +457,20 @@ class PlayerActivity : Activity() {
         super.onResume()
         resumed = true
         if (::emu.isInitialized) emu.paused = quickMenu?.isShowing == true
+        if (singleScreen != null) findViewById<GameView>(R.id.game_view).onResume()
     }
 
     override fun onDestroy() {
+        singleScreenActions?.close()
+        startupTasks?.close()
+        singleScreen?.close()
         companionScreen?.close()
         achievementPopups?.detach()
         if (::emu.isInitialized) {
             emu.shutdown()
             emu.join(1000)
         }
-        if (::audioOut.isInitialized) audioOut.release()
+        if (::audioOut.isInitialized && (!BuildConfig.SINGLE_SCREEN || !::emu.isInitialized)) audioOut.release()
         window.decorView.removeCallbacks(reclaimFocus)
         companionPresentation?.dismiss()
         companionActivity?.let(CompanionActivity::close)

@@ -10,7 +10,9 @@ class InputMapper {
     var swapAb: Boolean = false
 
     @Volatile private var pressed = 0
+    @Volatile private var touchKeys = 0
     @Volatile private var r2Held = false
+    @Volatile private var touchFastForward = false
 
     /** True for a mapped key (caller should consume the event); false otherwise. */
     fun onKey(keyCode: Int, down: Boolean): Boolean {
@@ -29,12 +31,21 @@ class InputMapper {
      */
     fun releaseAll() {
         pressed = 0
+        touchKeys = 0
         r2Held = false
+        touchFastForward = false
     }
 
-    fun keys(): Int = pressed
+    /** Labelled screen controls send GBA bits directly, independently of gamepad A/B swapping. */
+    fun setTouchKeys(keys: Int) {
+        touchKeys = keys and 0x3ff
+    }
 
-    fun fastForward(): Boolean = r2Held
+    fun keys(): Int = pressed or touchKeys
+
+    fun setTouchFastForward(enabled: Boolean) { touchFastForward = enabled }
+
+    fun fastForward(): Boolean = r2Held || touchFastForward
 
     private fun bitFor(keyCode: Int): Int? = when (keyCode) {
         KeyEvent.KEYCODE_BUTTON_B -> if (swapAb) GbaKeys.B else GbaKeys.A

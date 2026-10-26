@@ -4,6 +4,9 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
+// A separate installable phone edition; normal Plus remains the default build.
+val singleScreen = providers.gradleProperty("singleScreen").orNull == "true"
+
 android {
     namespace = "com.khumam.gbaduo"
     compileSdk = 35
@@ -26,11 +29,16 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.khumam.gbaduo.plus"
+        applicationId = if (singleScreen) "com.khumam.gbaduo.plus.ss" else "com.khumam.gbaduo.plus"
         minSdk = 30
         targetSdk = 35
         versionCode = 13
-        versionName = "0.1.7-plus.4"
+        versionName = "0.1.7-plus.4" + if (singleScreen) "-ss" else ""
+        buildConfigField("boolean", "SINGLE_SCREEN", singleScreen.toString())
+        manifestPlaceholders["playerOrientation"] = if (singleScreen) "fullUser" else "landscape"
+        manifestPlaceholders["playerConfigChanges"] = "orientation|screenSize|screenLayout|keyboardHidden" +
+            if (singleScreen) "|smallestScreenSize|density" else ""
+        manifestPlaceholders["applicationLabel"] = if (singleScreen) "@string/app_name_ss" else "@string/app_name"
 
         ndk {
             abiFilters += "arm64-v8a"
@@ -90,6 +98,7 @@ android {
         unitTests.all { test ->
             // PackScreenshotTest re-records its reference images with -PrecordScreenshots.
             test.systemProperty("gbaduo.recordScreenshots", project.findProperty("recordScreenshots") != null)
+            project.findProperty("ssPreviewPack")?.let { test.systemProperty("gbaduo.ss.previewPack", it) }
             // Files the screenshot/renderer tests read directly, so editing them re-runs the tests.
             test.inputs.dir("../docs-packs/examples")
             test.inputs.dir("src/test/screenshots")

@@ -1,4 +1,7 @@
-param([Parameter(Mandatory=$true)][string]$ApkPath)
+param(
+  [Parameter(Mandatory=$true)][string]$ApkPath,
+  [ValidateSet('Plus','SS')][string]$Edition='Plus'
+)
 $ErrorActionPreference='Stop'
 $plusRoot=Split-Path -Parent $PSScriptRoot
 $apk=(Resolve-Path -LiteralPath $ApkPath).Path
@@ -16,8 +19,10 @@ $signer=Join-Path $buildTools.FullName 'apksigner.bat'
 & $signer verify $apk
 if($LASTEXITCODE -ne 0){throw 'APK is unsigned or invalid. Sign it before packaging.'}
 $badging=(& $aapt dump badging $apk) -join "`n"
-if($LASTEXITCODE -ne 0 -or $badging -notmatch "package: name='com.khumam.gbaduo.plus'"){throw 'Wrong application ID; expected release GBA Duo Plus.'}
-if($badging -notmatch "application-label:'GBA Duo Plus'"){throw 'Wrong application label.'}
+$expectedId=if($Edition -eq 'SS'){'com.khumam.gbaduo.plus.ss'}else{'com.khumam.gbaduo.plus'}
+$expectedLabel=if($Edition -eq 'SS'){'GBA Duo Plus SS'}else{'GBA Duo Plus'}
+if($LASTEXITCODE -ne 0 -or -not $badging.Contains("package: name='$expectedId'")){throw 'Wrong release application ID for the selected edition.'}
+if(-not $badging.Contains("application-label:'$expectedLabel'")){throw 'Wrong application label.'}
 if($badging -notmatch "uses-permission: name='android.permission.INTERNET'"){throw 'RetroAchievements network permission is missing.'}
 $version=[regex]::Match($badging,"versionName='([^']+)'").Groups[1].Value
 if($version -notmatch '^\d+\.\d+\.\d+(?:[-.A-Za-z0-9]+)?$'){throw 'Unexpected APK version string.'}
@@ -36,11 +41,18 @@ try{
     }finally{$stream.Dispose();$buffer.Dispose()}
   }
 }finally{$archive.Dispose()}
-$release=Join-Path $plusRoot ('releases\'+$version)
+$baseVersion=if($Edition -eq 'SS'){
+  if(-not $version.EndsWith('-ss')){throw 'SS version suffix is missing.'}
+  $version.Substring(0,$version.Length-3)
+}else{$version}
+$release=Join-Path $plusRoot ('releases\'+$baseVersion)
 New-Item -ItemType Directory -Path $release -Force | Out-Null
-$name='GBA-Duo-Plus-'+$version+'.apk';$output=Join-Path $release $name
+$name=if($Edition -eq 'SS'){'GBA-Duo-Plus-SS-'+$baseVersion+'.apk'}else{'GBA-Duo-Plus-'+$version+'.apk'}
+$output=Join-Path $release $name
 Copy-Item -LiteralPath $apk -Destination $output -Force
 $digest=(Get-FileHash -LiteralPath $output -Algorithm SHA256).Hash.ToLowerInvariant()
-Set-Content -LiteralPath (Join-Path $release 'SHA256SUMS.txt') -Value "$digest  $name" -Encoding ASCII
+$sums=Join-Path $release 'SHA256SUMS.txt'
+$previous=if(Test-Path -LiteralPath $sums){@(Get-Content -LiteralPath $sums | Where-Object {$_ -and -not $_.EndsWith('  '+$name)})}else{@()}
+Set-Content -LiteralPath $sums -Value (@($previous)+"$digest  $name" | Sort-Object) -Encoding ASCII
 Write-Output "Audited local package: $output"
 Write-Output 'No GitHub release was created or uploaded.'

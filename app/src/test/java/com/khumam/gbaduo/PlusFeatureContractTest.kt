@@ -6,7 +6,8 @@ import org.junit.Test
 
 class PlusFeatureContractTest {
     @Test fun plusHasSeparateIdentityAndRetainsAchievementsWithoutHashSetter() {
-        assertEquals("com.khumam.gbaduo.plus" + if (BuildConfig.DEBUG) ".debug" else "", BuildConfig.APPLICATION_ID)
+        val edition = if (BuildConfig.SINGLE_SCREEN) ".ss" else ""
+        assertEquals("com.khumam.gbaduo.plus" + edition + if (BuildConfig.DEBUG) ".debug" else "", BuildConfig.APPLICATION_ID)
         val methods = RaNative::class.java.declaredMethods.map { it.name }.toSet()
         assertTrue(methods.containsAll(listOf("init", "loginWithPassword", "doFrame", "achievementList")))
         assertFalse(methods.contains("setHashOverride"))

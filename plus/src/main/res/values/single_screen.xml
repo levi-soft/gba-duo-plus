@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name_ss">GBA Duo Plus SS</string>
+    <string name="ss_loading_game">Loading game…</string>
+    <string name="ss_loading_companion">Loading companion…</string>
+    <string name="ss_menu">Menu</string>
+</resources>

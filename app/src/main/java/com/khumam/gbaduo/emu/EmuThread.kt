@@ -28,6 +28,7 @@ class EmuThread(
 ) : Thread("gbaduo-emu") {
 
     @Volatile private var running = false
+    private val coreSession = CoreSession()
     @Volatile var paused = false
     @Volatile var ffMultiplier = 2
     /** Explicit per-session opt-in for Studio's read-only RAM tools. */
@@ -38,7 +39,8 @@ class EmuThread(
     /** Only until the core has its own copy: a whole ROM (up to 32 MB) shouldn't be held twice. */
     @Volatile private var romBytes: ByteArray? = romBytes
 
-    private val pendingSaveState = java.util.concurrent.atomic.AtomicReference<Pair<String, Boolean>?>(null)
+    private data class StateRequest(val path: String, val save: Boolean, val finished: ((Boolean) -> Unit)?)
+    private val pendingSaveState = java.util.concurrent.atomic.AtomicReference<StateRequest?>(null)
     @Volatile var lastStateResult: Boolean? = null
 
     @Volatile var loaded = false
@@ -129,7 +131,7 @@ class EmuThread(
 
     override fun run() {
         try {
-            play()
+            coreSession.runExclusive { play() }
         } finally {
             onStopped?.invoke()
         }
@@ -155,7 +157,7 @@ class EmuThread(
         running = true
 
         var nextFrameAt = System.nanoTime()
-        while (running) {
+        while (running && !coreSession.stopped) {
             studioConnection.service(BuildConfig.DEBUG || studioConnectionEnabled)
             val pack = activePack
             if (pack !== inputPack) {
@@ -361,22 +363,25 @@ class EmuThread(
     }
 
     /** Thread-safe; services the request on the emu thread between frames. */
-    fun requestState(path: String, save: Boolean) {
-        pendingSaveState.set(path to save)
+    fun requestState(path: String, save: Boolean, finished: ((Boolean) -> Unit)? = null) {
+        pendingSaveState.getAndSet(StateRequest(path, save, finished))?.finished?.invoke(false)
     }
 
     private fun servicePendingStateRequest() {
         val request = pendingSaveState.getAndSet(null) ?: return
-        val (path, save) = request
+        val (path, save, finished) = request
         lastStateResult = if (save) NativeCore.saveState(path) else NativeCore.loadState(path)
         if (lastStateResult == true) {
             if (save) RetroAchievements.saveProgress(path) else RetroAchievements.loadProgress(path)
         }
         if (save && lastStateResult == true) onSaveDataChanged?.invoke()
+        finished?.invoke(lastStateResult == true)
     }
 
     fun shutdown() {
+        coreSession.stop()
         running = false
+        pendingSaveState.getAndSet(null)?.finished?.invoke(false)
     }
 
     private companion object {

@@ -77,15 +77,17 @@ class CompanionController(
      * Call when a pack is assigned (or re-assigned). False if its layout couldn't
      * be loaded (the screen then explains why instead).
      */
-    fun showPack(manifest: PackManifest, packDir: File): Boolean {
+    fun showPack(manifest: PackManifest, packDir: File): Boolean = showPreparedPack(manifest, packDir, null)
+
+    /** SS parses files on its startup worker; only the live tree is installed here on the UI thread. */
+    internal fun showPreparedPack(manifest: PackManifest, packDir: File, prepared: PreparedCompanion?): Boolean {
 
         content = runCatching {
-            val layout = LayoutParser.parseWithWarnings(File(packDir, manifest.layoutFile).readText())
-            logWarnings(manifest.layoutFile, layout.warnings)
-            val styles = PackStyles.forPack(manifest, packDir)
-            val builtIn = PackStyles.builtIn(context)
+            val sources = prepared ?: PreparedCompanion.load(context, manifest, packDir)
+            val styles = sources.styles
+            val builtIn = sources.builtIn
             val platform = AndroidCompanionPlatform(packDir, (builtIn + styles).flatMap { it.fontFaces })
-            val tree = CompanionTree(layout.root, builtIn, styles, platform::loadImage)
+            val tree = CompanionTree(sources.root, builtIn, styles, platform::loadImage)
             val followPreference = "dialogue-follow." + manifest.id
             val follow = context.getSharedPreferences("companion", Context.MODE_PRIVATE).getString(followPreference, "on")
             tree.perform(listOf(Action.Set(mapOf("dialogueFollowMode" to if (follow == "off") "off" else "on"))))
@@ -103,6 +105,11 @@ class CompanionController(
             return false
         }
         return true
+    }
+
+    internal fun showLoadError(manifest: PackManifest, error: Throwable) {
+        Log.e(TAG, "Could not prepare pack '${manifest.id}'", error)
+        content = message("${manifest.name}: ${error.message}")
     }
 
     /**

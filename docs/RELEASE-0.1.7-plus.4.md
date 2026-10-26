@@ -5,6 +5,38 @@ compatible FE packs can supply their own exact-ROM cursor metadata. Failed Lua
 ticks retain the last complete companion view instead of replacing it with an
 empty snapshot. Based on official GBA Duo **v0.1.7**; Android version code **13**.
 
+## Single Screen edition added to this release
+
+**GBA Duo Plus SS** runs the game and an interactive companion on one display.
+Download `GBA-Duo-Plus-SS-0.1.7-plus.4.apk` for phones, tablets and foldables;
+the original Plus APK remains the dual-screen edition. No version bump is needed.
+
+- Portrait stacks the screens. Phone landscape places the game beside the
+  companion; tablet and unfolded Fold windows stack two equally wide screens in
+  either orientation. Game and companion retain their own aspect ratios.
+- Touch D-pad, A/B, L/R, Select and Start, with the same A/B geometry in every
+  orientation. Menu opens Quick Menu. Swap exchanges screen positions without
+  reloading the game. Save/Load use quick slot 0; `>>` toggles fast-forward.
+- Persistent light/dark shell with Thor Rainbow accents, immersive display,
+  portrait camera padding and a responsive library header.
+- Cancellable background ROM/companion preparation, animated loading feedback,
+  serialized native sessions and touch release on rotation, pause and menus.
+- Existing companion ZIPs and the automatic Companion Builder flow work in SS.
+  Its separate application ID allows side-by-side installation; private saves,
+  packs and settings are separate from the regular Plus app.
+
+SS validation: **424 Debug tests**, Release build, signature/alignment checks,
+source scan and upstream-boundary checks passed. Earlier development builds were
+checked on a Motorola Razr Ultra 2025, including native input, rotation, Swap,
+theme, fast-forward and quick save/load. The approved final geometry has host
+render/input coverage and was not rerun on the phone. ZIP opening took 12–26
+seconds on that test device; loading can be cancelled with Menu.
+
+SS requires Android 11/API 30+ and ARM64, with no external display required.
+See [the SS guide](SINGLE-SCREEN.md) for build options and validation limits.
+The release includes an SS source snapshot and a link to its exact commit;
+the original Plus.4 tag and regular APK are retained.
+
 ## Added and fixed
 
 - **Companion-owned standard input:** `input.press` accepts A, B, Select, Start,
@@ -54,8 +86,8 @@ flicker; monitoring still found isolated timeout ticks, covered by the new
 retention regression. The production retention APK has automated coverage; it
 does not claim the sandbox error itself can never recur.
 
-Android 11/API 30+, ARM64, and a second Android display for the companion are
-required. Primary device: AYN Thor. Other devices need separate testing. No ROM,
+The regular Plus APK requires Android 11/API 30+, ARM64 and a second Android
+display for the companion. Its primary device is AYN Thor. Other devices need separate testing. No ROM,
 BIOS, save, private companion or signing key is included in this release.
 
 ## Authors and acknowledgements

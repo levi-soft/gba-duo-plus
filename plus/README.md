@@ -23,6 +23,11 @@ changes from review. Small host calls connect lifecycle/input/rendering to these
 implementations. Some existing RA, renderer and native changes still require
 direct integration; they are visible in the inventory and Git diff.
 
+`player/singlescreen/` owns SS phone geometry, touch regions, pointer tracking,
+embedded companion hosting and cancellable startup I/O. Only the build identity,
+Player lifecycle/input calls and parsed companion installation are integrated
+into the existing host. See [Single Screen](../docs/SINGLE-SCREEN.md).
+
 `companion/builder/` owns automatic companion discovery, the verified offline
 builder cache, local WebView execution, ROM staging and safe installation.
 The host only delegates its menu option and registers the private Activity.

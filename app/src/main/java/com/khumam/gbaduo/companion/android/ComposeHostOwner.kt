@@ -27,14 +27,18 @@ internal class ComposeHostOwner : LifecycleOwner, SavedStateRegistryOwner {
 
     private val registry = LifecycleRegistry(this)
     private val savedState = SavedStateRegistryController.create(this)
+    private var attached = false
 
     override val lifecycle: Lifecycle get() = registry
     override val savedStateRegistry: SavedStateRegistry get() = savedState.savedStateRegistry
 
-    /** Call once the host view exists (in the host's onCreate). */
+    /** One owner may cover the content root and its embedded ComposeView. Restore only once. */
     fun attach(host: View) {
-        savedState.performRestore(null)
-        registry.currentState = Lifecycle.State.RESUMED
+        if (!attached) {
+            savedState.performRestore(null)
+            registry.currentState = Lifecycle.State.RESUMED
+            attached = true
+        }
         host.setViewTreeLifecycleOwner(this)
         host.setViewTreeSavedStateRegistryOwner(this)
     }

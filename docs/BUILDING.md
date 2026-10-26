@@ -31,6 +31,10 @@ sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0" "ndk;27.
 ./gradlew :app:assembleRelease
 ```
 
+Build the separate phone edition with `./gradlew -PsingleScreen=true :app:assembleRelease`.
+SS installs as `com.khumam.gbaduo.plus.ss` and keeps the default dual-screen build
+unchanged. See [Single Screen layout, lifecycle and validation](SINGLE-SCREEN.md).
+
 Use `gradlew.bat` on Windows. Debug builds install as `com.khumam.gbaduo.plus.debug`; release builds use `com.khumam.gbaduo.plus`.
 
 With no signing configuration, `assembleRelease` produces an **unsigned** APK, normally `app/build/outputs/apk/release/app-release-unsigned.apk`. It is not ready to install until signed. The project does not silently use a maintainer's local Android debug key for public releases.

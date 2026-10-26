@@ -51,3 +51,15 @@ jobs:
         with:
           name: unsigned-plus-development-apk
           path: app/build/outputs/apk/release/*unsigned.apk
+      - name: Single Screen layout, input and startup tests
+        run: >-
+          ./gradlew -PsingleScreen=true :app:testDebugUnitTest
+          --tests '*SingleScreen*Test' --tests '*TouchButtonsTest'
+          --tests '*StartupTasksTest' --tests '*InputMapperTest' --tests '*CoreSessionTest'
+          --tests '*PlusFeatureContractTest'
+      - name: Build separate Single Screen APK
+        run: ./gradlew -PsingleScreen=true :app:assembleRelease
+      - uses: actions/upload-artifact@v4
+        with:
+          name: unsigned-plus-ss-development-apk
+          path: app/build/outputs/apk/release/*unsigned.apk

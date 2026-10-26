@@ -2,9 +2,40 @@ package com.khumam.gbaduo.emu
 
 import android.view.KeyEvent
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
+import org.junit.Assert.assertFalse
 import org.junit.Test
 
 class InputMapperTest {
+    @Test fun touchFastForwardAndPhysicalR2ReleaseIndependently() {
+        val mapper = InputMapper()
+        mapper.setTouchFastForward(true)
+        mapper.onKey(KeyEvent.KEYCODE_BUTTON_R2, true)
+        mapper.setTouchFastForward(false)
+        assertTrue(mapper.fastForward())
+        mapper.onKey(KeyEvent.KEYCODE_BUTTON_R2, false)
+        assertFalse(mapper.fastForward())
+        mapper.setTouchFastForward(true); mapper.releaseAll(); assertFalse(mapper.fastForward())
+    }
+
+    @Test fun touchAndGamepadReleaseIndependently() {
+        val mapper = InputMapper()
+        mapper.onKey(KeyEvent.KEYCODE_DPAD_LEFT, true)
+        mapper.setTouchKeys(GbaKeys.LEFT or GbaKeys.A)
+        mapper.setTouchKeys(0)
+        assertEquals(GbaKeys.LEFT, mapper.keys())
+        mapper.setTouchKeys(GbaKeys.A)
+        mapper.onKey(KeyEvent.KEYCODE_DPAD_LEFT, false)
+        assertEquals(GbaKeys.A, mapper.keys())
+        mapper.releaseAll()
+        assertEquals(0, mapper.keys())
+    }
+
+    @Test fun labelledTouchButtonsIgnorePhysicalSwapAndRejectExtraBits() {
+        val mapper = InputMapper().apply { swapAb = true }
+        mapper.setTouchKeys(GbaKeys.A or (1 shl 15))
+        assertEquals(GbaKeys.A, mapper.keys())
+    }
 
     @Test
     fun mapsFaceButtonsToAAndB() {

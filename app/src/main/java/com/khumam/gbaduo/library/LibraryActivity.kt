@@ -108,6 +108,7 @@ class LibraryActivity : Activity() {
         artwork = ArtworkBinder(this, library)
         carousel = CartridgeCarousel(recycler, onSelected = ::showSelected, onPlay = { play() }, bindArtwork = artwork::bind)
         ArtworkLibraryControls.attach(actions as LinearLayout) { selectedEntry()?.let { ArtworkEntry.launch(this, it, library) } }
+        if (BuildConfig.SINGLE_SCREEN) com.khumam.gbaduo.player.singlescreen.SingleScreenLibraryChrome.attach(this)
 
         findViewById<PixelButton>(R.id.open_settings).setOnClickListener { openSettings() }
         findViewById<PixelButton>(R.id.play).setOnClickListener { play() }
@@ -157,7 +158,7 @@ class LibraryActivity : Activity() {
         val body = Fonts.body(this)
 
         findViewById<OutlineText>(R.id.wordmark).apply {
-            text = getString(R.string.app_name).uppercase()
+            text = getString(if (BuildConfig.SINGLE_SCREEN) R.string.app_name_ss else R.string.app_name).uppercase()
             setTextSizeSp(if (compact) 22f else 30f)
         }
         gameTitle.apply {
