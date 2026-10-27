@@ -17,7 +17,7 @@ Migration fixtures verified old A/B preferences and shader/color selection, pres
 
 Not exercised here: authenticated RA online events, a live SGDB key request, real folder artwork imports and every shader × GBC color combination. Plus and SS share the existing Studio abstract-socket name; keep Studio Connection active in only one edition at a time.
 
-Signed APKs are local upgrade candidates. No new public release, GitHub tag, source ZIP or website download link was published for this upgrade. Historical validation follows.
+Publication artifacts are the signed regular APK, SS APK and SHA256SUMS.txt for 0.1.8-plus.1. No manually attached source ZIP is included. Historical validation follows.
 
 ---
 

@@ -1,17 +1,17 @@
 # GBA Duo Plus: tính năng và bộ công cụ companion
 
-**GBA Duo Plus 0.1.8-plus.1 (source đang nâng cấp)** là bản fork cộng đồng do [levi-soft](https://github.com/levi-soft)
+**GBA Duo Plus 0.1.8-plus.1** là bản fork cộng đồng do [levi-soft](https://github.com/levi-soft)
 duy trì trên nền [GBA Duo v0.1.8 của khumam](https://github.com/khumam/gba-duo).
 Ứng dụng dành cho thiết bị Android hai màn hình, Android 11 trở lên, ARM64.
 Thiết bị phát triển chính là AYN Thor; các máy hai màn hình khác cần kiểm tra riêng.
 
-**[Tải APK và đọc ghi chú phát hành](https://github.com/levi-soft/gba-duo-plus/releases/tag/v0.1.7-plus.4)** ·
+**[Tải APK và đọc ghi chú phát hành](https://github.com/levi-soft/gba-duo-plus/releases/tag/v0.1.8-plus.1)** ·
 [Website Companion Builder](https://levi-soft.github.io/gba-duo-companion-builder/) ·
 [GBA Duo Studio](https://github.com/levi-soft/gba-duo-studio)
 
 ## Nền 0.1.8
 
-Source đã ghép controller/hotkey mapping, Game settings, chỉnh màu riêng và artwork của upstream 0.1.8, giữ Builder 1.1.5 cùng các phần mở rộng Plus/SS. APK công khai vẫn là Plus.4 cho tới đợt phát hành mới. [Chi tiết nâng cấp](RELEASE-0.1.8-plus.1.md).
+Source đã ghép controller/hotkey mapping, Game settings, chỉnh màu riêng và artwork của upstream 0.1.8, giữ Builder 1.1.5 cùng các phần mở rộng Plus/SS. [Chi tiết nâng cấp](RELEASE-0.1.8-plus.1.md).
 
 ## Mới ở 0.1.7-plus.4
 
@@ -147,7 +147,7 @@ Bản này không có chế độ chơi trên điện thoại một màn hình �
 
 ## 9. Bản phát hành và kiểm chứng
 
-[Release 0.1.7-plus.4](https://github.com/levi-soft/gba-duo-plus/releases/tag/v0.1.7-plus.4)
+[Release 0.1.7-plus.4](https://github.com/levi-soft/gba-duo-plus/releases/tag/v0.1.8-plus.1)
 cung cấp APK ARM64 đã ký và SHA-256. APK được build từ source công bố, bao gồm
 các sửa lỗi hủy/tạo pack và ảnh bìa từ đợt rà soát cuối. Mã phiên bản Android là `10`.
 

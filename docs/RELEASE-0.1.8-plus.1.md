@@ -1,4 +1,4 @@
-# 0.1.8-plus.1 upgrade candidate
+# 0.1.8-plus.1
 
 Both Plus and Plus SS now use official GBA Duo v0.1.8 (`8832d19`). The mGBA revision is unchanged. Android versionCode is 14; SS retains its separate application ID and `-ss` version suffix.
 
@@ -11,6 +11,6 @@ Both Plus and Plus SS now use official GBA Duo v0.1.8 (`8832d19`). The mGBA revi
 
 Local verification: 320 focused Release tests, 537 full SS Debug tests and 176 native checks passed. Both signed APKs build and pass package/signature audits. Thor verified an in-place regular upgrade, old FE7 save loading, the assigned companion and map-focus navigation, plus SS startup, 10 touch buttons, quick states, fast-forward, swap and four rotations without reloading the core. All three Plus shader pipelines rendered with GBA correction. Online RA account/achievement events and exhaustive GBC/color combinations were not exercised in this device pass.
 
-This is a local upgrade candidate. The public download remains 0.1.7-plus.4 until a new public release is published. See [validation](VALIDATION.md) and [feature comparison](FEATURES.md).
+Both signed APKs and SHA256SUMS.txt are distributed in the same [GitHub release](https://github.com/levi-soft/gba-duo-plus/releases/tag/v0.1.8-plus.1). See [validation](VALIDATION.md) and [feature comparison](FEATURES.md).
 
 Upgrade in place with the APK for the same edition and signing certificate; no uninstall or data clearing is required. Keep a backup before testing a downgrade: source migration leaves legacy preferences and covers, but an older APK does not understand the new controller/per-game settings and artwork chosen after the upgrade.
