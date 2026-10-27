@@ -1,3 +1,21 @@
+# 0.1.8-plus.4 SS game-only mode (2026-10-27)
+
+- Both configurations passed all **537 Debug unit/host-render tests** on the
+  feature source, including three-state Swap, preference migration, held-input
+  release, preserved views, portrait cutouts and responsive geometry.
+- Thor: the third Swap state displayed a larger game viewport without the
+  unassigned companion frame. Switching preserved the native session; all ten
+  GBA controls passed press/release checks. Closing/reopening retained game only.
+- Portrait rotation and an assigned live companion were not verified on Thor
+  in this run; those paths have host tests. The device kept landscape orientation
+  during rotation commands, and its original rotation settings were restored.
+- The release uses versionCode 17 and the existing signing certificate for both
+  editions. The regular Plus behavior and Builder 1.1.5 remain unchanged.
+
+Historical validation follows.
+
+---
+
 # 0.1.8-plus.3 cover shapes (2026-10-27)
 
 - Feature validation: **80/80 focused regular Release tests** and **114/114 focused SS Debug tests** passed. Coverage includes the actual Game settings action, Square → Portrait → All → Square transitions and saving, default-square API queries and automatic lookup, and empty square results without silently fetching other shapes.

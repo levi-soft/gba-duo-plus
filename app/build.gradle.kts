@@ -32,8 +32,8 @@ android {
         applicationId = if (singleScreen) "com.khumam.gbaduo.plus.ss" else "com.khumam.gbaduo.plus"
         minSdk = 30
         targetSdk = 35
-        versionCode = 16
-        versionName = "0.1.8-plus.3" + if (singleScreen) "-ss" else ""
+        versionCode = 17
+        versionName = "0.1.8-plus.4" + if (singleScreen) "-ss" else ""
         buildConfigField("boolean", "SINGLE_SCREEN", singleScreen.toString())
         manifestPlaceholders["playerOrientation"] = if (singleScreen) "fullUser" else "landscape"
         manifestPlaceholders["playerConfigChanges"] = "orientation|screenSize|screenLayout|keyboardHidden" +

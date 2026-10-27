@@ -6,13 +6,13 @@ GBA Duo made the central idea possible: play Game Boy Advance, Game Boy Color an
 
 Maintained by [levi-soft](https://github.com/levi-soft), Plus adds automatic companion creation, selectable library covers, additional pixel-art shaders, persistent control preferences, companion navigation for supported games and an optional GBA Duo Studio connection. It extends the official RetroAchievements client and adopts controller mapping, per-game settings, color correction and artwork settings from GBA Duo 0.1.8.
 
-**Current source version:** `0.1.8-plus.3` · **Upstream base:** `v0.1.8` · **License:** [GPL v3](LICENSE)
+**Current source version:** `0.1.8-plus.4` · **Upstream base:** `v0.1.8` · **License:** [GPL v3](LICENSE)
 
-**[Download GBA Duo Plus 0.1.8-plus.3 — APK and release notes](https://github.com/levi-soft/gba-duo-plus/releases/tag/v0.1.8-plus.3)**
+**[Download GBA Duo Plus 0.1.8-plus.4 — APK and release notes](https://github.com/levi-soft/gba-duo-plus/releases/tag/v0.1.8-plus.4)**
 
 **Companion tools:** [GBA Duo Companion Builder — build from your ROM](https://levi-soft.github.io/gba-duo-companion-builder/) · [Builder source](https://github.com/levi-soft/gba-duo-companion-builder) · [GBA Duo Studio — visual pack editor](https://github.com/levi-soft/gba-duo-studio)
 
-**[Full Plus feature guide in Vietnamese](docs/PLUS-FEATURES.vi.md)** · [0.1.8-plus.3 release details](docs/RELEASE-0.1.8-plus.3.md)
+**[Full Plus feature guide in Vietnamese](docs/PLUS-FEATURES.vi.md)** · [0.1.8-plus.4 release details](docs/RELEASE-0.1.8-plus.4.md)
 
 **Website:** [GBA Duo Plus](https://levi-soft.github.io/gba-duo-plus/) ·
 [GBA Duo Plus SS for phones, tablets and foldables](https://levi-soft.github.io/gba-duo-plus/single-screen/) ·
@@ -20,11 +20,17 @@ Maintained by [levi-soft](https://github.com/levi-soft), Plus adds automatic com
 
 **Single Screen edition:** [GBA Duo Plus SS](docs/SINGLE-SCREEN.md)
 embeds game and companion on one display, with portrait/landscape touch controls.
-It is a separate installable build in the same [Plus.3 release](https://github.com/levi-soft/gba-duo-plus/releases/tag/v0.1.8-plus.3).
+It is a separate installable build in the same [Plus.4 release](https://github.com/levi-soft/gba-duo-plus/releases/tag/v0.1.8-plus.4).
 The default Plus build retains dual-screen behavior. See the SS guide for device
 validation and known startup limits.
 
 [Tiếng Việt](README.vi.md) · [Features](#features) · [Comparison](docs/FEATURES.md) · [Build](docs/BUILDING.md) · [Launchers](docs/LAUNCHERS.md) · [Studio](docs/STUDIO-CONNECTION.md) · [Credits](CREDITS.md)
+
+## New in 0.1.8-plus.4
+
+Plus SS adds a third Swap mode: **game first → companion first → game only**.
+Game only provides a larger centred game viewport with GBA touch controls and
+remembers the selected mode. [Release details](docs/RELEASE-0.1.8-plus.4.md).
 
 ## New in 0.1.8-plus.3
 
@@ -124,7 +130,7 @@ See [the detailed baseline comparison](docs/FEATURES.md). Credit for algorithms,
 
 ## Getting started
 
-1. Download the signed **[0.1.8-plus.3 APK](https://github.com/levi-soft/gba-duo-plus/releases/tag/v0.1.8-plus.3)**, or [build from source](docs/BUILDING.md). Upstream APKs are the official edition, not Plus.
+1. Download the signed **[0.1.8-plus.4 APK](https://github.com/levi-soft/gba-duo-plus/releases/tag/v0.1.8-plus.4)**, or [build from source](docs/BUILDING.md). Upstream APKs are the official edition, not Plus.
 2. Open Plus and grant access to your own ROM folder using Android's folder picker. Supported inputs include `.gba`, `.gbc`, `.gb` and supported ZIP archives.
 3. Choose a game. Open the in-game menu with L2/BACK for save states, shader selection, Swap A/B and RetroAchievements.
 4. Open the game's Companion menu and choose **Find and create companion**, or import and assign a compatible ZIP. The [Builder website](https://levi-soft.github.io/gba-duo-companion-builder/) can also create ZIPs locally. Packs remain separate from the emulator.

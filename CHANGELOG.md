@@ -1,5 +1,18 @@
 # Plus changelog
 
+## 0.1.8-plus.4
+
+[Signed APKs and release notes](https://github.com/levi-soft/gba-duo-plus/releases/tag/v0.1.8-plus.4) · [Details](docs/RELEASE-0.1.8-plus.4.md)
+
+- SS Swap cycles through game first, companion first and game only. Game only
+  centres a larger game viewport with the existing GBA controls, including when
+  no companion is assigned.
+- Keep the game session and companion views when switching, release held keys
+  and remember the mode across sessions. Retain portrait cutout padding and
+  adaptive phone, tablet and Fold geometry.
+- Publish both editions with Android versionCode 17; regular dual-screen
+  behavior is unchanged. Builder remains 1.1.5.
+
 ## 0.1.7-plus.3
 
 [Signed APK and release notes](https://github.com/levi-soft/gba-duo-plus/releases/tag/v0.1.7-plus.3) · [What's new](docs/RELEASE-0.1.7-plus.3.md)
