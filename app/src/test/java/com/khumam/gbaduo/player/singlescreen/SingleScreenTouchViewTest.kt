@@ -48,6 +48,64 @@ class SingleScreenTouchViewTest {
         activity.getSharedPreferences("single_screen_display", Activity.MODE_PRIVATE).edit().clear().commit()
         activity.finish()
     }
+    @Test fun thirdSwapModeHidesCompanionAndRestoresTheSameViewsAfterRotation() {
+        val activity = Robolectric.buildActivity(Activity::class.java).setup().get()
+        var keys = 0
+        val surface = View(activity)
+        val host = SingleScreenPlayerHost(activity, surface, { keys = it }, {})
+        activity.setContentView(host); host.gameLoaded()
+        host.showCompanion(CompanionController(activity, "Fixture", "TEST", 0))
+        layout(host, 800, 360)
+        val gameParent = surface.parent
+        val companionFrame = host.getChildAt(1) as android.view.ViewGroup
+        val companion = companionFrame.getChildAt(0)
+        val swap = host.controlView(Control.SWAP)
+        swap.performClick(); layout(host, 800, 360)
+        assertEquals(SingleScreenLayout.ScreenMode.COMPANION_FIRST, host.screenMode)
+        val companionWidth = companionFrame.measuredWidth
+        val dpad = host.controlView(Control.DPAD)
+        event(MotionEvent.ACTION_DOWN, Finger(1, dpad.width / 2f, dpad.height * .1f)).let { dpad.dispatchTouchEvent(it); it.recycle() }
+        assertEquals(GbaKeys.UP, keys)
+        swap.performClick(); layout(host, 800, 360)
+        assertEquals(0, keys)
+        assertEquals(SingleScreenLayout.ScreenMode.GAME_ONLY, host.screenMode)
+        assertFalse(host.companionVisible)
+        assertTrue(host.arrangement.gameOnly)
+        assertEquals(companionWidth, companionFrame.measuredWidth)
+        layout(host, 360, 800)
+        assertTrue(host.arrangement.gameOnly)
+        assertSame(gameParent, surface.parent)
+        assertSame(companion, companionFrame.getChildAt(0))
+        val restoredActivity = Robolectric.buildActivity(Activity::class.java).setup().get()
+        val restored = SingleScreenPlayerHost(restoredActivity, View(restoredActivity), {}, {})
+        restoredActivity.setContentView(restored)
+        assertEquals(SingleScreenLayout.ScreenMode.GAME_ONLY, restored.screenMode)
+        assertFalse(restored.companionVisible)
+        restored.gameLoaded(); restored.showCompanion(CompanionController(restoredActivity, "No pack fixture", "TEST", 0))
+        layout(restored, 360, 800)
+        assertFalse(restored.companionVisible)
+        restored.close(); restoredActivity.finish()
+        swap.performClick(); layout(host, 360, 800)
+        assertEquals(SingleScreenLayout.ScreenMode.GAME_FIRST, host.screenMode)
+        assertTrue(host.companionVisible)
+        assertFalse(host.arrangement.gameOnly)
+        assertSame(gameParent, surface.parent)
+        assertSame(companion, companionFrame.getChildAt(0))
+        host.close(); activity.finish()
+    }
+
+    @Test fun oldSwapPreferenceMigratesAndUnknownModesDoNotCrashStartup() {
+        val activity = Robolectric.buildActivity(Activity::class.java).setup().get()
+        val prefs = activity.getSharedPreferences("single_screen_display", Activity.MODE_PRIVATE)
+        prefs.edit().putBoolean("swapped", true).commit()
+        val legacy = SingleScreenPlayerHost(activity, View(activity), {}, {})
+        assertEquals(SingleScreenLayout.ScreenMode.COMPANION_FIRST, legacy.screenMode)
+        legacy.close()
+        prefs.edit().putString("screen_mode", "unknown_future_mode").commit()
+        val unknown = SingleScreenPlayerHost(activity, View(activity), {}, {})
+        assertEquals(SingleScreenLayout.ScreenMode.COMPANION_FIRST, unknown.screenMode)
+        unknown.close(); activity.finish()
+    }
     @Test fun loadingDisablesGameInputButLeavesMenuAvailableToCancel() {
         val activity = Robolectric.buildActivity(Activity::class.java).setup().get()
         var saves = 0; var menus = 0; var keys = 0

@@ -12,7 +12,12 @@ internal object SingleScreenLayout {
 
     enum class Control { DPAD, FACE, L, R, SELECT, START, MENU, QUICK_SAVE, QUICK_LOAD, FAST_FORWARD, THEME, SWAP }
     enum class Mode { PHONE_LANDSCAPE, PORTRAIT_STACK, EXPANDED_LANDSCAPE_STACK, EXPANDED_PORTRAIT_STACK }
-    data class Arrangement(val game: Rect, val companion: Rect, val controls: Map<Control, Rect>, val mode: Mode, val logo: Rect)
+    enum class ScreenMode {
+        GAME_FIRST, COMPANION_FIRST, GAME_ONLY;
+        fun next() = entries[(ordinal + 1) % entries.size]
+    }
+    data class Arrangement(val game: Rect, val companion: Rect, val controls: Map<Control, Rect>, val mode: Mode,
+        val logo: Rect, val gameOnly: Boolean = false)
 
     private val footerControls = listOf(Control.SWAP, Control.QUICK_SAVE, Control.SELECT, Control.MENU,
         Control.START, Control.QUICK_LOAD, Control.FAST_FORWARD)
@@ -24,10 +29,11 @@ internal object SingleScreenLayout {
     }
 
     fun arrange(width: Float, height: Float, density: Float, gameAspect: Float = 1.5f,
-        portraitTopInset: Float = 0f, swapped: Boolean = false): Arrangement {
+        portraitTopInset: Float = 0f, swapped: Boolean = false, gameOnly: Boolean = false): Arrangement {
         val w = width.coerceAtLeast(1f)
         val topInset = if (width < height) portraitTopInset.coerceIn(0f, (height - 1f).coerceAtLeast(0f)) else 0f
         val h = (height - topInset).coerceAtLeast(1f)
+        fun shifted(rect: Rect) = rect.copy(y = rect.y + topInset)
         val expanded = isExpandedWindow(width, height, density)
         val mode = when {
             width < height && expanded -> Mode.EXPANDED_PORTRAIT_STACK
@@ -68,6 +74,49 @@ internal object SingleScreenLayout {
             val logoWidth = min(88f * density, rail * .90f)
             logo = Rect((rail - logoWidth) / 2, h * if (expanded) .34f else .29f,
                 logoWidth, min(36f * density, h * .09f))
+        }
+        if (gameOnly) {
+            val game: Rect
+            if (portrait) {
+                val controlHeight = min(260f * density, h * .46f)
+                val screenBox = Rect(gap, gap, (w - gap * 2).coerceAtLeast(1f),
+                    (h - controlHeight - gap * 2).coerceAtLeast(1f))
+                val fitted = fit(screenBox, gameAspect)
+                game = fitted.copy(y = screenBox.y + (screenBox.height - fitted.height) / 2)
+                val top = h - controlHeight
+                val small = min(hit, w * .105f)
+                val body = controlHeight - small - gap
+                val touch = min(hit, body * .27f)
+                val pad = min(w * .36f, (body - touch) * .95f)
+                val face = min(w * .28f, (body - touch) / 1.1f)
+                val centre = top + touch + (body - touch) / 2
+                centered(Control.DPAD, w * .18f, centre, pad)
+                centered(Control.FACE, w * .82f, centre, face * 1.2f, face * 1.1f)
+                centered(Control.L, w * .13f, top + touch / 2, w * .23f, touch)
+                centered(Control.R, w * .87f, top + touch / 2, w * .23f, touch)
+                centered(Control.THEME, w / 2, top + touch / 2, touch)
+                logo = logo.copy(y = centre - logo.height / 2)
+            } else {
+                val rail = w * if (expanded) .18f else .16f
+                val screenBox = Rect(rail + gap * 2, gap, (w - rail * 2 - gap * 4).coerceAtLeast(1f),
+                    (h - footer - gap * 2).coerceAtLeast(1f))
+                val fitted = fit(screenBox, gameAspect)
+                game = fitted.copy(y = screenBox.y + (screenBox.height - fitted.height) / 2)
+                val pad = min(rail * .90f, min(h * .38f, 144f * density))
+                val faceWidth = min(rail * .90f, 132f * density)
+                val faceHeight = faceWidth * 1.1f / 1.2f
+                val handY = min(h * .62f, h - footer - gap - max(pad, faceHeight) / 2)
+                centered(Control.DPAD, rail / 2, handY, pad)
+                centered(Control.FACE, w - rail / 2, handY, faceWidth, faceHeight)
+                centered(Control.THEME, rail / 2, h * .12f, hit)
+                centered(Control.L, w * .06f, h - footer / 2, w * .105f, footer * .8f)
+                centered(Control.R, w * .94f, h - footer / 2, w * .105f, footer * .8f)
+                footerRow(w / 2, screenBox.width)
+                val logoWidth = min(88f * density, rail * .90f)
+                logo = Rect((rail - logoWidth) / 2, h * .29f, logoWidth, min(36f * density, h * .09f))
+            }
+            return Arrangement(shifted(game), Rect(0f, topInset, 0f, 0f),
+                controls.mapValues { shifted(it.value) }, mode, shifted(logo), gameOnly = true)
         }
         val first: Rect
         val second: Rect
@@ -152,7 +201,6 @@ internal object SingleScreenLayout {
                 logo = logo.copy(y = centre - logo.height / 2)
             }
         }
-        fun shifted(rect: Rect) = rect.copy(y = rect.y + topInset)
         return Arrangement(shifted(if (swapped) second else first), shifted(if (swapped) first else second),
             controls.mapValues { shifted(it.value) }, mode, shifted(logo))
     }

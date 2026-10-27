@@ -16,7 +16,7 @@ internal class SingleScreenSkin(private val density: Float) {
     fun draw(canvas: Canvas, layout: SingleScreenLayout.Arrangement) {
         canvas.drawColor(if (darkTheme) Color.rgb(25, 28, 31) else SHELL)
         frame(canvas, layout.game)
-        frame(canvas, layout.companion)
+        if (!layout.gameOnly) frame(canvas, layout.companion)
 
         val logoSize = min(12f * density, min(layout.logo.width * .18f, layout.logo.height * .34f))
         val logoY = layout.logo.y + logoSize * 1.6f

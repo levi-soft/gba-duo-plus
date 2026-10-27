@@ -23,9 +23,12 @@ require a second Android display or alter the companion ZIP format.
   scales and moves together. Classification uses current window dp dimensions:
   a shortest side of at least 600dp, or at least 480dp with aspect no wider than 1.6:1.
   A narrow outer display or smaller window retains the phone layout.
-- **Swap** exchanges the two screen positions, preserving their respective aspects
-  and the existing surface/companion views. It releases held inputs, does not reload
-  the ROM, and remembers the chosen order across sessions.
+- **Swap** cycles through game first, companion first and game only.
+  Game only hides the companion frame and gives the game a larger, centred viewport
+  with the same GBA controls. It supports games with no assigned companion pack.
+  Switching preserves the existing surface and companion views, releases held inputs,
+  does not reload the ROM, and remembers the chosen mode across sessions. Existing
+  saved two-screen orders migrate to their corresponding modes.
 - The game keeps its GBA 3:2 or GB/GBC 10:9 aspect. The companion keeps a 4:3
   viewport. Neither stretches to fill the phone. A light shell and raised grey
   screen frames surround the viewports; red A, yellow B and rainbow accents
@@ -97,6 +100,15 @@ The older Plus.4 SS asset was added after its original tag; that historical rele
 retains its original APKs and separately documented SS source commit.
 
 ## Verification status
+
+The same-version three-state Swap update passes all 537 Debug unit/host-render tests
+in both SS and regular Plus configurations, and both Release APKs build. Geometry
+covers portrait cutouts, phone landscape, tablet/Fold windows and both game aspects.
+On Thor, a game with no companion pack passed the three-state cycle without a
+native session reload, all ten GBA input press/release checks, and remembering game
+only after closing and reopening the game. Thor remained in landscape during the
+rotation commands; portrait rotation and an assigned live pack have not been
+verified on that device for this change. Its rotation settings were restored.
 
 Automated geometry, input, worker and Android host-render tests are provided.
 Preview video is a synthetic pattern, not a native emulation or GPU test. Host

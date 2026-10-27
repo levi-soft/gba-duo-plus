@@ -4,6 +4,33 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class SingleScreenLayoutTest {
+    @Test fun gameOnlyUsesOneLargerFrameAndKeepsAllControlsClearAcrossWindows() {
+        for ((width, height) in listOf(997 to 408, 800 to 360, 640 to 360, 480 to 320, 340 to 340,
+            360 to 800, 412 to 915, 320 to 480, 600 to 600, 800 to 600, 600 to 800, 1024 to 768)) {
+            for (density in listOf(1f, 2f, 3f)) for (aspect in listOf(1.5f, 160f / 144f)) {
+                val w = width * density; val h = height * density
+                val inset = if (w < h) 32f * density else 0f
+                val normal = SingleScreenLayout.arrange(w, h, density, aspect, inset)
+                val layout = SingleScreenLayout.arrange(w, h, density, aspect, inset, gameOnly = true)
+                assertTrue(layout.gameOnly)
+                assertEquals(0f, layout.companion.width, 0f)
+                assertEquals(0f, layout.companion.height, 0f)
+                assertEquals(aspect, layout.game.width / layout.game.height, .001f)
+                assertTrue(layout.game.width >= normal.game.width - .01f)
+                assertEquals(w / 2, layout.game.x + layout.game.width / 2, .01f)
+                assertEquals(SingleScreenLayout.Control.entries.toSet(), layout.controls.keys)
+                val face = layout.controls.getValue(SingleScreenLayout.Control.FACE)
+                val buttons = TouchButtons.faceBounds(face.width, face.height).map { (_, r) -> r.copy(x = face.x + r.x, y = face.y + r.y) }
+                val boxes = listOf(layout.game, layout.logo) + layout.controls.filterKeys { it != SingleScreenLayout.Control.FACE }.values + buttons
+                for (r in boxes) assertTrue("$width x $height: $r", r.x >= 0 && r.y >= inset && r.right <= w + .01f && r.bottom <= h + .01f)
+                for (i in boxes.indices) for (j in i + 1 until boxes.size) {
+                    val a = boxes[i]; val b = boxes[j]
+                    assertFalse("$width x $height: overlapping $a / $b",
+                        minOf(a.right, b.right) - maxOf(a.x, b.x) > .1f && minOf(a.bottom, b.bottom) - maxOf(a.y, b.y) > .1f)
+                }
+            }
+        }
+    }
     @Test fun expandedWindowsStackInBothOrientationsButOuterPhoneWindowKeepsSideLayout() {
         for ((w, h) in listOf(800 to 600, 600 to 800, 600 to 600, 720 to 540, 540 to 720, 1024 to 768)) {
             for (swapped in listOf(false, true)) for (aspect in listOf(1.5f, 160f / 144f)) {

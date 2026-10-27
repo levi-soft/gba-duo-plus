@@ -73,7 +73,19 @@ class SingleScreenRenderTest {
     @Test @Config(qualifiers = "w800dp-h600dp-land-mdpi")
     fun tabletLandscapeSwapped() = render("tablet-landscape-swapped", swapped = true)
 
-    private fun render(name: String, cutoutTop: Int = 0, dark: Boolean = false, swapped: Boolean = false) {
+    @Test @Config(qualifiers = "w997dp-h408dp-land-mdpi")
+    fun gameOnlyLandscape() = render("game-only-landscape", gameOnly = true)
+
+    @Test @Config(qualifiers = "w360dp-h800dp-port-mdpi")
+    fun gameOnlyPortraitWithCutout() = render("game-only-portrait", 32, gameOnly = true)
+
+    @Test @Config(qualifiers = "w800dp-h600dp-land-mdpi")
+    fun gameOnlyTablet() = render("game-only-tablet", gameOnly = true)
+
+    @Test @Config(qualifiers = "w600dp-h600dp-land-mdpi")
+    fun gameOnlyFoldDark() = render("game-only-fold-dark", dark = true, gameOnly = true)
+
+    private fun render(name: String, cutoutTop: Int = 0, dark: Boolean = false, swapped: Boolean = false, gameOnly: Boolean = false) {
         val fixture = System.getProperty("gbaduo.ss.previewPack")
         val directory = File(fixture ?: "../docs-packs/examples/classic")
         val manifest = PackManifest.parse(File(directory, "manifest.json").readText())
@@ -102,6 +114,7 @@ class SingleScreenRenderTest {
                 host = SingleScreenPlayerHost(context, video, {}, {})
                 if (dark) host.controlView(SingleScreenLayout.Control.THEME).performClick()
                 if (swapped) host.controlView(SingleScreenLayout.Control.SWAP).performClick()
+                if (gameOnly) repeat(2) { host.controlView(SingleScreenLayout.Control.SWAP).performClick() }
                 host.showCompanion(controller)
                 host.gameLoaded()
                 host
@@ -130,7 +143,11 @@ class SingleScreenRenderTest {
             compose.runOnUiThread { PixelCopy.request((context as Activity).window, rect, image, { result = it }, Handler(Looper.getMainLooper())) }
             compose.waitForIdle()
             assertEquals(PixelCopy.SUCCESS, result)
-            assertEquals(4f / 3f, host.arrangement.companion.width / host.arrangement.companion.height, .001f)
+            if (gameOnly) {
+                assertTrue(host.arrangement.gameOnly)
+                assertFalse(host.companionVisible)
+                assertEquals(0f, host.arrangement.companion.width, 0f)
+            } else assertEquals(4f / 3f, host.arrangement.companion.width / host.arrangement.companion.height, .001f)
             assertTrue(host.arrangement.game.y >= cutoutTop)
             // Windows image previews can retain a mapped file; never truncate an open capture.
             val file = File("build/screenshots/single-screen/$name-${System.currentTimeMillis()}.png"); file.parentFile?.mkdirs()
