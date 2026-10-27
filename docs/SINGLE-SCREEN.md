@@ -1,6 +1,6 @@
 # GBA Duo Plus SS — Single Screen edition
 
-SS is a separate phone edition of **0.1.7-plus.4**, built from the Plus source.
+SS is a separate phone edition of **0.1.8-plus.1**, built from the Plus source.
 It embeds the existing companion controller in the game Activity. It does not
 require a second Android display or alter the companion ZIP format.
 
@@ -83,8 +83,8 @@ same existing four `PLUS_*` environment variables. Without them the APK is unsig
 
 | Edition | Application ID | Version | Local APK name |
 |---|---|---|---|
-| Plus | `com.khumam.gbaduo.plus` | `0.1.7-plus.4` | `GBA-Duo-Plus-0.1.7-plus.4.apk` |
-| Plus SS | `com.khumam.gbaduo.plus.ss` | `0.1.7-plus.4-ss` | `GBA-Duo-Plus-SS-0.1.7-plus.4.apk` |
+| Plus | `com.khumam.gbaduo.plus` | `0.1.8-plus.1` | `GBA-Duo-Plus-0.1.8-plus.1.apk` |
+| Plus SS | `com.khumam.gbaduo.plus.ss` | `0.1.8-plus.1-ss` | `GBA-Duo-Plus-SS-0.1.8-plus.1.apk` |
 
 The apps install side by side and have separate private saves, companion packs,
 settings, sign-ins and folder permissions. Import an existing companion ZIP or
@@ -92,9 +92,9 @@ create one with the same automatic Builder flow. There is no automatic migration
 
 Audit a signed SS APK with `tools/package-apk.ps1 -Edition SS -ApkPath <apk>`.
 It keeps the regular and SS checksum entries in the same local release directory.
-SS is an additional asset in the existing Plus.4 release;
-previous tags and the regular APK must remain unchanged. SS source must be linked
-to its own exact source commit because the original Plus.4 tag predates SS.
+Both editions are built from the same 0.1.8-plus.1 source and distributed together.
+The older Plus.4 SS asset was added after its original tag; that historical release
+retains its original APKs and separately documented SS source commit.
 
 ## Verification status
 
