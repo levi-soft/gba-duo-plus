@@ -78,23 +78,25 @@ internal object SingleScreenLayout {
         if (gameOnly) {
             val game: Rect
             if (portrait) {
+                // Balance three separate zones above the fixed utility row.
+                val playBottom = controls.getValue(Control.MENU).y - gap
                 val controlHeight = min(260f * density, h * .46f)
                 val screenBox = Rect(gap, gap, (w - gap * 2).coerceAtLeast(1f),
-                    (h - controlHeight - gap * 2).coerceAtLeast(1f))
+                    (playBottom * .48f - gap * 2).coerceAtLeast(1f))
                 val fitted = fit(screenBox, gameAspect)
                 game = fitted.copy(y = screenBox.y + (screenBox.height - fitted.height) / 2)
-                val top = h - controlHeight
                 val small = min(hit, w * .105f)
                 val body = controlHeight - small - gap
                 val touch = min(hit, body * .27f)
                 val pad = min(w * .36f, (body - touch) * .95f)
                 val face = min(w * .28f, (body - touch) / 1.1f)
-                val centre = top + touch + (body - touch) / 2
+                val shoulderY = playBottom * .54f
+                val centre = playBottom * .76f
                 centered(Control.DPAD, w * .18f, centre, pad)
                 centered(Control.FACE, w * .82f, centre, face * 1.2f, face * 1.1f)
-                centered(Control.L, w * .13f, top + touch / 2, w * .23f, touch)
-                centered(Control.R, w * .87f, top + touch / 2, w * .23f, touch)
-                centered(Control.THEME, w / 2, top + touch / 2, touch)
+                centered(Control.L, w * .13f, shoulderY, w * .23f, touch)
+                centered(Control.R, w * .87f, shoulderY, w * .23f, touch)
+                centered(Control.THEME, w / 2, shoulderY, touch)
                 logo = logo.copy(y = centre - logo.height / 2)
             } else {
                 val rail = w * if (expanded) .18f else .16f

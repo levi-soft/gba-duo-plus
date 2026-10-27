@@ -4,6 +4,37 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class SingleScreenLayoutTest {
+    @Test fun gameOnlyPortraitBalancesTheScreenShouldersAndThumbsAboveTheBottomUtilities() {
+        for ((w, h) in listOf(360f to 800f, 412f to 915f, 408f to 997f, 320f to 480f, 600f to 800f)) {
+            for (aspect in listOf(1.5f, 160f / 144f)) {
+                val layout = SingleScreenLayout.arrange(w, h, 1f, aspect, portraitTopInset = 32f, gameOnly = true)
+                val shoulders = layout.controls.getValue(SingleScreenLayout.Control.L)
+                val theme = layout.controls.getValue(SingleScreenLayout.Control.THEME)
+                val dpad = layout.controls.getValue(SingleScreenLayout.Control.DPAD)
+                val face = layout.controls.getValue(SingleScreenLayout.Control.FACE)
+                val menu = layout.controls.getValue(SingleScreenLayout.Control.MENU)
+                assertTrue(shoulders.y >= layout.game.bottom)
+                assertTrue(dpad.y >= shoulders.bottom)
+                assertTrue(face.y >= shoulders.bottom)
+                assertEquals(shoulders.y, theme.y, .001f)
+                assertEquals(dpad.y + dpad.height / 2, face.y + face.height / 2, .001f)
+                assertTrue(menu.y >= maxOf(dpad.bottom, face.bottom))
+                assertTrue(menu.bottom <= h)
+                val dual = SingleScreenLayout.arrange(w, h, 1f, aspect, portraitTopInset = 32f)
+                assertEquals(dual.controls.getValue(SingleScreenLayout.Control.MENU), menu)
+                assertEquals(w / 2, layout.logo.x + layout.logo.width / 2, .001f)
+            }
+        }
+    }
+    @Test fun gameOnlyPortraitMatchesTheAnnotatedScreenAndThumbRegions() {
+        val layout = SingleScreenLayout.arrange(360f, 800f, 1f, portraitTopInset = 32f, gameOnly = true)
+        val pad = layout.controls.getValue(SingleScreenLayout.Control.DPAD)
+        val shoulders = layout.controls.getValue(SingleScreenLayout.Control.L)
+        assertTrue(layout.game.y in 80f..100f)
+        assertTrue(shoulders.y + shoulders.height / 2 in 410f..440f)
+        assertTrue(pad.y + pad.height / 2 in 570f..600f)
+        assertTrue(layout.controls.getValue(SingleScreenLayout.Control.MENU).y >= 740f)
+    }
     @Test fun gameOnlyUsesOneLargerFrameAndKeepsAllControlsClearAcrossWindows() {
         for ((width, height) in listOf(997 to 408, 800 to 360, 640 to 360, 480 to 320, 340 to 340,
             360 to 800, 412 to 915, 320 to 480, 600 to 600, 800 to 600, 600 to 800, 1024 to 768)) {

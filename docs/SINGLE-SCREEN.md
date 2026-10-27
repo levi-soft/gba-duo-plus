@@ -29,6 +29,9 @@ require a second Android display or alter the companion ZIP format.
   Switching preserves the existing surface and companion views, releases held inputs,
   does not reload the ROM, and remembers the chosen mode across sessions. Existing
   saved two-screen orders migrate to their corresponding modes.
+  Game-only portrait centres the viewport in an upper zone and the D-pad, A/B
+  and logo in a lower thumb zone. L/R and Theme share the row between those
+  zones. The seven utility buttons retain their bottom row.
 - The game keeps its GBA 3:2 or GB/GBC 10:9 aspect. The companion keeps a 4:3
   viewport. Neither stretches to fill the phone. A light shell and raised grey
   screen frames surround the viewports; red A, yellow B and rainbow accents

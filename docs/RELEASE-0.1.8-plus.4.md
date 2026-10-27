@@ -36,3 +36,19 @@ passed press/release checks, and reopening retained game only. This real-device
 feature check used a game without a companion pack. Portrait rotation and an
 assigned live pack were covered by host tests, not verified on Thor during this
 update. Thor's rotation settings were restored after testing.
+
+## SS portrait layout refresh within Plus.4
+
+The SS APK now uses the approved game-only portrait arrangement: the game is
+centred in an upper zone, D-pad/A/B and the logo are centred in a lower thumb
+zone, and L/R plus Theme share the row between them. Swap, Save, Select, Menu,
+Start, Load and >> remain at the bottom. Other screen modes are unchanged.
+
+The refresh retains `0.1.8-plus.4-ss` and versionCode **17**. Its 45 focused SS
+geometry, input and host-render tests passed; Release build, signing/alignment
+checks and an in-place install on Thor passed. The approved portrait preview is
+a host render; real-device portrait rotation was not newly verified.
+
+Download the SS APK again and install over SS to receive this same-version
+refresh. The regular Plus APK is unchanged; `SHA256SUMS.txt` identifies the new SS
+binary.
