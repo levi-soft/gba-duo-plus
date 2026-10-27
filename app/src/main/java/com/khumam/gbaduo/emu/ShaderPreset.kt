@@ -19,13 +19,6 @@ enum class ShaderPreset(
         fragmentAsset = "shaders/off/fragment.glsl",
         uniforms = emptyList(),
     ),
-    GBA_COLOR(
-        id = "gba_color",
-        displayName = "GBA Color",
-        vertexAsset = "shaders/common_vertex.glsl",
-        fragmentAsset = "shaders/gba_color/fragment.glsl",
-        uniforms = listOf("darken_screen" to 0.5f),
-    ),
     LCD(
         id = "lcd",
         displayName = "LCD Grid",
@@ -49,7 +42,6 @@ enum class ShaderPreset(
 
     companion object {
         fun byId(id: String?): ShaderPreset = when (id) {
-            "gba_color_soft" -> GBA_COLOR
             "lcd_soft" -> LCD
             else -> entries.firstOrNull { it.id == id } ?: OFF
         }

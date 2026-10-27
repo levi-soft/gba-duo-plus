@@ -16,6 +16,8 @@ internal class LibretroShaderRenderer(private val assets: AssetManager, private 
     private var fbos = IntArray(0)
     private var sourceWidth = 0
     private var sourceHeight = 0
+    private var targetWidth = 0
+    private var targetHeight = 0
     private val vertices = buffer(floatArrayOf(-1f,-1f, 1f,-1f, -1f,1f, 1f,1f))
     private val straight = buffer(floatArrayOf(0f,0f, 1f,0f, 0f,1f, 1f,1f))
     private val flipped = buffer(floatArrayOf(0f,1f, 1f,1f, 0f,0f, 1f,0f))
@@ -34,23 +36,25 @@ internal class LibretroShaderRenderer(private val assets: AssetManager, private 
                     .replace(Regex("(?m)^\\s*#pragma[^\\n]*"), "")
                 programs.add(link(stage(source,"VERTEX"), stage(source,"FRAGMENT")))
             }
+            val correction = assets.open("shaders/color_correction.glsl").bufferedReader().use { it.readText() }
             blit = link("""#version 300 es
                 in vec4 VertexCoord; in vec2 TexCoord; out vec2 uv;
                 void main(){gl_Position=VertexCoord;uv=TexCoord;}
             """.trimIndent(), """#version 300 es
                 precision highp float;
+                $correction
                 in vec2 uv; uniform sampler2D Texture; out vec4 color;
-                void main(){color=texture(Texture,uv);}
+                void main(){color=cc(texture(Texture,uv));}
             """.trimIndent())
         } catch (e: Exception) { close(); throw e }
     }
 
     private fun stage(source:String, kind:String) = "#version 300 es\n#define $kind\nprecision highp float;\nprecision highp int;\n$source"
 
-    private fun allocate(width:Int,height:Int) {
-        if(width==sourceWidth && height==sourceHeight) return
+    private fun allocate(width:Int,height:Int,outWidth:Int,outHeight:Int) {
+        if(width==sourceWidth && height==sourceHeight && (preset!=ShaderPreset.XBRZ || outWidth==targetWidth && outHeight==targetHeight)) return
         deleteTargets()
-        val count = if(preset==ShaderPreset.SCALEFX) 5 else if(preset==ShaderPreset.HQ2X) 1 else 0
+        val count = if(preset==ShaderPreset.SCALEFX) 5 else 1
         textures = IntArray(count); fbos = IntArray(count)
         GL.glGenFramebuffers(count,fbos,0)
         try {
@@ -58,25 +62,32 @@ internal class LibretroShaderRenderer(private val assets: AssetManager, private 
                 textures[i] = newTexture()
                 val scale = if(preset==ShaderPreset.HQ2X) 2 else if(i==4) 3 else 1
                 val floatTarget = preset==ShaderPreset.SCALEFX && i<2
-                GL.glTexImage2D(GL.GL_TEXTURE_2D,0,if(floatTarget) GL.GL_RGBA32F else GL.GL_RGBA8,width*scale,height*scale,0,GL.GL_RGBA,if(floatTarget) GL.GL_FLOAT else GL.GL_UNSIGNED_BYTE,null)
+                val tw = if(preset==ShaderPreset.XBRZ) outWidth else width*scale
+                val th = if(preset==ShaderPreset.XBRZ) outHeight else height*scale
+                GL.glTexImage2D(GL.GL_TEXTURE_2D,0,if(floatTarget) GL.GL_RGBA32F else GL.GL_RGBA8,tw,th,0,GL.GL_RGBA,if(floatTarget) GL.GL_FLOAT else GL.GL_UNSIGNED_BYTE,null)
                 GL.glBindFramebuffer(GL.GL_FRAMEBUFFER,fbos[i])
                 GL.glFramebufferTexture2D(GL.GL_FRAMEBUFFER,GL.GL_COLOR_ATTACHMENT0,GL.GL_TEXTURE_2D,textures[i],0)
                 check(GL.glCheckFramebufferStatus(GL.GL_FRAMEBUFFER)==GL.GL_FRAMEBUFFER_COMPLETE) { "${preset.displayName}: unsupported framebuffer format" }
             }
             sourceWidth=width; sourceHeight=height
+            targetWidth=outWidth; targetHeight=outHeight
         } finally { GL.glBindFramebuffer(GL.GL_FRAMEBUFFER,0) }
     }
 
-    fun draw(input:Int,width:Int,height:Int,surfaceWidth:Int,surfaceHeight:Int) {
-        allocate(width,height)
+    fun draw(input:Int,width:Int,height:Int,surfaceWidth:Int,surfaceHeight:Int,colorMode:Float=0f) {
         GL.glDisable(GL.GL_BLEND)
         GL.glDisable(GL.GL_DITHER)
         val fit = minOf(surfaceWidth.toFloat()/width,surfaceHeight.toFloat()/height)
         val outWidth=(width*fit).toInt(); val outHeight=(height*fit).toInt()
+        if(outWidth<=0 || outHeight<=0) return
+        allocate(width,height,outWidth,outHeight)
         if(preset==ShaderPreset.XBRZ) {
+            GL.glBindFramebuffer(GL.GL_FRAMEBUFFER,fbos[0])
+            GL.glViewport(0,0,outWidth,outHeight)
+            render(programs[0],input,input,0,width,height,outWidth,outHeight,false)
             GL.glBindFramebuffer(GL.GL_FRAMEBUFFER,0)
             GL.glViewport((surfaceWidth-outWidth)/2,(surfaceHeight-outHeight)/2,outWidth,outHeight)
-            render(programs[0],input,input,0,width,height,outWidth,outHeight,true)
+            render(blit,textures[0],input,0,width,height,outWidth,outHeight,true,colorMode)
         }else {
             var previous=input
             for(i in programs.indices) {
@@ -87,13 +98,14 @@ internal class LibretroShaderRenderer(private val assets: AssetManager, private 
             }
             GL.glBindFramebuffer(GL.GL_FRAMEBUFFER,0)
             GL.glViewport((surfaceWidth-outWidth)/2,(surfaceHeight-outHeight)/2,outWidth,outHeight)
-            render(blit,previous,input,0,width,height,outWidth,outHeight,true)
+            render(blit,previous,input,0,width,height,outWidth,outHeight,true,colorMode)
         }
         GL.glActiveTexture(GL.GL_TEXTURE0)
     }
 
-    private fun render(program:Int,source:Int,original:Int,firstPass:Int,w:Int,h:Int,ow:Int,oh:Int,flip:Boolean) {
+    private fun render(program:Int,source:Int,original:Int,firstPass:Int,w:Int,h:Int,ow:Int,oh:Int,flip:Boolean,colorMode:Float=0f) {
         GL.glUseProgram(program)
+        GL.glUniform1f(GL.glGetUniformLocation(program,"ccMode"),colorMode)
         fun texture(name:String,unit:Int,id:Int) {
             val loc=GL.glGetUniformLocation(program,name)
             if(loc>=0){ GL.glActiveTexture(GL.GL_TEXTURE0+unit);GL.glBindTexture(GL.GL_TEXTURE_2D,id);GL.glUniform1i(loc,unit) }

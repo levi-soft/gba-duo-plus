@@ -7,7 +7,7 @@ class ShaderPresetTest {
 
     @Test
     fun byIdFindsMatchingPreset() {
-        assertEquals(ShaderPreset.GBA_COLOR, ShaderPreset.byId("gba_color"))
+        assertEquals(ShaderPreset.HQ2X, ShaderPreset.byId("hq2x"))
         assertEquals(ShaderPreset.XBRZ, ShaderPreset.byId("xbrz"))
     }
 
@@ -19,7 +19,7 @@ class ShaderPresetTest {
 
     @Test
     fun removedPresetsRestoreSupportedSelection() {
-        assertEquals(ShaderPreset.GBA_COLOR, ShaderPreset.byId("gba_color_soft"))
+        assertEquals(ShaderPreset.OFF, ShaderPreset.byId("gba_color_soft"))
         assertEquals(ShaderPreset.LCD, ShaderPreset.byId("lcd_soft"))
         assertEquals(ShaderPreset.OFF, ShaderPreset.byId("scale2x"))
     }

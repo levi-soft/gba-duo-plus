@@ -1,3 +1,26 @@
+# 0.1.8 upgrade validation (2026-10-27)
+
+Source is based on official v0.1.8 (8832d19), with regular/SS versionCode 14. Builder remains 1.1.5.
+
+- Regular Debug: 535/535 passed before the final two scraping race/cancellation tests were added.
+- Full SS Debug after those additions: 537/537 passed.
+- Focused regular Release: 320/320 passed, including migrations, controls/hotkeys, shader settings, save import, artwork, core startup, companion navigation/retention, Builder and RA helpers.
+- Linux native harness: 176 checks, zero failures, ASan/UBSan enabled, run in a disposable Debian container.
+- Both release APKs: R8/lint/build passed; signed with the existing release certificate, zip alignment and package audit passed.
+- Extension boundary: 44 documented upstream integration files and 66 Plus extension files; checker test passed.
+
+Thor device pass: installed the regular APK over 0.1.7-plus.4 without uninstalling/clearing app data. Library retained 15 ROM entries and existing folder access. Existing FE7 save loaded at chapter 7; after selecting the companion in the library, it rendered unit stats and a minimap with current script frames. Selecting Lyn in the companion moved the game cursor to Lyn and ended with no keys held. Studio info/data requests worked. xBRZ, HQ2x and ScaleFX rendered with GBA correction; no shader fallback/crash was logged in this pass. The device had no assigned pack for the initially opened game; selecting a pack was needed to exercise companion rendering, so this does not establish pre-existing assignment migration on-device. The game-storage/assignment lookup path is unchanged.
+
+SS was a fresh install on Thor: game startup, ten touch press/release masks, fast-forward toggle, slot-0 save/load, swapping without a new session/Activity, and four orientation changes passed. Rotation policy was restored to its initial free state. Existing phone/tablet/fold layout geometry is unchanged and covered by JVM tests; this Thor run is not a new physical Fold/tablet test.
+
+Migration fixtures verified old A/B preferences and shader/color selection, preservation of save bytes, shared artwork interoperability, copying old cover selections without deleting their originals, cancellation/failed atomic publication, and no resurrection after artwork removal. No cover migration with a real pre-existing Thor selection was observed in this pass.
+
+Not exercised here: authenticated RA online events, a live SGDB key request, real folder artwork imports and every shader × GBC color combination. Plus and SS share the existing Studio abstract-socket name; keep Studio Connection active in only one edition at a time.
+
+Signed APKs are local upgrade candidates. No new public release, GitHub tag, source ZIP or website download link was published for this upgrade. Historical validation follows.
+
+---
+
 # Pre-commit review of Plus 0.1.7-plus.2 (2026-10-24)
 
 ## Publication follow-up

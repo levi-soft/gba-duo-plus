@@ -39,6 +39,7 @@ import com.khumam.gbaduo.library.ui.PixelButton
 import com.khumam.gbaduo.player.PlayerActivity
 import com.khumam.gbaduo.settings.RomFoldersActivity
 import com.khumam.gbaduo.settings.SettingsActivity
+import com.khumam.gbaduo.settings.GameSettingsActivity
 import com.khumam.gbaduo.storage.GameStorage
 import com.khumam.gbaduo.storage.LegacyMigration
 import java.io.File
@@ -107,12 +108,13 @@ class LibraryActivity : Activity() {
 
         artwork = ArtworkBinder(this, library)
         carousel = CartridgeCarousel(recycler, onSelected = ::showSelected, onPlay = { play() }, bindArtwork = artwork::bind)
-        ArtworkLibraryControls.attach(actions as LinearLayout) { selectedEntry()?.let { ArtworkEntry.launch(this, it, library) } }
+        ArtworkLibraryControls.attach(actions as LinearLayout) { selectedEntry()?.let(::openGameSettings) }
         if (BuildConfig.SINGLE_SCREEN) com.khumam.gbaduo.player.singlescreen.SingleScreenLibraryChrome.attach(this)
 
         findViewById<PixelButton>(R.id.open_settings).setOnClickListener { openSettings() }
         findViewById<PixelButton>(R.id.play).setOnClickListener { play() }
         findViewById<PixelButton>(R.id.pack_button).setOnClickListener { selectedEntry()?.let(::showCompanionMenu) }
+        findViewById<PixelButton>(R.id.game_settings_button).setOnClickListener { selectedEntry()?.let(::openGameSettings) }
         emptyAction.setOnClickListener { startActivity(Intent(this, RomFoldersActivity::class.java)) }
     }
 
@@ -174,6 +176,23 @@ class LibraryActivity : Activity() {
             (hud.layoutParams as LinearLayout.LayoutParams).marginEnd = Pixel.dp(this, 10f).toInt()
             info.setPadding(gutter, 0, gutter, 0)
             findViewById<View>(R.id.hints_bar).setPadding(gutter, 0, gutter, 0)
+            // Three buttons side by side: smaller text and gaps so none wraps or runs off the edge.
+            actions.setPadding(gutter, 0, gutter, 0)
+            val gap = Pixel.dp(this, 10f).toInt()
+            findViewById<PixelButton>(R.id.play).apply {
+                val narrow = Pixel.dp(this@LibraryActivity, 96f).toInt()
+                setMinWidth(narrow)
+                minimumWidth = narrow
+                textSize = 14f
+            }
+            findViewById<PixelButton>(R.id.pack_button).apply {
+                textSize = 14f
+                (layoutParams as LinearLayout.LayoutParams).marginStart = gap
+            }
+            findViewById<PixelButton>(R.id.game_settings_button).apply {
+                textSize = 14f
+                (layoutParams as LinearLayout.LayoutParams).marginStart = gap
+            }
         }
         // The empty / scanning box: 560dp, or the screen width minus a margin when narrower.
         empty.layoutParams = empty.layoutParams.apply {
@@ -188,6 +207,7 @@ class LibraryActivity : Activity() {
         }
         findViewById<PixelButton>(R.id.play).style(Pixel.YELLOW)
         findViewById<PixelButton>(R.id.pack_button).style(Pixel.CREAM)
+        findViewById<PixelButton>(R.id.game_settings_button).style(Pixel.CREAM)
 
         pointer.apply { typeface = displayBold; textSize = 18f; setTextColor(Pixel.PINK); setShadowLayer(0.01f, 2f, 2f, Pixel.INK) }
 
@@ -260,7 +280,7 @@ class LibraryActivity : Activity() {
                 }
             }
             KeyEvent.KEYCODE_BUTTON_Y -> if (event.repeatCount == 0) selectedEntry()?.let(::showCompanionMenu)
-            KeyEvent.KEYCODE_BUTTON_X -> if (event.repeatCount == 0) selectedEntry()?.let { ArtworkEntry.launch(this, it, library) }
+            KeyEvent.KEYCODE_BUTTON_X -> if (event.repeatCount == 0) selectedEntry()?.let(::openGameSettings)
             KeyEvent.KEYCODE_BUTTON_START, KeyEvent.KEYCODE_MENU -> if (event.repeatCount == 0) openSettings()
             else -> return super.onKeyDown(keyCode, event)
         }
@@ -376,7 +396,7 @@ class LibraryActivity : Activity() {
             hint("◀ ▶", getString(R.string.hint_browse))
             hint("A", getString(R.string.play))
             hint("Y", getString(R.string.hint_pack))
-            if (!compact) hint("X", "Artwork")
+            if (!compact) hint("X", getString(R.string.hint_game_settings))
             if (!compact) hint("L R", getString(R.string.hint_jump))
         } else if (canAddFolder) {
             hint("A", getString(R.string.add_rom_folder))
@@ -418,6 +438,32 @@ class LibraryActivity : Activity() {
             onResult = { result ->
                 result.onSuccess { (crc, storage, matches) -> showCompanionDialog(entry, crc, storage, matches) }
                     .onFailure { Toast.makeText(this, getString(R.string.load_failed, entry.fileName), Toast.LENGTH_SHORT).show() }
+            },
+        )
+    }
+
+    /** Opens the game's settings page once its folder (keyed by ROM checksum) is known. */
+    private fun openGameSettings(entry: RomEntry) {
+        background(
+            work = {
+                val crc = library.crc32(entry) ?: error("Could not read ${entry.fileName}")
+                val storage = GameStorage.forGame(filesDir, entry.platform, entry.title, entry.gameCode, crc)
+                LegacyMigration.migrate(filesDir, entry.fileName, crc, storage)
+                crc to storage.ensureDirs()
+            },
+            onResult = { result ->
+                result.onSuccess { (crc, storage) ->
+                    startActivity(
+                        Intent(this, GameSettingsActivity::class.java)
+                            .putExtra(GameSettingsActivity.EXTRA_GAME_DIR, storage.dir.absolutePath)
+                            .putExtra(GameSettingsActivity.EXTRA_TITLE, GameTitle.display(entry.fileName, entry.title))
+                            .putExtra(GameSettingsActivity.EXTRA_PLATFORM, entry.platform.label)
+                            .putExtra(GameSettingsActivity.EXTRA_PLATFORM_ID, entry.platform.id)
+                            .putExtra(GameSettingsActivity.EXTRA_FILE_NAME, entry.fileName)
+                            .putExtra(GameSettingsActivity.EXTRA_CODE, entry.gameCode)
+                            .putExtra(GameSettingsActivity.EXTRA_CRC, crc),
+                    )
+                }.onFailure { Toast.makeText(this, getString(R.string.load_failed, entry.fileName), Toast.LENGTH_SHORT).show() }
             },
         )
     }

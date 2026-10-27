@@ -22,6 +22,14 @@ class GameStorage private constructor(val dir: File) {
 
     private val consentFile: File get() = File(dir, "consent.json")
 
+    /** Every per-game setting, in `settings.json`. */
+    val settings: GameSettings get() = GameSettings(File(dir, "settings.json"))
+
+    /** The save state slot (1..9) that quick save and quick load use. Invalid or missing is 1. */
+    var currentSlot: Int
+        get() = settings.getInt(GameSettingsKeys.SLOT)?.takeIf { it in 1..9 } ?: 1
+        set(value) = settings.put(GameSettingsKeys.SLOT, value.coerceIn(1, 9))
+
     /**
      * The save state made automatically just before a companion pack first changes this
      * game's memory, so the player can always go back. Not a numbered slot (and not

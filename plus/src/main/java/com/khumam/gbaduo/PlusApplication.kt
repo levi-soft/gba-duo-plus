@@ -10,6 +10,7 @@ import com.khumam.gbaduo.player.singlescreen.SingleScreenWindows
 class PlusApplication : Application() {
     override fun onCreate() {
         super.onCreate()
+        PlusUpgrade.migrate(this)
         if (!BuildConfig.SINGLE_SCREEN) return
         registerActivityLifecycleCallbacks(object : ActivityLifecycleCallbacks {
             private val listeners = HashMap<Activity, ViewTreeObserver.OnWindowFocusChangeListener>()

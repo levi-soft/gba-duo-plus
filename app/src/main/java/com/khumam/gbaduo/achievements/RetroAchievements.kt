@@ -291,11 +291,19 @@ object RetroAchievements {
         }
     }
 
+    /** rcheevos' result when the ROM's hash isn't in the RetroAchievements database. */
+    private const val RC_NO_GAME_LOADED = -29
+    const val ERROR_UNKNOWN_GAME = "unknown_game"
+
     @JvmStatic
     fun onGameLoad(result: Int, error: String?, title: String?, gameId: Int, total: Int, unlocked: Int, imageUrl: String?) {
         main.post {
             gameSummary = if (total > 0) "$title: $unlocked / $total unlocked" else "No achievements found for this ROM."
-            gameListeners.forEach { it.onGameLoaded(title, total, unlocked, imageUrl, if (result == 0) null else error ?: "Unknown error") }
+            gameListeners.forEach { it.onGameLoaded(title, total, unlocked, imageUrl, when (result) {
+                0 -> null
+                RC_NO_GAME_LOADED -> ERROR_UNKNOWN_GAME
+                else -> error ?: "Unknown error"
+            }) }
         }
     }
 

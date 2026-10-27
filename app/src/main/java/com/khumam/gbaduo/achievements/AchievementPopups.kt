@@ -61,8 +61,8 @@ class AchievementPopups(private val container: FrameLayout) : RetroAchievements.
     override fun onGameLoaded(title: String?, total: Int, unlocked: Int, imageUrl: String?, error: String?) {
         val label = context.getString(R.string.ra_title)
         when {
-            error?.contains("Unknown game", ignoreCase = true) == true ->
-                enqueue(Popup(label, context.getString(R.string.ra_no_achievements), null, 0, null, 3500))
+            error == RetroAchievements.ERROR_UNKNOWN_GAME ->
+                enqueue(Popup(label, context.getString(R.string.ra_unknown_game), null, 0, null, 5000))
             error != null -> enqueue(Popup(label, context.getString(R.string.ra_game_error, error), null, 0, null, 3500))
             total == 0 -> enqueue(Popup(label, title ?: "", context.getString(R.string.ra_no_achievements), 0, imageUrl, 3500))
             else -> enqueue(Popup(label, title ?: "", context.getString(R.string.ra_game_summary, unlocked, total), 0, imageUrl, 3500))
@@ -103,10 +103,16 @@ class AchievementPopups(private val container: FrameLayout) : RetroAchievements.
         // Keep its bounds stable; animate opacity only.
         view.translationY = 0f
         view.alpha = if (motion) 0f else 1f
-        view.animate().alpha(1f).setDuration(duration).setInterpolator(easeOut).start()
+        // The window only keeps what was opaque at layout time and the game surface sits below it,
+        // so a popup that slides in loses its bottom strip unless the region is gathered again.
+        view.animate().translationY(0f).alpha(1f).setDuration(duration).setInterpolator(easeOut)
+            .setUpdateListener { container.requestTransparentRegion(view) }
+            .withEndAction { container.requestTransparentRegion(view) }
+            .start()
         view.postDelayed({
             view.animate().alpha(0f).setDuration(duration).withEndAction {
                 container.removeView(view)
+                container.requestTransparentRegion(container)
                 if (showing === view) showing = null
                 showNext()
             }.start()

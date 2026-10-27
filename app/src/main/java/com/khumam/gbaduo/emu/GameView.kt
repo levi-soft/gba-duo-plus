@@ -45,8 +45,15 @@ class GameView(context: Context, attrs: AttributeSet? = null) : GLSurfaceView(co
         requestRender()
     }
 
+    /** Thread-safe; read by the GL thread on the next frame. */
+    fun setColorCorrection(correction: ColorCorrection) {
+        renderer.colorMode = correction.mode
+        requestRender()
+    }
+
     private inner class Renderer(private val assets: AssetManager) : GLSurfaceView.Renderer {
         @Volatile var pendingShader: ShaderPreset = ShaderPreset.OFF
+        @Volatile var colorMode = 0f
         @Volatile var videoSize: Pair<Int, Int> = 240 to 160
 
         private var activeShader: ShaderPreset? = null
@@ -55,6 +62,7 @@ class GameView(context: Context, attrs: AttributeSet? = null) : GLSurfaceView(co
         private var texture = 0
         private var positionHandle = 0
         private var texSizeHandle = -1
+        private var colorModeHandle = -1
         private var surfaceWidth = 0
         private var surfaceHeight = 0
         private lateinit var vertexBuffer: FloatBuffer
@@ -110,7 +118,7 @@ class GameView(context: Context, attrs: AttributeSet? = null) : GLSurfaceView(co
                 buffer.rewind()
                 GLES20.glTexImage2D(GLES20.GL_TEXTURE_2D, 0, GLES20.GL_RGBA, videoWidth, videoHeight, 0, GLES20.GL_RGBA, GLES20.GL_UNSIGNED_BYTE, buffer)
                 try {
-                    pipeline!!.draw(texture, videoWidth, videoHeight, surfaceWidth, surfaceHeight)
+                    pipeline!!.draw(texture, videoWidth, videoHeight, surfaceWidth, surfaceHeight, colorMode)
                 } catch (error: Exception) {
                     Log.e(TAG, "Shader pipeline failed, reverting to Off", error)
                     GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, 0)
@@ -122,6 +130,9 @@ class GameView(context: Context, attrs: AttributeSet? = null) : GLSurfaceView(co
             }
             applyAspectFitViewport(videoWidth, videoHeight)
             GLES20.glUseProgram(program)
+            if (colorModeHandle >= 0) {
+                GLES20.glUniform1f(colorModeHandle, colorMode)
+            }
             if (texSizeHandle >= 0) {
                 GLES20.glUniform2f(texSizeHandle, videoWidth.toFloat(), videoHeight.toFloat())
             }
@@ -174,6 +185,7 @@ class GameView(context: Context, attrs: AttributeSet? = null) : GLSurfaceView(co
             GLES20.glUniform1i(GLES20.glGetUniformLocation(program, "tex"), 0)
             // Set per frame in onDrawFrame, since the video size depends on the loaded game.
             texSizeHandle = GLES20.glGetUniformLocation(program, "texSize")
+            colorModeHandle = GLES20.glGetUniformLocation(program, "ccMode")
             for ((name, value) in preset.uniforms) {
                 val loc = GLES20.glGetUniformLocation(program, name)
                 if (loc >= 0) {
@@ -184,7 +196,10 @@ class GameView(context: Context, attrs: AttributeSet? = null) : GLSurfaceView(co
 
         private fun buildProgram(preset: ShaderPreset): Int {
             val vertexSource = assets.open(preset.vertexAsset).bufferedReader().use { it.readText() }
+            val correction = assets.open("shaders/color_correction.glsl").bufferedReader().use { it.readText() }
+            // Every fragment shader opens with this exact line; the correction goes right after it.
             val fragmentSource = assets.open(preset.fragmentAsset).bufferedReader().use { it.readText() }
+                .replaceFirst("precision mediump float;", "precision mediump float;\n$correction")
 
             val vertex = compileShader(GLES20.GL_VERTEX_SHADER, vertexSource)
             val fragment = compileShader(GLES20.GL_FRAGMENT_SHADER, fragmentSource)

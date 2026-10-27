@@ -7,6 +7,7 @@ import androidx.recyclerview.widget.LinearSnapHelper
 import androidx.recyclerview.widget.RecyclerView
 import com.khumam.gbaduo.library.GameTitle
 import com.khumam.gbaduo.library.RomEntry
+import com.khumam.gbaduo.library.artwork.ArtworkLoader
 import kotlin.math.abs
 import kotlin.math.min
 import kotlin.math.roundToInt
@@ -29,6 +30,7 @@ class CartridgeCarousel(
     private val itemWidth = Pixel.dp(context, ITEM_WIDTH_DP).roundToInt()
     private val layoutManager = LinearLayoutManager(context, LinearLayoutManager.HORIZONTAL, false)
     private val adapter = Adapter()
+    private val artwork = if (bindArtwork == null) ArtworkLoader(context) else null
     private val easeOut = PathInterpolator(0.25f, 1f, 0.5f, 1f) // ease-out-quart
     private val stepMs = if (Pixel.motionEnabled(context)) 220 else 0
 
@@ -74,6 +76,13 @@ class CartridgeCarousel(
         if (entries.isEmpty()) { onSelected(-1); return }
         recycler.post { jumpTo(target); setSelected(target); applyTransforms() }
     }
+
+    /** Reloads covers if the artwork store changed (after scraping, or a per-game pick). */
+    fun reloadArtwork() {
+        if (artwork?.refresh() == true) adapter.notifyDataSetChanged()
+    }
+
+    fun release() { artwork?.shutdown() }
 
     fun hasPack(entry: RomEntry) = entry.gameCode in packCodes
 
@@ -169,7 +178,8 @@ class CartridgeCarousel(
                 selectedCart = position == selected
                 contentDescription = title
             }
-            bindArtwork?.invoke(holder.cart, entry)
+            if (bindArtwork != null) bindArtwork.invoke(holder.cart, entry)
+            else artwork?.bind(holder.cart, entry)
         }
 
         override fun onViewRecycled(holder: Holder) {
@@ -180,6 +190,6 @@ class CartridgeCarousel(
     }
 
     private companion object {
-        const val ITEM_WIDTH_DP = 236f
+        const val ITEM_WIDTH_DP = 158f
     }
 }

@@ -4,9 +4,9 @@
 
 GBA Duo made the central idea possible: play Game Boy Advance, Game Boy Color and Game Boy games on one screen of an Android handheld, with an interactive companion on the other. Plus builds on that work rather than replacing its authorship. Thank you to khumam and every upstream contributor for publishing the original application and companion system.
 
-Maintained by [levi-soft](https://github.com/levi-soft), Plus adds automatic companion creation, selectable library covers, additional pixel-art shaders, persistent control preferences, companion navigation for supported games and an optional GBA Duo Studio connection. It extends the official RetroAchievements client from GBA Duo 0.1.7.
+Maintained by [levi-soft](https://github.com/levi-soft), Plus adds automatic companion creation, selectable library covers, additional pixel-art shaders, persistent control preferences, companion navigation for supported games and an optional GBA Duo Studio connection. It extends the official RetroAchievements client and adopts controller mapping, per-game settings, color correction and artwork settings from GBA Duo 0.1.8.
 
-**Current source version:** `0.1.7-plus.4` · **Upstream base:** `v0.1.7` · **License:** [GPL v3](LICENSE)
+**Current source version:** `0.1.8-plus.1` (upgrade candidate) · **Upstream base:** `v0.1.8` · **License:** [GPL v3](LICENSE)
 
 **[Download GBA Duo Plus 0.1.7-plus.4 — APK and release notes](https://github.com/levi-soft/gba-duo-plus/releases/tag/v0.1.7-plus.4)**
 
@@ -26,6 +26,10 @@ validation and known startup limits.
 
 [Tiếng Việt](README.vi.md) · [Features](#features) · [Comparison](docs/FEATURES.md) · [Build](docs/BUILDING.md) · [Launchers](docs/LAUNCHERS.md) · [Studio](docs/STUDIO-CONNECTION.md) · [Credits](CREDITS.md)
 
+## Upgrade candidate: 0.1.8-plus.1
+
+The source now includes official 0.1.8 while keeping Plus and SS extensions. Existing controls, color/shader choices and selected covers are migrated without clearing saves or companion assignments. The signed public download below remains Plus.4 until a new public release is published. See [upgrade notes](docs/RELEASE-0.1.8-plus.1.md).
+
 ## New in 0.1.7-plus.4
 
 Companions can request standard GB/GBA button pulses for matching games. FE Map focus reads exact-ROM navigation metadata from the pack, allowing compatible new profiles without adding an APK whitelist entry. Transient Lua errors retain the last complete companion view and expose stale/error diagnostics instead of blanking the screen. [Release notes](docs/RELEASE-0.1.7-plus.4.md).
@@ -36,7 +40,7 @@ Companions can request standard GB/GBA button pulses for matching games. FE Map 
 |---|---|
 | Source | [levi-soft/gba-duo-plus](https://github.com/levi-soft/gba-duo-plus) |
 | Original project | [khumam/gba-duo](https://github.com/khumam/gba-duo) |
-| Exact upstream baseline | [`6aa3823b7c4e4c8478b74fe24cf837a19224fc23`](https://github.com/khumam/gba-duo/commit/6aa3823b7c4e4c8478b74fe24cf837a19224fc23), tag `v0.1.7` |
+| Exact upstream baseline | [`8832d19ebc833da2ab3303d2d1ff48e5720ea68c`](https://github.com/khumam/gba-duo/commit/8832d19ebc833da2ab3303d2d1ff48e5720ea68c), tag `v0.1.8` |
 | Release application ID | `com.khumam.gbaduo.plus` |
 | Debug application ID | `com.khumam.gbaduo.plus.debug` |
 | Requirements | Android 11/API 30 or later; ARM64; a second Android display for the companion |
@@ -87,7 +91,7 @@ FE6 T-EN is original FE6; Vietnamese Remastered is an FE8-based hack. Other ROM 
 | Area | Plus behavior |
 |---|---|
 | Library artwork | Select square covers from a SteamGridDB gallery, import a local PNG/JPEG/WebP, or use the default no-account Libretro source for lookup and missing-artwork scraping. Covers are stored locally, retain aspect ratio and keep the original cartridge drawing as fallback. [Setup and extension boundary](docs/ARTWORK.md). |
-| RetroAchievements | Retains the official 0.1.7 [rcheevos](https://github.com/RetroAchievements/rcheevos) client and adds encrypted token storage, achievement-list UI and save-state progress sidecars. Account sign-in, ROM recognition and the underlying client come from the official integration. |
+| RetroAchievements | Retains the official 0.1.8 [rcheevos](https://github.com/RetroAchievements/rcheevos) client and adds encrypted token storage, achievement-list UI and save-state progress sidecars. Account sign-in, ROM recognition and the underlying client come from the official integration. |
 | Achievement presentation | Automatic sign-in/game notices, game image and unlocked/total count; bottom-right unlock popups with a 70% background opacity. Unsupported ROMs show a no-achievements notice. |
 | Pixel-art shaders | **xBRZ, HQ2x and ScaleFX**, adapted from the Libretro GLSL shader collection with original notices retained. |
 | Controls | **Swap A/B is remembered** between game sessions. Existing shader persistence is retained for the expanded preset set. |
@@ -96,7 +100,7 @@ FE6 T-EN is original FE6; Vietnamese Remastered is an FE8-based hack. Other ROM 
 | Daijisho custom player | Add **GBA Duo Plus** as a player to launch ROMs directly. Retains upstream's `LaunchActivity`, with additional path aliases, input validation and session/lifecycle handling. See [player setup and launch arguments](docs/LAUNCHERS.md#add-a-gba-duo-plus-player-in-daijisho). |
 | Studio Connection | Per-session opt-in, read-only local RAM/snapshot and bounded ROM/VRAM/palette/OAM inspection for compatible desktop tooling. Revision-2 capability discovery retains the existing wire envelope. No LAN listener or memory-write command. The upstream permission-gated pack tap API is separate from this read-only desktop bridge. |
 
-RetroAchievements now uses the official 0.1.7 integration as its foundation. Plus adds encrypted token storage, achievement-list UI, save-state progress and the selected popup presentation to that single official client. The former Plus RA runtime has been removed.
+RetroAchievements uses the official integration, including the 0.1.8 popup and ROM-recognition fixes, as its foundation. Plus adds encrypted token storage, achievement-list UI, save-state progress and the selected popup presentation to that single official client. The former Plus RA runtime has been removed.
 
 Inherited from 0.1.7: pixel-style library and Settings, readable game titles, external save-folder synchronization, permission-gated RAM writes, ROM sprite/tilemap decoding, responsive CSS and bounded Lua execution.
 

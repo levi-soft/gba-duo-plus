@@ -8,7 +8,7 @@ import com.khumam.gbaduo.emu.ShaderPreset
 import java.text.DateFormat
 import java.util.Date
 
-/** Pause-and-choose overlay: save/load state slots, fast-forward speed, shader, swap A/B, quit. */
+/** Pause-and-choose overlay: save/load state slots, fast-forward speed, shader, quit. */
 class QuickMenu(
     private val context: Context,
     private val emu: EmuThread,
@@ -38,7 +38,7 @@ class QuickMenu(
             context.getString(R.string.load_state),
             context.getString(R.string.ff_speed, ffSpeed),
             context.getString(R.string.shader_label, shader.displayName),
-            context.getString(R.string.swap_ab) + if (swapAb) ": On" else ": Off",
+            context.getString(R.string.swap_ab),
         ).apply {
             add("Studio Connection: " + if (emu.studioConnectionEnabled) "On" else "Off")
             if (onAchievements != null) add("RetroAchievements")

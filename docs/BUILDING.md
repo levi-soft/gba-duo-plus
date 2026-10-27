@@ -82,4 +82,4 @@ Gradle gates. See [the extension boundary](../plus/README.md) for maintenance.
 | rcheevos | Vendored `engine/rcheevos` source | `1433173220a7eaede6a9ed7a18e94117be1821e0` (`v12.5.0`) |
 | Lua | Vendored `engine/lua` source | `5.4.7` |
 
-Native CMake builds the GB/GBA cores, the sandboxed Lua host and rcheevos; optional mGBA frontends/dependencies are disabled. Preserve licenses and file headers if changing any component. A source ZIP downloaded from GitHub does not embed submodule contents: clone recursively or initialize the pinned mGBA submodule before building. rcheevos is now vendored as in official 0.1.7.
+Native CMake builds the GB/GBA cores, the sandboxed Lua host and rcheevos; optional mGBA frontends/dependencies are disabled. Preserve licenses and file headers if changing any component. A source ZIP downloaded from GitHub does not embed submodule contents: clone recursively or initialize the pinned mGBA submodule before building. rcheevos is now vendored as in official 0.1.8.

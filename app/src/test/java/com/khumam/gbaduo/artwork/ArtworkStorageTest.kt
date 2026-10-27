@@ -50,6 +50,36 @@ class ArtworkStorageTest {
 
     private fun identity(crc: Long = 0x32cd990d) = ArtworkIdentity("gba", crc)
 
+    @Test fun legacySelectionIsCopiedToSharedCacheAndRemovalDoesNotResurrectIt() {
+        val context = isolatedContext()
+        val legacy = File(context.filesDir, "plus-artwork")
+        val image = File(legacy, "images/12345678-1234-1234-1234-123456789abc.webp")
+        image.parentFile!!.mkdirs(); image.writeBytes(png())
+        val metadata = File(legacy, "records/${identity().key}.json")
+        metadata.parentFile!!.mkdirs()
+        metadata.writeText(org.json.JSONObject().put("identity", identity().key).put("image", image.name)
+            .put("manual", true).put("width", 64).put("height", 32).put("updatedAt", 12).toString())
+        val repository = ArtworkRepository(context)
+        assertEquals(64, repository.loadBitmap(identity())!!.width)
+        val shared = com.khumam.gbaduo.library.artwork.Artwork.store(context)
+        assertNotNull(shared.file("gba", identity().crc32))
+        assertTrue(image.isFile); assertTrue(metadata.isFile)
+        shared.removeAll()
+        assertFalse(ArtworkRepository(context).has(identity()))
+        assertTrue(image.isFile)
+    }
+
+    @Test fun sharedFolderArtworkAppearsInPlusAndManualPlusSelectionAppearsInSharedStore() {
+        val context = isolatedContext()
+        val shared = com.khumam.gbaduo.library.artwork.Artwork.store(context)
+        shared.put("gba", identity().crc32, png(), "folder", "cover.png")
+        val repository = ArtworkRepository(context)
+        assertEquals(64, repository.loadBitmap(identity())!!.width)
+        repository.apply(identity(), png(80, 40), manual = true)
+        assertEquals("manual", shared.meta("gba", identity().crc32)!!.source)
+        assertEquals(80, ArtworkImageStore.decode(shared.file("gba", identity().crc32)!!.readBytes()).width)
+    }
+
     @Test fun identityUsesActualRomPlatformAndCrcRatherThanTitle() {
         assertEquals("gba-32CD990D", identity().key)
         assertNotEquals(identity().key, identity(0x32cd990e).key)
@@ -104,20 +134,20 @@ class ArtworkStorageTest {
         val original = repository.apply(identity(), png(), manual = true)
         val gate = ArtworkRequestGate()
         val token = gate.begin()
-        val root = File(context.filesDir, "plus-artwork")
+        val root = File(context.filesDir, "artwork")
         var staged = false
         val result = repository.applyIfOwned(identity(), png(80, 40)) {
             // Both expensive files exist before the final ownership decision.
-            staged = File(root, "images").listFiles()!!.size == 2 &&
-                File(root, "records").listFiles()!!.any { it.extension == "tmp" }
+            staged = File(root, "gba").listFiles()!!.size == 2 &&
+                root.listFiles()!!.any { it.extension == "tmp" }
             gate.close()
             gate.claim(token)
         }
         assertTrue(staged)
         assertNull(result)
         assertEquals(original, repository.record(identity()))
-        assertEquals(1, File(root, "images").listFiles()!!.size)
-        assertEquals(1, File(root, "records").listFiles()!!.size)
+        assertEquals(1, File(root, "gba").listFiles()!!.size)
+        assertEquals(1, root.listFiles()!!.count { it.isFile })
         assertEquals(64, repository.loadBitmap(identity())!!.width)
     }
 
@@ -135,27 +165,27 @@ class ArtworkStorageTest {
         assertNotNull(saved)
         assertEquals(saved, repository.record(identity()))
         assertEquals(80, repository.loadBitmap(identity())!!.width)
-        assertEquals(1, File(context.filesDir, "plus-artwork/images").listFiles()!!.size)
-        assertEquals(1, File(context.filesDir, "plus-artwork/records").listFiles()!!.size)
+        assertEquals(1, File(context.filesDir, "artwork/gba").listFiles()!!.size)
+        assertEquals(1, File(context.filesDir, "artwork").listFiles()!!.count { it.isFile })
     }
 
     @Test fun failedAtomicPointerMoveKeepsThePreviousCoverAndRemovesTheNewImage() {
         val context = isolatedContext()
         val repository = ArtworkRepository(context)
         val original = repository.apply(identity(), png(), manual = true)
-        val root = File(context.filesDir, "plus-artwork")
+        val root = File(context.filesDir, "artwork")
         assertThrows(java.io.IOException::class.java) {
             repository.applyIfOwned(identity(), png(80, 40)) {
                 // A deterministic filesystem fault at the publication boundary.
-                val stagedMetadata = File(root, "records").listFiles()!!.single { it.extension == "tmp" }
+                val stagedMetadata = root.listFiles()!!.single { it.extension == "tmp" }
                 assertTrue(stagedMetadata.delete())
                 true
             }
         }
         assertEquals(original, repository.record(identity()))
         assertEquals(64, repository.loadBitmap(identity())!!.width)
-        assertEquals(1, File(root, "images").listFiles()!!.size)
-        assertEquals(1, File(root, "records").listFiles()!!.size)
+        assertEquals(1, File(root, "gba").listFiles()!!.size)
+        assertEquals(1, root.listFiles()!!.count { it.isFile })
     }
 
     @Test fun attributionStripsQueriesFragmentsAndNeverStoresDownloadSecrets() {

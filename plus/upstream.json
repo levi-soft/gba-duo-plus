@@ -1,7 +1,7 @@
 {
   "repository": "https://github.com/khumam/gba-duo.git",
-  "tag": "v0.1.7",
-  "commit": "6aa3823b7c4e4c8478b74fe24cf837a19224fc23",
+  "tag": "v0.1.8",
+  "commit": "8832d19ebc833da2ab3303d2d1ff48e5720ea68c",
   "integrations": {
     "app/proguard-rules.pro": "Preserve Plus Studio inspection JNI names and automatic-builder JavaScript bridge methods",
     "app/build.gradle.kts": "Plus identity, release signing, extension source sets and opt-in Single Screen application identity",
@@ -25,7 +25,7 @@
     "app/src/main/java/com/khumam/gbaduo/companion/ui/CompanionScreen.kt": "Retained snapshots, indexed styles, raster-grid and aspect-fit renderer integration",
     "app/src/main/java/com/khumam/gbaduo/companion/ui/CssLayout.kt": "Retained snapshots, indexed styles, raster-grid and aspect-fit renderer integration",
     "app/src/main/java/com/khumam/gbaduo/emu/EmuThread.kt": "Native core ownership serialization, latched startup cancellation and optional completion callbacks for SS quick states",
-    "app/src/main/java/com/khumam/gbaduo/emu/GameView.kt": "Plus shader pipeline selection and GLES3 host",
+    "app/src/main/java/com/khumam/gbaduo/emu/GameView.kt": "Plus GLES3 multipass shaders with independent upstream color correction on the final output",
     "app/src/main/java/com/khumam/gbaduo/emu/NativeCore.kt": "Frame-scoped cursor request JNI and RA native progress extension integration",
     "app/src/main/java/com/khumam/gbaduo/emu/ShaderPreset.kt": "Plus shader pipeline selection and GLES3 host",
     "app/src/main/java/com/khumam/gbaduo/library/LaunchActivity.kt": "External launcher path compatibility and existing-session routing",
@@ -39,7 +39,13 @@
     "app/src/main/java/com/khumam/gbaduo/settings/AboutActivity.kt": "Plus attribution and Studio project links",
     "app/src/main/java/com/khumam/gbaduo/storage/SaveSync.kt": "Synchronize RA sidecars with save states",
     "app/src/main/res/values/strings.xml": "Plus branding and launcher identity",
-    "app/src/main/java/com/khumam/gbaduo/emu/InputMapper.kt": "Independent SS touch keys and fast-forward, merged with unchanged physical key mapping",
-    "app/src/main/java/com/khumam/gbaduo/companion/android/ComposeHostOwner.kt": "Allow one lifecycle and saved-state owner to cover the plain SS Activity root and nested companion without duplicate restoration"
+    "app/src/main/java/com/khumam/gbaduo/emu/InputMapper.kt": "Merge independent SS touch keys and fast-forward with upstream controller/hotkey schemes; non-consuming UI key reads and persistent A/B swap",
+    "app/src/main/java/com/khumam/gbaduo/companion/android/ComposeHostOwner.kt": "Allow one lifecycle and saved-state owner to cover the plain SS Activity root and nested companion without duplicate restoration",
+    "app/src/main/java/com/khumam/gbaduo/library/artwork/ArtworkStore.kt": "Atomic shared artwork index for upstream folder/SGDB and Plus providers, request ownership and legacy-cover removal tombstones",
+    "app/src/main/java/com/khumam/gbaduo/library/artwork/ArtworkPrefs.kt": "Reuse Plus encrypted SteamGridDB credentials across both artwork entry points",
+    "app/src/main/java/com/khumam/gbaduo/library/artwork/ArtworkScraper.kt": "Recheck request cancellation, current selection and per-game locks before publishing downloaded covers",
+    "app/src/main/java/com/khumam/gbaduo/settings/GameSettingsActivity.kt": "Reuse Plus Libretro, SteamGridDB gallery and local image picker with upstream per-game shader/color/folder settings",
+    "app/src/main/java/com/khumam/gbaduo/settings/ScrapingActivity.kt": "Expose retained Plus no-key Libretro missing-cover queue within upstream artwork settings",
+    "app/src/main/java/com/khumam/gbaduo/settings/SteamGridDbActivity.kt": "Handle secure credential storage failures without crashing the settings lifecycle"
   }
 }

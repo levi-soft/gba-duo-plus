@@ -55,6 +55,7 @@ class ArtworkHostIntegrationTest {
         val play = PixelButton(context).apply { text = "Play"; minWidth = 200; setOnClickListener { played++ } }
         actions.addView(play)
         actions.addView(PixelButton(context).apply { text = "Companion pack" })
+        actions.addView(PixelButton(context).apply { id = com.khumam.gbaduo.R.id.game_settings_button })
         var opened = 0
         ArtworkLibraryControls.attach(actions) { opened++ }
         val width = (320 * context.resources.displayMetrics.density).toInt()

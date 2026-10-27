@@ -57,6 +57,15 @@
             android:configChanges="orientation|screenSize|screenLayout|keyboardHidden"
             android:exported="false" />
         <activity android:name=".settings.SaveFolderActivity" android:exported="false" />
+        <activity android:name=".settings.ControllerActivity" android:exported="false" />
+        <activity android:name=".settings.GameSettingsActivity" android:exported="false" />
+        <activity android:name=".settings.ScrapingActivity" android:exported="false" />
+        <activity android:name=".settings.ProvidersActivity" android:exported="false" />
+        <activity android:name=".settings.ArtworkFolderActivity" android:exported="false" />
+        <activity android:name=".settings.SteamGridDbActivity" android:exported="false" />
+        <activity android:name=".settings.ArtworkPickerActivity" android:exported="false" />
+        <activity android:name=".settings.ButtonMappingActivity" android:exported="false" />
+        <activity android:name=".settings.HotkeysActivity" android:exported="false" />
         <activity android:name=".settings.RetroAchievementsActivity" android:exported="false"
             android:windowSoftInputMode="adjustResize|stateHidden" />
 

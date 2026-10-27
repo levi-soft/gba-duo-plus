@@ -1,10 +1,10 @@
 # Artwork (Plus extension)
 
-Artwork is a GBA Duo Plus addition on the pinned official library. It keeps the original cartridge carousel, controller navigation, game launching, saves, companion assignments and RetroAchievements identity.
+Official 0.1.8 supplies artwork folders, SteamGridDB scraping and per-game selection locks. Plus extends those features with Libretro, manual import, a gallery and square cover rendering. It keeps the original cartridge carousel, controller navigation, game launching, saves, companion assignments and RetroAchievements identity.
 
 ## Pick a cover
 
-Select a game in the library and choose **Artwork**, or press **X**. Existing controls retain their functions: A plays, Y opens Companion, and Start opens Settings.
+Select a game in the library and choose **Game settings → Find artwork**, or press **X** and open Find artwork. Existing controls retain their functions: A plays, Y opens Companion, and Start opens Settings.
 
 - **SteamGridDB:** search a game, choose the correct result, browse square images, preview one and select **Apply artwork**. **Show all image formats** includes other grid aspect ratios. The library uses a square frame and fits images without stretching or forced cropping.
 - **Choose image:** use the Android picker to import a PNG, JPEG or WebP. Preview before applying. Plus copies the image into its private storage; it does not move or change the original file.
@@ -15,7 +15,7 @@ Selected images remain available offline. Changing a provider's game association
 
 ## Configure sources
 
-Open **Settings → Artwork sources**. The Plus artwork screens use English to match the current Plus interface, including when Android is configured in Vietnamese.
+Open **Settings → Scraping**. Open **Libretro artwork** for the retained Plus provider configuration and missing-cover workflow. The Plus artwork screens use English to match the current Plus interface, including when Android is configured in Vietnamese.
 
 SteamGridDB requires a personal API key. **Get SteamGridDB API key** opens its official account page; sign in there and paste the key into Plus. Keys are encrypted using an artwork-specific Android Keystore key, separate from RetroAchievements credentials. Never include keys in bug reports.
 
@@ -25,12 +25,12 @@ Sources: [Libretro thumbnails](https://github.com/libretro-thumbnails/libretro-t
 
 ## Missing-artwork scraping
 
-**Scrape missing artwork** uses the public Libretro box-art index. Existing choices are kept. Only an unambiguous normalized title match is assigned automatically; translations, renamed ROMs and ambiguous games may need individual search or manual import. This is title matching, not verified ROM-hash identification. Cancellation and running again are supported. A manual choice made during downloading wins. SteamGridDB remains an explicit game/image picker.
+**Scrape missing artwork** uses the public Libretro box-art index. Existing choices are kept. Only an unambiguous normalized title match is assigned automatically; translations, renamed ROMs and ambiguous games may need individual search or manual import. This is title matching, not verified ROM-hash identification. Cancellation and running again are supported. A manual choice made during downloading wins. SteamGridDB also supports upstream batch scraping when its key is configured; folder matches take priority. Per-game removed/picked locks protect explicit selections.
 
 Requests send search/index paths and artwork names to the chosen source. ROM bytes, saves and companion data are not uploaded. Hashing, requests and image decoding run on workers. Carousel drawing uses local decoded images and does not initiate network requests.
 ## Storage and image handling
 
-Selected artwork is durable user data under `filesDir/plus-artwork/`, keyed by actual platform and ROM CRC32. Renaming or moving a ROM does not change that identity. Failed validation or replacement preserves the previous selection. Image input, dimensions and encoded output are bounded; large valid images are downsampled before saving. Gallery thumbnails are separately limited in size. Source/author information is retained without storing provider credentials or private download URLs in artwork metadata.
+Selected artwork is durable user data under `filesDir/artwork/` (shared with upstream settings; legacy `plus-artwork/` selections are copied once and kept for rollback), keyed by actual platform and ROM CRC32. Renaming or moving a ROM does not change that identity. Failed validation or replacement preserves the previous selection. Image input, dimensions and encoded output are bounded; large valid images are downsampled before saving. Gallery thumbnails are separately limited in size. Source/author information is retained without storing provider credentials or private download URLs in artwork metadata.
 
 Replacement images and metadata are prepared and synchronized on a worker before
 the final request-ownership claim. Cancellation or navigation before that claim
@@ -42,7 +42,7 @@ also run on a worker.
 
 ## Source and upstream boundary
 
-All implementation classes are in `plus/src/main/java/com/khumam/gbaduo/artwork/`. Host hooks are limited to:
+Plus provider, picker, binder and legacy-migration classes are in `plus/src/main/java/com/khumam/gbaduo/artwork/`. The shared index, folder scraping and per-game settings extend upstream 0.1.8 classes explicitly. Other hooks include:
 
 1. Library Activity: entry button/X, binder lifecycle.
 2. Cartridge carousel: optional bind callback and recycled-view cleanup.

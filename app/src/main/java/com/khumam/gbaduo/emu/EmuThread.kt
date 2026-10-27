@@ -121,7 +121,7 @@ class EmuThread(
             .put("frame", NativeCore.frameCounter()).put("paused", paused)
             .put("packId", activePack?.id ?: JSONObject.NULL)
             .put("dataFrame", latestDebugFrame ?: JSONObject.NULL)
-            .put("inputKeys", input.keys()).put("fastForward", input.fastForward())
+            .put("inputKeys", input.peekKeys()).put("fastForward", input.fastForward())
             .put("effectiveInputKeys", effectiveInputKeys).put("cursorNavigation", navigatorTarget)
         override fun read(address: Long, length: Int) = NativeCore.readRam(address, length)
         override fun romSize() = StudioMemory.romSize()
@@ -290,7 +290,7 @@ class EmuThread(
         // Automatic pack reads/Lua work share the emulation thread. Defer them
         // during physical cursor movement, just like the UI draw; taps still run immediately.
         val directions = GbaKeys.UP or GbaKeys.DOWN or GbaKeys.LEFT or GbaKeys.RIGHT
-        if (!due && input.keys() and directions != 0) return
+        if (!due && input.peekKeys() and directions != 0) return
         if (due || framesSinceSnapshot >= interval) {
             framesSinceSnapshot = 0
             val snapshotStarted = System.nanoTime()

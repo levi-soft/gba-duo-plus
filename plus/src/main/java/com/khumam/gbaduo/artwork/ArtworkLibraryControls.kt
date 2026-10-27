@@ -2,6 +2,7 @@ package com.khumam.gbaduo.artwork
 
 import android.view.ViewGroup
 import android.widget.LinearLayout
+import com.khumam.gbaduo.R
 import com.khumam.gbaduo.library.ui.Pixel
 import com.khumam.gbaduo.library.ui.PixelButton
 
@@ -9,15 +10,12 @@ import com.khumam.gbaduo.library.ui.PixelButton
 object ArtworkLibraryControls {
     fun attach(actions: LinearLayout, open: () -> Unit) {
         val context = actions.context
-        val button = PixelButton(context).apply {
-            text = "Artwork"
-            contentDescription = "Artwork (X)"
+        actions.findViewById<PixelButton>(R.id.game_settings_button).apply {
+            text = "Game settings"
+            contentDescription = "Game settings (X)"
             style(Pixel.CREAM)
             setOnClickListener { open() }
         }
-        actions.addView(button, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
-            marginStart = Pixel.dp(context, 16f).toInt()
-        })
         if (context.resources.configuration.screenWidthDp < 700) {
             // Three usable actions also fit narrow secondary displays.
             val gap = Pixel.dp(context, 8f).toInt()

@@ -1,5 +1,8 @@
 package com.khumam.gbaduo.player
 
+import com.khumam.gbaduo.controls.ControlPrefs
+import com.khumam.gbaduo.storage.GameSettingsKeys
+
 import android.app.Activity
 import android.app.ActivityOptions
 import android.app.AlertDialog
@@ -24,10 +27,12 @@ import com.khumam.gbaduo.companion.PackFingerprint
 import com.khumam.gbaduo.companion.PackManifest
 import com.khumam.gbaduo.companion.PackStore
 import com.khumam.gbaduo.emu.AudioOut
+import com.khumam.gbaduo.emu.ColorSettings
 import com.khumam.gbaduo.emu.EmuThread
 import com.khumam.gbaduo.emu.GameView
 import com.khumam.gbaduo.emu.InputMapper
 import com.khumam.gbaduo.emu.ShaderPreset
+import com.khumam.gbaduo.emu.ShaderSettings
 import com.khumam.gbaduo.library.GameTitle
 import com.khumam.gbaduo.library.RomArchive
 import com.khumam.gbaduo.library.RomHeader
@@ -49,6 +54,8 @@ class PlayerActivity : Activity() {
     private lateinit var emu: EmuThread
     private lateinit var audioOut: AudioOut
     private var quickMenu: QuickMenu? = null
+    private var hotkeys: HotkeyActions? = null
+    private var playerNotes: PlayerNotes? = null
     private var companionScreen: CompanionController? = null
     private var companionPresentation: CompanionPresentation? = null
     private var companionActivity: CompanionActivity.Session? = null
@@ -68,9 +75,7 @@ class PlayerActivity : Activity() {
     private var topResumed = false
 
     private val prefs by lazy { getSharedPreferences("player", MODE_PRIVATE) }
-    private var savedShader: ShaderPreset
-        get() = ShaderPreset.byId(prefs.getString("shader_id", null))
-        set(value) = prefs.edit().putString("shader_id", value.id).apply()
+    private var savedShader = ShaderPreset.OFF
     private var savedSwapAb: Boolean
         get() = prefs.getBoolean("swap_ab", false)
         set(value) = prefs.edit().putBoolean("swap_ab", value).apply()
@@ -91,7 +96,7 @@ class PlayerActivity : Activity() {
             singleScreen = SingleScreenPlayerHost(this, surface, onKeys = { keys ->
                 if (::input.isInitialized) {
                     input.setTouchKeys(keys)
-                    if (input.keys() and directionMask == 0) requestCompanionDraw()
+                    if (input.peekKeys() and directionMask == 0) requestCompanionDraw()
                 }
             }, onMenu = ::showQuickMenu,
                 onQuickSave = { singleScreen?.releaseControls(); singleScreenActions?.save() },
@@ -140,7 +145,8 @@ class PlayerActivity : Activity() {
 
     private fun startGame(source: GameSource) {
         if (isFinishing || isDestroyed) return
-        val mirror = SaveMirror.forGame(this, source.storage)?.also {
+        val mirror = SaveMirror.forGame(this, source.storage,
+            intent.getStringExtra(EXTRA_ROM_FILE_NAME) ?: source.rom.fileName)?.also {
             it.onUnavailable = {
                 runOnUiThread {
                     if (!isFinishing) Toast.makeText(this, R.string.save_folder_unavailable, Toast.LENGTH_LONG).show()
@@ -164,10 +170,12 @@ class PlayerActivity : Activity() {
 
         // With a save folder set, take in newer saves from it (another device) before the
         // core opens game.sav, then mirror changes out while playing.
-        input = InputMapper().apply { swapAb = savedSwapAb }
+        input = InputMapper(ControlPrefs.load(this))
         audioOut = AudioOut()
         val gameView = findViewById<GameView>(R.id.game_view)
+        savedShader = ShaderSettings.forGame(this, storage.settings)
         gameView.setShader(savedShader)
+        gameView.setColorCorrection(ColorSettings.forGame(this, storage.settings))
         RetroAchievements.init(this)
         achievementPopups = AchievementPopups(findViewById(android.R.id.content) as android.widget.FrameLayout).also { it.attach() }
         singleScreen?.setGameAspect(if (header.platform == Platform.GBA) 1.5f else 160f / 144f)
@@ -221,13 +229,18 @@ class PlayerActivity : Activity() {
                         states = SaveStates(storage),
                         initialShader = savedShader,
                         initialSwapAb = savedSwapAb,
-                        onSwapAb = { savedSwapAb = it; input.swapAb = it },
+                        onSwapAb = { savedSwapAb = it; ControlPrefs.save(this@PlayerActivity, input.swapAbButtons()) },
                         onSetFfSpeed = { emu.ffMultiplier = it },
-                        onSetShader = { savedShader = it; gameView.setShader(it) },
+                        onSetShader = { savedShader = it; storage.settings.put(GameSettingsKeys.SHADER, it.id); gameView.setShader(it) },
                         onQuit = { finish() },
                         onAchievements = { done -> RetroAchievements.show(this@PlayerActivity, done) },
                     )
                     singleScreen?.gameLoaded()
+                    val notes = PlayerNotes(findViewById(android.R.id.content) as android.widget.FrameLayout).also { playerNotes = it }
+                    hotkeys = HotkeyActions(
+                        activity = this@PlayerActivity, emu = emu, states = SaveStates(storage), storage = storage,
+                        quickMenu = quickMenu!!, notes = notes, onQuit = { finish() },
+                    )
                     setUpCompanion(header, crc32, storage)
                 } else {
                     gameView.postDelayed(this, 16)
@@ -377,11 +390,11 @@ class PlayerActivity : Activity() {
     private val directionMask = com.khumam.gbaduo.emu.GbaKeys.UP or com.khumam.gbaduo.emu.GbaKeys.DOWN or com.khumam.gbaduo.emu.GbaKeys.LEFT or com.khumam.gbaduo.emu.GbaKeys.RIGHT
 
     private fun requestCompanionDraw() {
-        if (!::input.isInitialized || input.keys() and directionMask != 0) return
+        if (!::input.isInitialized || input.peekKeys() and directionMask != 0) return
         if (!companionDrawQueued.compareAndSet(false, true)) return
         companionHandler.post {
             companionDrawQueued.set(false)
-            if (!isFinishing && input.keys() and directionMask == 0) latestCompanionSnapshot.take()?.let { companionScreen?.update(it) }
+            if (!isFinishing && input.peekKeys() and directionMask == 0) latestCompanionSnapshot.take()?.let { companionScreen?.update(it) }
         }
     }
 
@@ -391,15 +404,25 @@ class PlayerActivity : Activity() {
             KeyEvent.ACTION_UP -> false
             else -> return false
         }
-        if (event.keyCode == KeyEvent.KEYCODE_BUTTON_L2 || event.keyCode == KeyEvent.KEYCODE_BACK) {
+        if (event.keyCode == KeyEvent.KEYCODE_BACK) {
             if (down && event.repeatCount == 0) showQuickMenu()
             return true
         }
         if (!::input.isInitialized) return false
-        val handled = input.onKey(event.keyCode, down)
-        if (handled && input.keys() and directionMask == 0) requestCompanionDraw()
-        if (BuildConfig.DEBUG && handled && (event.repeatCount == 0 || !down)) android.util.Log.d("GbaDuoInput", "key=" + event.keyCode + " down=" + down + " device=" + event.deviceId + " lagMs=" + (android.os.SystemClock.uptimeMillis() - event.eventTime) + " mask=" + input.keys() + " ff=" + input.fastForward())
-        return handled
+        return when (val result = input.onKey(event.keyCode, down, event.repeatCount)) {
+            com.khumam.gbaduo.emu.KeyResult.Ignored -> false
+            com.khumam.gbaduo.emu.KeyResult.Consumed -> { requestCompanionDraw(); true }
+            is com.khumam.gbaduo.emu.KeyResult.Action -> {
+                if (result.action == com.khumam.gbaduo.controls.HotkeyAction.QUICK_MENU) showQuickMenu()
+                else {
+                    if (result.action == com.khumam.gbaduo.controls.HotkeyAction.EXIT) {
+                        input.releaseAll(); singleScreen?.releaseControls()
+                    }
+                    hotkeys?.perform(result.action)
+                }
+                true
+            }
+        }
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean =
@@ -423,6 +446,7 @@ class PlayerActivity : Activity() {
             return
         }
         if (quickMenu?.isShowing == true) return
+        if (::input.isInitialized) input.releaseAll()
         singleScreen?.releaseControls()
         quickMenu?.show()
     }
@@ -466,6 +490,7 @@ class PlayerActivity : Activity() {
         singleScreen?.close()
         companionScreen?.close()
         achievementPopups?.detach()
+        playerNotes?.remove()
         if (::emu.isInitialized) {
             emu.shutdown()
             emu.join(1000)

@@ -35,7 +35,9 @@ jobs:
           ./gradlew :app:testReleaseUnitTest
           --tests '*PlusFeatureContractTest' --tests '*BridgeProtocolTest'
           --tests '*FeMapCursorNavigatorTest' --tests '*CompanionInputTest' --tests '*InputMapperTest'
-          --tests '*ShaderPresetTest' --tests '*LaunchIntentResolverTest'
+          --tests '*PlusUpgradeTest' --tests '*Control*Test' --tests '*KeyCaptureTest' --tests '*KeyNamesTest'
+          --tests '*GameShaderTest' --tests '*GameSettingsTest' --tests '*SaveLibraryImportTest'
+          --tests '*CoreSessionTest' --tests '*StartupTasksTest' --tests '*ShaderPresetTest' --tests '*LaunchIntentResolverTest'
           --tests '*ExternalRomPathTest' --tests '*RomArchiveTest'
           --tests '*LatestCompanionSnapshotTest' --tests '*RetainedScriptSnapshotTest' --tests '*CssRasterGridTest'
           --tests '*ResponsiveCssTest' --tests '*GameTitleTest'

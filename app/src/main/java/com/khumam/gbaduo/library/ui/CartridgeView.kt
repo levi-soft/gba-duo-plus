@@ -1,6 +1,7 @@
 package com.khumam.gbaduo.library.ui
 
 import android.content.Context
+import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.Path
@@ -38,6 +39,9 @@ class CartridgeView @JvmOverloads constructor(
         set(value) { field = value; invalidate() }
     var platform: Platform = Platform.GBA
         set(value) { field = value; labelLayout = null; invalidate() }
+    /** Cover art for the label; null draws the title instead. */
+    var art: Bitmap? = null
+        set(value) { if (field !== value) { field = value; invalidate() } }
     var hasPack = false
         set(value) { field = value; invalidate() }
     var selectedCart = false
@@ -88,8 +92,8 @@ class CartridgeView @JvmOverloads constructor(
         val pad = ring + dp(2f)
         val availW = width - pad * 2 - shadow
         val availH = height - pad * 2 - shadow
-        // Shell proportions: GBA is landscape, GB/GBC portrait.
-        val aspect = if (platform == Platform.GBA) 1.42f else 0.86f
+        // Every shell is portrait, so a cover (usually 3:4 or square) fills the label.
+        val aspect = SHELL_ASPECT
         var w = availW
         var h = w / aspect
         if (h > availH) { h = availH; w = h * aspect }
@@ -130,7 +134,6 @@ class CartridgeView @JvmOverloads constructor(
         paint.color = Pixel.INK
         canvas.drawPath(body, paint)
 
-        if (platform != Platform.GBA) drawArrow(canvas)
         if (hasPack) drawPackSticker(canvas)
     }
 
@@ -177,65 +180,98 @@ class CartridgeView @JvmOverloads constructor(
         canvas.restore()
     }
 
-    /** Grip ridges: right edge on a GBA cart, across the top on GB/GBC. */
+    /** Grip ridges across the top of the shell. */
     private fun drawRidges(canvas: Canvas) {
         val b = bodyBounds
         paint.style = Paint.Style.FILL
         paint.color = shade(shellColor, -0.28f)
         val t = dp(2f)
-        if (platform == Platform.GBA) {
-            val x0 = b.right - b.width() * 0.085f
-            for (i in 0 until 5) {
-                val y = b.top + b.height() * (0.24f + i * 0.13f)
-                canvas.drawRect(x0, y, b.right - b.width() * 0.025f, y + t, paint)
-            }
-        } else {
-            for (i in 0 until 3) {
-                val y = b.top + b.height() * (0.05f + i * 0.04f)
-                canvas.drawRect(b.left + b.width() * 0.12f, y, b.right - b.width() * 0.28f, y + t, paint)
-            }
+        for (i in 0 until 3) {
+            val y = b.top + b.height() * (0.045f + i * 0.03f)
+            canvas.drawRect(b.left + b.width() * 0.16f, y, b.right - b.width() * 0.3f, y + t, paint)
         }
     }
 
     private fun layoutLabel(b: RectF) {
-        if (platform == Platform.GBA) {
-            label.set(b.left + b.width() * 0.12f, b.top + b.height() * 0.16f,
-                b.right - b.width() * 0.14f, b.bottom - b.height() * 0.12f)
-        } else {
-            label.set(b.left + b.width() * 0.1f, b.top + b.height() * 0.2f,
-                b.right - b.width() * 0.1f, b.bottom - b.height() * 0.2f)
-        }
+        label.set(b.left + b.width() * 0.07f, b.top + b.height() * 0.17f,
+            b.right - b.width() * 0.07f, b.bottom - b.height() * 0.07f)
     }
 
     private fun drawLabel(canvas: Canvas) {
         val lw = dp(2f)
-        // Face.
-        paint.style = Paint.Style.FILL
-        paint.color = Pixel.LAVENDER
-        canvas.drawRect(label, paint)
-        // Header band with the platform name.
-        val bandH = label.height() * 0.22f
-        paint.color = accent
-        canvas.drawRect(label.left, label.top, label.right, label.top + bandH, paint)
+        val cover = art
+        if (cover != null) {
+            fitLabelTo(cover)
+            drawArt(canvas, cover)
+            drawPlatformTag(canvas)
+        } else {
+            // Face, header band with the platform name, then the title.
+            paint.style = Paint.Style.FILL
+            paint.color = Pixel.LAVENDER
+            canvas.drawRect(label, paint)
+            val bandH = label.height() * 0.14f
+            paint.color = accent
+            canvas.drawRect(label.left, label.top, label.right, label.top + bandH, paint)
+            paint.style = Paint.Style.STROKE
+            paint.strokeWidth = lw
+            paint.color = Pixel.INK
+            canvas.drawLine(label.left, label.top + bandH, label.right, label.top + bandH, paint)
+
+            smallPaint.textSize = (bandH * 0.5f).coerceIn(dp(6f), dp(11f))
+            smallPaint.color = Pixel.INK
+            val name = TextUtils.ellipsize(platformName, smallPaint, label.width() - dp(8f), TextUtils.TruncateAt.END)
+            val fm = smallPaint.fontMetrics
+            canvas.drawText(name, 0, name.length, label.left + dp(5f),
+                label.top + bandH / 2 - (fm.ascent + fm.descent) / 2, smallPaint)
+            drawTitle(canvas, bandH)
+        }
+        // Outline.
         paint.style = Paint.Style.STROKE
         paint.strokeWidth = lw
         paint.color = Pixel.INK
-        canvas.drawLine(label.left, label.top + bandH, label.right, label.top + bandH, paint)
+        canvas.drawRect(label, paint)
+    }
 
-        smallPaint.textSize = (bandH * 0.42f).coerceIn(dp(6f), dp(11f))
-        smallPaint.color = Pixel.INK
-        val name = TextUtils.ellipsize(platformName, smallPaint, label.width() - dp(8f), TextUtils.TruncateAt.END)
+    /** A small ink tag in the cover's bottom-left corner naming the platform. */
+    private fun drawPlatformTag(canvas: Canvas) {
+        smallPaint.textSize = dp(8f)
+        smallPaint.color = Pixel.CREAM
+        val text = platform.label
+        val padX = dp(5f)
+        val w = smallPaint.measureText(text) + padX * 2
+        val h = dp(14f)
+        paint.style = Paint.Style.FILL
+        paint.color = Pixel.INK
+        val top = label.bottom - h
+        canvas.drawRect(label.left, top, label.left + w, label.bottom, paint)
         val fm = smallPaint.fontMetrics
-        canvas.drawText(name, 0, name.length, label.left + dp(5f),
-            label.top + bandH / 2 - (fm.ascent + fm.descent) / 2, smallPaint)
+        canvas.drawText(text, label.left + padX, top + h / 2 - (fm.ascent + fm.descent) / 2, smallPaint)
+    }
 
-        // Title, up to three lines, centred in the space under the band.
+    /** Shrinks [label] to the cover's own proportions, centred in the face, so nothing is cropped. */
+    private fun fitLabelTo(bitmap: Bitmap) {
+        val scale = min(label.width() / bitmap.width, label.height() / bitmap.height)
+        val w = bitmap.width * scale
+        val h = bitmap.height * scale
+        label.set(label.centerX() - w / 2, label.centerY() - h / 2, label.centerX() + w / 2, label.centerY() + h / 2)
+    }
+
+    /** The cover, drawn whole into the (already fitted) label. */
+    private fun drawArt(canvas: Canvas, bitmap: Bitmap) {
+        paint.style = Paint.Style.FILL
+        paint.isFilterBitmap = true
+        canvas.drawBitmap(bitmap, null, label, paint)
+        paint.isFilterBitmap = false
+    }
+
+    /** Title, up to four lines, centred in the space under the band. */
+    private fun drawTitle(canvas: Canvas, bandH: Float) {
         val inner = (label.width() - dp(12f)).toInt().coerceAtLeast(1)
-        titlePaint.textSize = (label.height() * 0.15f).coerceIn(dp(9f), dp(17f))
+        titlePaint.textSize = (label.height() * 0.105f).coerceIn(dp(8f), dp(15f))
         val layout = labelLayout?.takeIf { labelLayoutWidth == inner }
             ?: StaticLayout.Builder.obtain(title.ifBlank { "?" }, 0, title.ifBlank { "?" }.length, titlePaint, inner)
                 .setAlignment(Layout.Alignment.ALIGN_CENTER)
-                .setMaxLines(3)
+                .setMaxLines(4)
                 .setEllipsize(TextUtils.TruncateAt.END)
                 .setIncludePad(false)
                 .build().also { labelLayout = it; labelLayoutWidth = inner }
@@ -251,23 +287,6 @@ class CartridgeView @JvmOverloads constructor(
             val cw = codePaint.measureText(gameCode)
             canvas.drawText(gameCode, label.centerX() - cw / 2, label.bottom - codePaint.textSize * 0.45f, codePaint)
         }
-        // Outline.
-        paint.style = Paint.Style.STROKE
-        paint.strokeWidth = lw
-        paint.color = Pixel.INK
-        canvas.drawRect(label, paint)
-    }
-
-    /** The ▼ embossed under a Game Boy cart's label. */
-    private fun drawArrow(canvas: Canvas) {
-        val b = bodyBounds
-        val s = b.width() * 0.07f
-        val cx = b.centerX()
-        val y = label.bottom + (b.bottom - label.bottom) / 2 - s / 2
-        val arrow = Path().apply { moveTo(cx - s, y); lineTo(cx + s, y); lineTo(cx, y + s); close() }
-        paint.style = Paint.Style.FILL
-        paint.color = shade(shellColor, -0.3f)
-        canvas.drawPath(arrow, paint)
     }
 
     /** A tilted pink sticker: this game has a companion pack installed. */
@@ -296,6 +315,9 @@ class CartridgeView @JvmOverloads constructor(
     }
 
     private companion object {
+        /** Width over height of the shell: portrait. */
+        const val SHELL_ASPECT = 0.78f
+
         const val PACK = "PACK"
         val ACCENTS = intArrayOf(Pixel.YELLOW, Pixel.CORAL, Pixel.PINK, Pixel.MINT, Pixel.PURPLE_LIGHT)
     }

@@ -34,8 +34,8 @@ The host only delegates its menu option and registers the private Activity.
 Manual companion ZIP import is retained. Removal/replacement when upstream
 provides equivalent support is documented in [AUTOMATIC-COMPANIONS](../docs/AUTOMATIC-COMPANIONS.md).
 
-`artwork/` owns cover storage, square image rendering, asynchronous binding,
-provider clients, source credentials, the image picker and batch lookup. The
+`artwork/` owns legacy cover migration, square image rendering, asynchronous binding,
+provider clients, source credentials, the image picker and Libretro batch lookup. Selected covers share upstream 0.1.8 artwork storage. The
 official carousel only invokes optional bind/draw delegates and opens the Plus
 entry. See [ARTWORK](../docs/ARTWORK.md) for provider setup and removal steps.
 
@@ -50,7 +50,7 @@ node --test tools/upstream-boundary.test.mjs
 An optional pristine official checkout can coexist beside Plus:
 
 ```sh
-git worktree add --detach ../GBA-Duo-Official-Reference 6aa3823b7c4e4c8478b74fe24cf837a19224fc23
+git worktree add --detach ../GBA-Duo-Official-Reference 8832d19ebc833da2ab3303d2d1ff48e5720ea68c
 git -C ../GBA-Duo-Official-Reference status --short
 ```
 
