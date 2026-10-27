@@ -6,6 +6,7 @@ import android.os.Looper
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
+import android.widget.Spinner
 import android.widget.TextView
 import com.khumam.gbaduo.R
 import com.khumam.gbaduo.library.Platform
@@ -30,6 +31,7 @@ import org.robolectric.annotation.GraphicsMode
 import java.io.ByteArrayOutputStream
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.CopyOnWriteArrayList
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
@@ -117,6 +119,7 @@ class ArtworkActivityTest {
         assertEquals(SteamGridDbActivity::class.java, Providers.all.single { it.titleRes == R.string.provider_sgdb }.settings)
         val picker = Robolectric.buildActivity(ArtworkPickerActivity::class.java, launched)
         val bytes = png()
+        val gridRequests = CopyOnWriteArrayList<String>()
         picker.get().apiFactory = {
             SteamGridDb("fixture", object : Http {
                 override fun get(url: String, headers: Map<String, String>): HttpResponse {
@@ -126,9 +129,15 @@ class ArtworkActivityTest {
                         return HttpResponse(200, bytes)
                     }
                     assertEquals("Bearer fixture", headers["Authorization"])
-                    val body = if ("/grids/" in url)
-                        """{"success":true,"data":[{"id":2,"url":"https://cdn2.steamgriddb.com/grid/test.png","thumb":"https://cdn2.steamgriddb.com/thumb/test.png","width":32,"height":16}]}"""
-                    else """{"success":true,"data":[{"id":1,"name":"Official result"}]}"""
+                    val body = if ("/grids/" in url) {
+                        gridRequests += url
+                        val (width, height) = when {
+                            "512x512" in url -> 512 to 512
+                            "600x900" in url -> 600 to 900
+                            else -> 300 to 200
+                        }
+                        """{"success":true,"data":[{"id":2,"url":"https://cdn2.steamgriddb.com/grid/test.png","thumb":"https://cdn2.steamgriddb.com/thumb/test.png","width":$width,"height":$height}]}"""
+                    } else """{"success":true,"data":[{"id":1,"name":"Official result"}]}"""
                     return HttpResponse(200, body.toByteArray())
                 }
             })
@@ -144,11 +153,26 @@ class ArtworkActivityTest {
             assertTrue("Official artwork worker did not publish the expected result", condition())
         }
         try {
+            val shapes = descendants(root).filterIsInstance<Spinner>().single()
+            assertEquals(0, shapes.selectedItemPosition)
             awaitUi { descendants(root).filterIsInstance<TextView>().any { it.text.toString() == "OFFICIAL RESULT" } }
             val title = descendants(root).filterIsInstance<TextView>().single { it.text.toString() == "OFFICIAL RESULT" }
             ((title.parent as View).parent as View).performClick()
-            awaitUi { descendants(root).filterIsInstance<ImageView>().any { it.isClickable } }
-            descendants(root).filterIsInstance<ImageView>().single { it.isClickable }.performClick()
+            fun cover(description: String) = descendants(root).filterIsInstance<ImageView>().singleOrNull { it.contentDescription == description }
+            awaitUi { cover("Select 512 x 512 cover") != null }
+            assertTrue(gridRequests.last().contains("dimensions=512x512,1024x1024"))
+            shapes.setSelection(1)
+            awaitUi { cover("Select 600 x 900 cover") != null }
+            assertTrue(gridRequests.last().contains("dimensions=600x900,342x482,660x930"))
+            shapes.setSelection(2)
+            awaitUi { cover("Select 300 x 200 cover") != null }
+            assertFalse(gridRequests.last().contains("dimensions="))
+            shapes.setSelection(0)
+            awaitUi { cover("Select 512 x 512 cover") != null }
+            val square = cover("Select 512 x 512 cover")!!
+            assertEquals(square.layoutParams.width, square.layoutParams.height)
+            assertEquals(ImageView.ScaleType.FIT_CENTER, square.scaleType)
+            square.performClick()
             awaitUi { picker.get().isFinishing }
             assertEquals("steamgriddb", Artwork.store(context).meta("gba", 7L)!!.source)
             assertNotNull(Artwork.store(context).file("gba", 7L))

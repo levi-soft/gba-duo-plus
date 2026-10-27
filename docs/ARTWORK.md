@@ -4,6 +4,10 @@ Official 0.1.8 supplies artwork folders, SteamGridDB search/scraping, cartridge 
 
 ## Pick a cover
 
+### Cover shapes (0.1.8-plus.3)
+
+The SteamGridDB picker offers **Square (default)**, **Portrait** and **All shapes**. Each newly opened picker starts with Square (512×512 or 1024×1024); rotation preserves the current choice. Changing shape reloads the selected game's covers, and thumbnails fit the image proportions. Empty square results do not silently fall back to portrait: choose another shape explicitly. Automatic SteamGridDB scraping also requests square covers by default. Existing artwork is kept until a replacement is selected.
+
 Version 0.1.8-plus.2 fixes the 0.1.8-plus.1 entry regression and separates the official SteamGridDB action from the retained Libretro/local import action. Interactive selection does not require reading ROM size again.
 
 Select a game in the library and choose **Game settings**, or press **X**. Existing controls retain their functions: A plays, Y opens Companion, and Start opens Settings.

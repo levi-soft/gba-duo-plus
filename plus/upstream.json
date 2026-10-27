@@ -44,6 +44,7 @@
     "app/src/main/java/com/khumam/gbaduo/settings/GameSettingsActivity.kt": "Official SteamGridDB action plus a separate Libretro/local image action within upstream game settings",
     "app/src/main/java/com/khumam/gbaduo/settings/ScrapingActivity.kt": "Expose retained Plus no-key Libretro missing-cover queue within upstream artwork settings",
     "app/src/main/java/com/khumam/gbaduo/settings/SteamGridDbActivity.kt": "Single shared key editor with creation link and secure credential storage failure handling",
-    "app/src/main/java/com/khumam/gbaduo/settings/ArtworkPickerActivity.kt": "Injectable official SteamGridDB client for end-to-end picker regression coverage"
+    "app/src/main/java/com/khumam/gbaduo/settings/ArtworkPickerActivity.kt": "Square/portrait/all selector, matching thumbnail proportions, stale-request guards and client injection for regression coverage",
+    "app/src/main/java/com/khumam/gbaduo/library/artwork/SteamGridDb.kt": "Square covers by default for picker and scraping; explicit portrait/all shape queries"
   }
 }

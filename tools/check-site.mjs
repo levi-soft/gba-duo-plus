@@ -7,7 +7,7 @@ const base='https://levi-soft.github.io/gba-duo-plus/';
 const titles=new Set();
 const descriptions=new Set();
 const sitemap=fs.readFileSync(path.join(root,'sitemap.xml'),'utf8');
-for(const [file,name,version] of [['index.html','GBA Duo Plus','0.1.8-plus.2'],['single-screen/index.html','GBA Duo Plus SS','0.1.8-plus.2-ss']]){
+for(const [file,name,version] of [['index.html','GBA Duo Plus','0.1.8-plus.3'],['single-screen/index.html','GBA Duo Plus SS','0.1.8-plus.3-ss']]){
   const html=fs.readFileSync(path.join(root,file),'utf8');
   const canonical=base+(file==='index.html'?'':'single-screen/');
   assert.equal([...html.matchAll(/<h1\b/g)].length,1,file+' must have one H1');

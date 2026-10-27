@@ -1,3 +1,13 @@
+# 0.1.8-plus.3 cover shapes (2026-10-27)
+
+- Feature validation: **80/80 focused regular Release tests** and **114/114 focused SS Debug tests** passed. Coverage includes the actual Game settings action, Square → Portrait → All → Square transitions and saving, default-square API queries and automatic lookup, and empty square results without silently fetching other shapes.
+- Thor: the feature build opened SteamGridDB with Square (default), fetched real square Fire Emblem covers using the saved device key, applied a square cover and rendered it in the official cartridge. No full-library scrape or new local image import was run on the user's data.
+- The published version uses Android versionCode 16, with the same feature source and existing signing certificate. Builder remains 1.1.5. The official cartridge rendering files are unchanged.
+
+Historical validation follows.
+
+---
+
 # 0.1.8-plus.2 artwork correction (2026-10-27)
 
 The 0.1.8-plus.1 Game settings action launched the Plus picker without raw ROM size; the picker rejected the missing value and finished before either provider searched. A regression test reproduced this failure before the fix. Libretro/local import now accepts unknown size while keeping platform/CRC and explicit-size bounds.

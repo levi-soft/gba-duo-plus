@@ -183,6 +183,11 @@
     <string name="artwork_auto_desc">Scrape library can set this game\'s cover again</string>
     <string name="artwork_search">Game name</string>
     <string name="artwork_search_go">Search</string>
+    <string name="artwork_cover_shape">Cover shape</string>
+    <string name="artwork_shape_square">Square (default)</string>
+    <string name="artwork_shape_portrait">Portrait</string>
+    <string name="artwork_shape_all">All shapes</string>
+    <string name="artwork_shape_empty">No covers in this shape. Choose another shape to see more.</string>
     <string name="artwork_searching">Searching…</string>
     <string name="artwork_no_results">Nothing found for that name</string>
     <string name="artwork_pick_hint">Search and choose a cover</string>

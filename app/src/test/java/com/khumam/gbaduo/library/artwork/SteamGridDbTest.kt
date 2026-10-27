@@ -38,29 +38,36 @@ class SteamGridDbTest {
     }
 
     @Test
-    fun gbaGridsAskForPortraitDimensionsAndSafeContent() {
+    fun gridsDefaultToSquareDimensionsAndSafeContent() {
         val http = FakeHttp { url -> json(if ("/grids/" in url) grids else search) }
         api(http).grids(42)
         val url = http.urls.single()
         assertTrue(url, url.startsWith("https://www.steamgriddb.com/api/v2/grids/game/42?"))
-        assertTrue(url, "dimensions=600x900,342x482,660x930" in url)
+        assertTrue(url, "dimensions=512x512,1024x1024" in url)
         assertTrue(url, "types=static" in url && "nsfw=false" in url && "humor=false" in url && "epilepsy=false" in url)
     }
 
     @Test
-    fun gameBoyGridsAskForPortraitDimensionsToo() {
+    fun portraitRequiresExplicitSelection() {
         val http = FakeHttp { json(grids) }
-        api(http).grids(42)
+        api(http).grids(42, SteamGridDb.CoverShape.PORTRAIT)
         assertTrue(http.urls.single(), "dimensions=600x900,342x482,660x930" in http.urls.single())
     }
 
     @Test
-    fun emptyGridsRetryWithoutDimensions() {
-        var calls = 0
-        val http = FakeHttp { if (calls++ == 0) json("""{"success":true,"data":[]}""") else json(grids) }
+    fun emptySquareResultDoesNotSilentlyFallBackToOtherShapes() {
+        val http = FakeHttp { json("""{"success":true,"data":[]}""") }
         val result = api(http).grids(42) as Sgdb.Ok
-        assertEquals(2, http.urls.size)
-        assertTrue("dimensions" !in http.urls[1])
+        assertEquals(1, http.urls.size)
+        assertTrue("dimensions=512x512,1024x1024" in http.urls.single())
+        assertTrue(result.value.isEmpty())
+    }
+
+    @Test
+    fun allShapesRequiresExplicitSelectionAndOmitsDimensions() {
+        val http = FakeHttp { json(grids) }
+        val result = api(http).grids(42, SteamGridDb.CoverShape.ALL) as Sgdb.Ok
+        assertTrue("dimensions=" !in http.urls.single())
         assertEquals(listOf(7L, 8L), result.value.map { it.id })
         assertEquals("https://cdn/t.png", result.value[0].thumb)
     }
@@ -71,6 +78,7 @@ class SteamGridDbTest {
         val result = api(http).cover("Wario Land 4") as Sgdb.Ok
         assertEquals(7L, result.value.id)
         assertTrue("/grids/game/42" in http.urls.last())
+        assertTrue("dimensions=512x512,1024x1024" in http.urls.last())
     }
 
     @Test

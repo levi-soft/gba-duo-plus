@@ -8,9 +8,12 @@ import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.widget.EditText
+import android.widget.AdapterView
+import android.widget.ArrayAdapter
 import android.widget.HorizontalScrollView
 import android.widget.ImageView
 import android.widget.LinearLayout
+import android.widget.Spinner
 import android.widget.Toast
 import com.khumam.gbaduo.R
 import com.khumam.gbaduo.library.Platform
@@ -21,6 +24,7 @@ import com.khumam.gbaduo.library.artwork.Sgdb
 import com.khumam.gbaduo.library.artwork.SgdbGame
 import com.khumam.gbaduo.library.artwork.SgdbGrid
 import com.khumam.gbaduo.library.artwork.SteamGridDb
+import com.khumam.gbaduo.library.artwork.SteamGridDb.CoverShape
 import com.khumam.gbaduo.library.artwork.UrlHttp
 import com.khumam.gbaduo.library.ui.Pixel
 import com.khumam.gbaduo.library.ui.PixelBoxDrawable
@@ -28,6 +32,7 @@ import com.khumam.gbaduo.storage.GameSettings
 import com.khumam.gbaduo.storage.GameSettingsKeys
 import java.io.File
 import java.util.concurrent.Executors
+import kotlin.math.roundToInt
 
 /**
  * Game settings > Find on SteamGridDB: search by name, pick the game, then pick the cover
@@ -41,6 +46,10 @@ class ArtworkPickerActivity : PixelPage() {
     private lateinit var api: SteamGridDb
     private lateinit var query: EditText
     private lateinit var results: LinearLayout
+    private lateinit var shapePicker: Spinner
+    private var shape = CoverShape.SQUARE
+    private var selectedGame: SgdbGame? = null
+    @Volatile private var requestId = 0
     private val io = Executors.newFixedThreadPool(3)
     internal var apiFactory: () -> SteamGridDb? = {
         ArtworkPrefs.sgdbKey(this)?.let { SteamGridDb(it, UrlHttp()) }
@@ -64,8 +73,28 @@ class ArtworkPickerActivity : PixelPage() {
         platform = platformId
         crc = intent.getLongExtra(GameSettingsActivity.EXTRA_CRC, 0)
         api = source
+        shape = savedInstanceState?.getString("coverShape")?.let { name ->
+            CoverShape.entries.firstOrNull { it.name == name }
+        } ?: CoverShape.SQUARE
 
         page(getString(R.string.artwork_find), listOf("▲ ▼ ◀ ▶" to "Choose", "A" to "Pick", "B" to "Back"))
+        content.addView(label(getString(R.string.artwork_cover_shape)), spaced(0))
+        shapePicker = Spinner(this).apply {
+            contentDescription = getString(R.string.artwork_cover_shape)
+            adapter = ArrayAdapter(this@ArtworkPickerActivity, android.R.layout.simple_spinner_dropdown_item,
+                listOf(getString(R.string.artwork_shape_square), getString(R.string.artwork_shape_portrait), getString(R.string.artwork_shape_all)))
+            setSelection(shape.ordinal)
+            onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+                override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
+                    val next = CoverShape.entries[position]
+                    if (next == shape) return
+                    shape = next
+                    selectedGame?.let(::loadGrids)
+                }
+                override fun onNothingSelected(parent: AdapterView<*>?) = Unit
+            }
+        }
+        content.addView(shapePicker, spaced(8))
         query = field(getString(R.string.artwork_search), InputType.TYPE_CLASS_TEXT)
         query.setText(intent.getStringExtra(GameSettingsActivity.EXTRA_TITLE).orEmpty())
         val go = button(getString(R.string.artwork_search_go), Pixel.YELLOW) { search() }
@@ -84,13 +113,17 @@ class ArtworkPickerActivity : PixelPage() {
     }
 
     private fun search() {
+        if (!shapePicker.isEnabled) return
         val name = query.text.toString().trim()
         if (name.isEmpty()) return
+        selectedGame = null
+        val request = ++requestId
         message(getString(R.string.artwork_searching), error = false)
         io.execute {
+            if (request != requestId) return@execute
             val result = api.search(name)
             runOnUiThread {
-                if (isDestroyed) return@runOnUiThread
+                if (isDestroyed || request != requestId) return@runOnUiThread
                 when (result) {
                     is Sgdb.Failed -> message(failText(result.reason))
                     is Sgdb.Ok -> if (result.value.isEmpty()) message(getString(R.string.artwork_no_results)) else showGames(result.value.take(8))
@@ -122,39 +155,47 @@ class ArtworkPickerActivity : PixelPage() {
     }
 
     private fun loadGrids(game: SgdbGame) {
+        selectedGame = game
+        val selectedShape = shape
+        val request = ++requestId
         message(getString(R.string.artwork_searching), error = false)
         io.execute {
-            val result = api.grids(game.id)
+            if (request != requestId) return@execute
+            val result = api.grids(game.id, selectedShape)
             runOnUiThread {
-                if (isDestroyed) return@runOnUiThread
+                if (isDestroyed || request != requestId) return@runOnUiThread
                 when (result) {
                     is Sgdb.Failed -> message(failText(result.reason))
-                    is Sgdb.Ok -> if (result.value.isEmpty()) message(getString(R.string.artwork_no_results)) else showGrids(result.value.take(24))
+                    is Sgdb.Ok -> if (result.value.isEmpty()) message(getString(R.string.artwork_shape_empty), error = false) else showGrids(result.value.take(24))
                 }
             }
         }
     }
 
     private fun showGrids(grids: List<SgdbGrid>) {
+        val request = requestId
         results.removeAllViews()
         results.addView(label(getString(R.string.artwork_pick_hint)), spaced(4))
         val strip = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; setPadding(0, dp(8), dp(12), dp(14)) }
         var first: View? = null
         for (grid in grids) {
             val thumb = ImageView(this).apply {
-                scaleType = ImageView.ScaleType.CENTER_CROP
+                scaleType = ImageView.ScaleType.FIT_CENTER
+                contentDescription = "Select ${grid.width} x ${grid.height} cover"
                 background = PixelBoxDrawable(this@ArtworkPickerActivity, Pixel.LAVENDER, shadowDp = 4f, shadowColor = SHADE, focusedFill = Pixel.YELLOW)
                 setPadding(dp(5), dp(5), dp(9), dp(9))
                 isFocusable = true
                 isClickable = true
                 setOnClickListener { choose(grid) }
             }
-            strip.addView(thumb, LinearLayout.LayoutParams(dp(120), dp(160)).apply { marginEnd = dp(12) })
+            val height = if (grid.width > 0 && grid.height > 0) (120f * grid.height / grid.width).roundToInt().coerceIn(68, 220) else 120
+            strip.addView(thumb, LinearLayout.LayoutParams(dp(120), dp(height)).apply { marginEnd = dp(12) })
             if (first == null) first = thumb
             io.execute {
+                if (request != requestId) return@execute
                 val bytes = (api.download(grid.thumb) as? Sgdb.Ok)?.value ?: return@execute
                 val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size) ?: return@execute
-                runOnUiThread { if (!isDestroyed) thumb.setImageBitmap(bitmap) }
+                runOnUiThread { if (!isDestroyed && request == requestId) thumb.setImageBitmap(bitmap) else bitmap.recycle() }
             }
         }
         results.addView(HorizontalScrollView(this).apply { isHorizontalScrollBarEnabled = false; addView(strip) })
@@ -162,6 +203,9 @@ class ArtworkPickerActivity : PixelPage() {
     }
 
     private fun choose(grid: SgdbGrid) {
+        shapePicker.isEnabled = false
+        query.isEnabled = false
+        val request = ++requestId
         message(getString(R.string.artwork_searching), error = false)
         io.execute {
             val stored = (api.download(grid.url) as? Sgdb.Ok)?.value?.let(ArtworkImages::encode)?.also {
@@ -169,11 +213,13 @@ class ArtworkPickerActivity : PixelPage() {
                 GameSettings(File(gameDir, "settings.json")).put(GameSettingsKeys.ARTWORK, GameSettingsKeys.ARTWORK_PICKED)
             }
             runOnUiThread {
-                if (isDestroyed) return@runOnUiThread
+                if (isDestroyed || request != requestId) return@runOnUiThread
                 if (stored != null) {
                     Toast.makeText(this, R.string.artwork_saved, Toast.LENGTH_SHORT).show()
                     finish()
                 } else {
+                    shapePicker.isEnabled = true
+                    query.isEnabled = true
                     message(getString(R.string.artwork_save_failed))
                 }
             }
@@ -181,7 +227,13 @@ class ArtworkPickerActivity : PixelPage() {
     }
 
     override fun onDestroy() {
+        requestId++
         io.shutdownNow()
         super.onDestroy()
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        outState.putString("coverShape", shape.name)
+        super.onSaveInstanceState(outState)
     }
 }

@@ -32,6 +32,11 @@ class SteamGridDb(
     private val http: Http,
     private val sleep: (Long) -> Unit = { Thread.sleep(it) },
 ) {
+    enum class CoverShape(val dimensions: String?) {
+        SQUARE("512x512,1024x1024"),
+        PORTRAIT("600x900,342x482,660x930"),
+        ALL(null),
+    }
 
     fun search(title: String): Sgdb<List<SgdbGame>> =
         getJson("$BASE/search/autocomplete/${encode(title)}") { json ->
@@ -43,13 +48,11 @@ class SteamGridDb(
             }
         }
 
-    /** The cover grids for a game, best-scored first, in portrait sizes: the cartridge label is portrait. */
-    fun grids(gameId: Long): Sgdb<List<SgdbGrid>> {
+    /** Square by default for both the picker and scraping. Other shapes require an explicit choice. */
+    fun grids(gameId: Long, shape: CoverShape = CoverShape.SQUARE): Sgdb<List<SgdbGrid>> {
         val base = "$BASE/grids/game/$gameId?types=static&nsfw=false&humor=false&epilepsy=false&mimes=image/png,image/jpeg"
-        val sized = "&dimensions=600x900,342x482,660x930"
-        val first = getJson(base + sized, ::parseGrids)
-        if (first is Sgdb.Ok && first.value.isEmpty()) return getJson(base, ::parseGrids)
-        return first
+        val sized = shape.dimensions?.let { "&dimensions=$it" }.orEmpty()
+        return getJson(base + sized, ::parseGrids)
     }
 
     /** Title -> first game found -> its best cover. Retries a subtitled title with just the main title. */
