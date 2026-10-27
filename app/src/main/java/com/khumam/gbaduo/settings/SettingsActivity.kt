@@ -5,7 +5,6 @@ import android.content.Intent
 import android.os.Bundle
 import android.widget.TextView
 import com.khumam.gbaduo.R
-import com.khumam.gbaduo.artwork.ArtworkSettingsActivity
 import com.khumam.gbaduo.achievements.RetroAchievements
 import com.khumam.gbaduo.companion.CompanionSettings
 import com.khumam.gbaduo.emu.ColorCorrection

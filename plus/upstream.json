@@ -30,10 +30,7 @@
     "app/src/main/java/com/khumam/gbaduo/emu/ShaderPreset.kt": "Plus shader pipeline selection and GLES3 host",
     "app/src/main/java/com/khumam/gbaduo/library/LaunchActivity.kt": "External launcher path compatibility and existing-session routing",
     "app/src/main/java/com/khumam/gbaduo/library/LaunchIntentResolver.kt": "External launcher path compatibility and existing-session routing",
-    "app/src/main/java/com/khumam/gbaduo/library/LibraryActivity.kt": "External launcher and companion/artwork management delegates; responsive SS header and application wordmark",
-    "app/src/main/java/com/khumam/gbaduo/library/ui/CartridgeCarousel.kt": "Optional artwork bind callback and recycled-view cleanup; original carousel/navigation retained",
-    "app/src/main/java/com/khumam/gbaduo/library/ui/CartridgeView.kt": "Optional artwork draw delegate with unchanged official cartridge fallback",
-    "app/src/main/java/com/khumam/gbaduo/settings/SettingsActivity.kt": "Single entry point to Plus artwork source settings",
+    "app/src/main/java/com/khumam/gbaduo/library/LibraryActivity.kt": "External launch and companion management delegates, legacy artwork migration with official loader, responsive SS header and wordmark",
     "app/src/main/java/com/khumam/gbaduo/player/PlayerActivity.kt": "Persisted controls, Studio/achievements menu, deferred companion draws and opt-in SS host/startup/lifecycle delegation",
     "app/src/main/java/com/khumam/gbaduo/player/QuickMenu.kt": "Persisted Swap A/B, Studio menu, achievements UI and deferred companion draws",
     "app/src/main/java/com/khumam/gbaduo/settings/AboutActivity.kt": "Plus attribution and Studio project links",
@@ -44,8 +41,9 @@
     "app/src/main/java/com/khumam/gbaduo/library/artwork/ArtworkStore.kt": "Atomic shared artwork index for upstream folder/SGDB and Plus providers, request ownership and legacy-cover removal tombstones",
     "app/src/main/java/com/khumam/gbaduo/library/artwork/ArtworkPrefs.kt": "Reuse Plus encrypted SteamGridDB credentials across both artwork entry points",
     "app/src/main/java/com/khumam/gbaduo/library/artwork/ArtworkScraper.kt": "Recheck request cancellation, current selection and per-game locks before publishing downloaded covers",
-    "app/src/main/java/com/khumam/gbaduo/settings/GameSettingsActivity.kt": "Reuse Plus Libretro, SteamGridDB gallery and local image picker with upstream per-game shader/color/folder settings",
+    "app/src/main/java/com/khumam/gbaduo/settings/GameSettingsActivity.kt": "Official SteamGridDB action plus a separate Libretro/local image action within upstream game settings",
     "app/src/main/java/com/khumam/gbaduo/settings/ScrapingActivity.kt": "Expose retained Plus no-key Libretro missing-cover queue within upstream artwork settings",
-    "app/src/main/java/com/khumam/gbaduo/settings/SteamGridDbActivity.kt": "Handle secure credential storage failures without crashing the settings lifecycle"
+    "app/src/main/java/com/khumam/gbaduo/settings/SteamGridDbActivity.kt": "Single shared key editor with creation link and secure credential storage failure handling",
+    "app/src/main/java/com/khumam/gbaduo/settings/ArtworkPickerActivity.kt": "Injectable official SteamGridDB client for end-to-end picker regression coverage"
   }
 }

@@ -1,6 +1,5 @@
 package com.khumam.gbaduo.artwork
 
-import android.app.AlertDialog
 import android.content.Intent
 import android.graphics.Bitmap
 import android.net.Uri
@@ -9,18 +8,17 @@ import android.text.InputType
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
-import android.widget.ArrayAdapter
 import android.widget.EditText
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
-import android.widget.Spinner
 import android.widget.TextView
 import com.khumam.gbaduo.library.Platform
 import com.khumam.gbaduo.library.ui.Fonts
 import com.khumam.gbaduo.library.ui.Pixel
 import com.khumam.gbaduo.library.ui.PixelBoxDrawable
 import com.khumam.gbaduo.settings.PixelPage
+import com.khumam.gbaduo.settings.ScrapingActivity
 import java.io.ByteArrayOutputStream
 import java.net.URI
 import java.util.concurrent.Executors
@@ -33,32 +31,31 @@ class ArtworkActivity : PixelPage() {
     private val io = Executors.newSingleThreadExecutor()
     private val thumbnails = Executors.newFixedThreadPool(2)
     private lateinit var repository: ArtworkRepository
-    private lateinit var credentials: ArtworkCredentials
     private lateinit var rom: ArtworkRomInfo
     private lateinit var platform: Platform
     private lateinit var status: TextView
-    private var providerId = "libretro"
     private var searchText = ""
-    internal var providerFactory: (String) -> ArtworkProvider? = ::provider
+    internal var providerFactory: () -> ArtworkProvider = { LibretroArtworkProvider() }
+    internal var imageDownloader: (ArtworkCandidate) -> ByteArray = { ArtworkHttp.download(it) }
 
     override fun onCreate(state: Bundle?) {
         super.onCreate(state)
         page("Artwork")
         repository = ArtworkRepository(this)
-        credentials = ArtworkCredentials(this)
         val crc = intent.getLongExtra("artwork.crc", -1)
-        val bytes = intent.getLongExtra("artwork.size", -1)
+        // Per-game settings already know platform/CRC but do not read the ROM again.
+        // Size is optional metadata for this picker; 0 means unknown, never a ZIP size.
+        val bytes = intent.getLongExtra("artwork.size", 0)
         platform = Platform.byId(intent.getStringExtra("artwork.platform")) ?: run { finish(); return }
-        if (crc !in 0..0xffffffffL || bytes !in 1..32L * 1024 * 1024) { finish(); return }
+        if (crc !in 0..0xffffffffL || bytes !in 0..32L * 1024 * 1024) { finish(); return }
         rom = ArtworkRomInfo(ArtworkIdentity(platform.id, crc), intent.getStringExtra("artwork.title").orEmpty(),
             intent.getStringExtra("artwork.file").orEmpty(), intent.getStringExtra("artwork.code").orEmpty(), bytes)
         searchText = state?.getString("search") ?: rom.title
-        providerId = state?.getString("provider") ?: "libretro"
         showMenu()
     }
 
     override fun onSaveInstanceState(state: Bundle) {
-        state.putString("search", searchText); state.putString("provider", providerId)
+        state.putString("search", searchText)
         super.onSaveInstanceState(state)
     }
 
@@ -79,61 +76,24 @@ class ArtworkActivity : PixelPage() {
             val bitmap = runCatching { repository.loadBitmap(rom.identity) }.getOrNull()
             runOnUiThread { if (gate.isCurrent(token)) { current.setImageBitmap(bitmap); current.contentDescription = if (bitmap == null) "No custom artwork" else "Current artwork" } }
         }
-        val sources = Spinner(this).apply {
-            adapter = ArrayAdapter(this@ArtworkActivity, android.R.layout.simple_spinner_dropdown_item, listOf("Libretro", "SteamGridDB"))
-            setSelection(if (providerId == "steamgriddb") 1 else 0)
-            contentDescription = "Artwork source"
-        }
-        content.addView(sources, spaced(14))
         val query = field("Game name", InputType.TYPE_CLASS_TEXT).apply { setText(searchText) }
         val search = button("Find artwork", Pixel.YELLOW) {
             searchText = query.text.toString().trim()
-            providerId = if (sources.selectedItemPosition == 1) "steamgriddb" else "libretro"
             if (searchText.isBlank()) { status.text = "Enter a game name."; return@button }
             findGames()
         }
         content.addView(search, spaced(14))
         content.addView(button("Choose image…", Pixel.LAVENDER) { chooseImage() }, spaced(12))
-        content.addView(button("Artwork sources", Pixel.LAVENDER) { startActivity(Intent(this, ArtworkSettingsActivity::class.java)) }, spaced(12))
-        content.addView(button("Remove custom artwork", Pixel.LAVENDER) {
-            AlertDialog.Builder(this).setTitle("Remove custom artwork?")
-                .setMessage("This restores the original cartridge display. Your original image file will not be deleted.")
-                .setNegativeButton("Cancel", null).setPositiveButton("Remove") { _, _ ->
-                    workOwned("Removing artwork…", { request -> gate.commit(request) { repository.remove(rom.identity) } }) {
-                        setResult(RESULT_OK); finish()
-                    }
-                }.show()
-        }, spaced(12))
+        content.addView(button("Artwork sources", Pixel.LAVENDER) { startActivity(Intent(this, ScrapingActivity::class.java)) }, spaced(12))
         focusFirst(query)
     }
 
-    private fun provider(id: String): ArtworkProvider? {
-        return if (id != "steamgriddb") {
-            LibretroArtworkProvider()
-        } else {
-            val key = credentials.steamGridDbKey()
-            if (key.isBlank()) null
-            else SteamGridDbProvider(key)
-        }
-    }
-
-    private fun configure(message: String) {
-        AlertDialog.Builder(this).setTitle("Set up artwork source").setMessage(message)
-            .setNegativeButton("Cancel", null).setPositiveButton("Open settings") { _, _ -> startActivity(Intent(this, ArtworkSettingsActivity::class.java)) }.show()
-    }
-
     private fun findGames() {
-        val selectedProvider = providerId
         val query = searchText
-        work("Searching ${if (selectedProvider == "steamgriddb") "SteamGridDB" else "Libretro"}…", {
-            // Keystore/prefs and the provider request belong to the same worker.
-            providerFactory(selectedProvider)?.let { source -> source to source.search(query, platform) }
+        work("Searching Libretro...", {
+            val source = providerFactory()
+            source to source.search(query, platform)
         }) { result ->
-            if (result == null) {
-                status.text = "SteamGridDB needs an API key."
-                configure("Add your SteamGridDB API key in Artwork sources, then return to choose an image.")
-                return@work
-            }
             val (source, games) = result
             clear(if (games.isEmpty()) "No games found. Try a shorter title, or choose an image manually." else "Choose the correct game. Search results are not automatically assigned to this ROM.")
             for (game in games.take(50)) content.addView(button(game.title + (game.year?.let { " · $it" } ?: ""), Pixel.LAVENDER) { findImages(source, game) }, spaced(12))
@@ -185,7 +145,7 @@ class ArtworkActivity : PixelPage() {
                     if (!gate.isCurrent(token)) return@execute
                     val bitmap = runCatching {
                         val thumbnail = candidate.thumbnailUrl?.takeIf { it.isNotBlank() }?.let { candidate.copy(url = it, thumbnailUrl = null) } ?: candidate
-                        val decoded = ArtworkImageStore.decode(ArtworkHttp.download(thumbnail))
+                        val decoded = ArtworkImageStore.decode(imageDownloader(thumbnail))
                         val largest = max(decoded.width, decoded.height)
                         if (largest > 256) {
                             val ratio = 256f / largest
@@ -202,14 +162,11 @@ class ArtworkActivity : PixelPage() {
             content.addView(row, spaced(12))
         }
         if (shown.size < images.size) content.addView(button("Show more images", Pixel.YELLOW) { showImages(source, game, images, count + 24, (content.parent as? ScrollView)?.scrollY ?: 0) }, spaced(16))
-        if (source is SteamGridDbProvider) content.addView(button("Show all image formats", Pixel.LAVENDER) {
-            work("Loading all static image formats…", { source.imagesAllFormats(game, platform) }) { all -> showImages(source, game, all, 24) }
-        }, spaced(12))
         content.addView(button("Change search", Pixel.LAVENDER) { showMenu() }, spaced(16))
     }
 
     private fun previewRemote(candidate: ArtworkCandidate, back: () -> Unit) {
-        work("Downloading preview…", { ArtworkHttp.download(candidate).let { it to ArtworkImageStore.decode(it) } }) { (bytes, bitmap) ->
+        work("Downloading preview…", { imageDownloader(candidate).let { it to ArtworkImageStore.decode(it) } }) { (bytes, bitmap) ->
             showPreview(bytes, bitmap, candidate, false, back)
         }
     }
@@ -243,7 +200,7 @@ class ArtworkActivity : PixelPage() {
         val side = minOf(360, resources.configuration.screenWidthDp - 70).coerceAtLeast(100)
         content.addView(squareImage(side).apply { setImageBitmap(bitmap); contentDescription = "Artwork preview, original aspect ratio" },
             LinearLayout.LayoutParams(dp(side), dp(side)).apply { gravity = Gravity.CENTER_HORIZONTAL; topMargin = dp(14) })
-        note("The original image proportions are preserved inside the square library card.")
+        note("The library displays this image inside the official cartridge label.")
         val apply = button("Apply artwork", Pixel.YELLOW) {
             workOwned("Saving artwork…", { request -> repository.applyIfOwned(rom.identity, bytes, candidate, manual) { gate.claim(request) } }) {
                 setResult(RESULT_OK); finish()

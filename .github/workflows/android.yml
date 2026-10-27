@@ -47,7 +47,7 @@ jobs:
           --tests '*AchievementPopupsTest' --tests '*CompanionTreeTest'
           --tests '*AutomaticBuilderCoreTest' --tests '*BuilderRomSourceTest'
           --tests '*InstalledPackStorageTest'
-          --tests '*BuilderLanguageTest' --tests '*Artwork*Test'
+          --tests '*BuilderLanguageTest' --tests '*Artwork*Test' --tests '*SteamGridDbTest'
       - run: ./gradlew :app:assembleRelease
       - uses: actions/upload-artifact@v4
         with:

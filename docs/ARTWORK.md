@@ -1,25 +1,27 @@
 # Artwork (Plus extension)
 
-Official 0.1.8 supplies artwork folders, SteamGridDB scraping and per-game selection locks. Plus extends those features with Libretro, manual import, a gallery and square cover rendering. It keeps the original cartridge carousel, controller navigation, game launching, saves, companion assignments and RetroAchievements identity.
+Official 0.1.8 supplies artwork folders, SteamGridDB search/scraping, cartridge cover rendering and per-game selection locks. Plus adds Libretro and manual image import. The duplicate Plus SteamGridDB client, key editor, square renderer and image binder were removed in 0.1.8-plus.2. It keeps the official cartridge carousel, controller navigation, game launching, saves, companion assignments and RetroAchievements identity.
 
 ## Pick a cover
 
-Select a game in the library and choose **Game settings → Find artwork**, or press **X** and open Find artwork. Existing controls retain their functions: A plays, Y opens Companion, and Start opens Settings.
+Version 0.1.8-plus.2 fixes the 0.1.8-plus.1 entry regression and separates the official SteamGridDB action from the retained Libretro/local import action. Interactive selection does not require reading ROM size again.
 
-- **SteamGridDB:** search a game, choose the correct result, browse square images, preview one and select **Apply artwork**. **Show all image formats** includes other grid aspect ratios. The library uses a square frame and fits images without stretching or forced cropping.
-- **Choose image:** use the Android picker to import a PNG, JPEG or WebP. Preview before applying. Plus copies the image into its private storage; it does not move or change the original file.
-- **Libretro (default):** search box art without an account or API key. Choose a matching regional title to open its single cover directly in preview, then apply. Libretro skips the image-selection grid when only one cover exists.
-- **Remove artwork:** restore the original cartridge placeholder. No ROM, save or companion is removed.
+Select a game in the library and choose **Game settings**, or press **X**. Existing controls retain their functions: A plays, Y opens Companion, and Start opens Settings.
+
+- **Find on SteamGridDB:** uses the official picker. Search a game, choose the correct result, then select a cover thumbnail to download and apply it. The library displays artwork inside the official cartridge label, fitted to the image proportions.
+- **Choose image** inside **Libretro / local image**: use the Android picker to import a PNG, JPEG or WebP. Preview before applying. Plus copies the image into its private storage; it does not move or change the original file.
+- **Libretro / local image:** search box art without an account or API key. Choose a matching regional title to open its single cover directly in preview, then apply. Libretro skips the image-selection grid when only one cover exists. Local image import is on this same page.
+- **Remove cover** in Game settings: restore the original cartridge placeholder. No ROM, save or companion is removed. The duplicate remove button in the Plus picker has been removed.
 
 Selected images remain available offline. Changing a provider's game association or choosing a cover never changes the ROM bytes, achievement identity or save name. Translations and mods can be assigned an image from a selected base game even when their actual hashes do not match its provider database.
 
 ## Configure sources
 
-Open **Settings → Scraping**. Open **Libretro artwork** for the retained Plus provider configuration and missing-cover workflow. The Plus artwork screens use English to match the current Plus interface, including when Android is configured in Vietnamese.
+Open **Settings → Scraping → Providers → SteamGridDB** for the single shared key editor and key test. **Libretro artwork** on the Scraping page starts the no-key missing-cover workflow. The Plus artwork screens use English to match the current Plus interface, including when Android is configured in Vietnamese.
 
 SteamGridDB requires a personal API key. **Get SteamGridDB API key** opens its official account page; sign in there and paste the key into Plus. Keys are encrypted using an artwork-specific Android Keystore key, separate from RetroAchievements credentials. Never include keys in bug reports.
 
-Libretro is the default source and requires no account. SteamGridDB is an optional alternative for choosing custom square covers; its saved API key remains available. ScreenScraper has been removed.
+Libretro requires no account. SteamGridDB uses the official implementation with the same encrypted key as scraping. ScreenScraper has been removed.
 
 Sources: [Libretro thumbnails](https://github.com/libretro-thumbnails/libretro-thumbnails), [SteamGridDB API](https://www.steamgriddb.com/api/v2). Daijisho also lists Libretro as its first GBA artwork source; Plus uses its own provider implementation.
 
@@ -42,13 +44,12 @@ also run on a worker.
 
 ## Source and upstream boundary
 
-Plus provider, picker, binder and legacy-migration classes are in `plus/src/main/java/com/khumam/gbaduo/artwork/`. The shared index, folder scraping and per-game settings extend upstream 0.1.8 classes explicitly. Other hooks include:
+Plus Libretro, local picker and legacy-migration classes are in `plus/src/main/java/com/khumam/gbaduo/artwork/`. The shared index, folder scraping and per-game settings extend upstream 0.1.8 classes explicitly. Other hooks include:
 
-1. Library Activity: entry button/X, binder lifecycle.
-2. Cartridge carousel: optional bind callback and recycled-view cleanup.
-3. Cartridge view: optional draw delegate; returning false uses the original drawing.
-4. Settings: one card opening the Plus configuration screen.
-5. Manifest: private Plus activities.
+1. Library Activity: legacy-cover migration, followed by a refresh of the official loader.
+2. Game settings: the Libretro/local image action alongside the official SteamGridDB action.
+3. Scraping: a no-key Libretro batch action alongside the official folder/SteamGridDB workflow.
+4. Manifest: the private Libretro/local picker. SteamGridDB uses the official settings and picker Activities.
 
 These integrations are recorded in `plus/upstream.json`. No official class is copied into Plus to conceal a fork. If upstream later provides equivalent support, route or remove these hooks and remove the Plus implementation. Preserve selected image files during migration; disabling a feature must not silently delete user artwork.
 

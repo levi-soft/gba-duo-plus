@@ -1,5 +1,6 @@
 package com.khumam.gbaduo.settings
 
+import android.content.Intent
 import android.graphics.BitmapFactory
 import android.os.Bundle
 import android.text.InputType
@@ -41,20 +42,28 @@ class ArtworkPickerActivity : PixelPage() {
     private lateinit var query: EditText
     private lateinit var results: LinearLayout
     private val io = Executors.newFixedThreadPool(3)
+    internal var apiFactory: () -> SteamGridDb? = {
+        ArtworkPrefs.sgdbKey(this)?.let { SteamGridDb(it, UrlHttp()) }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val dir = intent.getStringExtra(GameSettingsActivity.EXTRA_GAME_DIR)
-        val key = ArtworkPrefs.sgdbKey(this)
+        val source = apiFactory()
         val platformId = Platform.byId(intent.getStringExtra(GameSettingsActivity.EXTRA_PLATFORM_ID))
-        if (dir == null || key == null || platformId == null) {
+        if (dir == null || platformId == null) {
+            finish()
+            return
+        }
+        if (source == null) {
+            startActivity(Intent(this, SteamGridDbActivity::class.java))
             finish()
             return
         }
         gameDir = dir
         platform = platformId
         crc = intent.getLongExtra(GameSettingsActivity.EXTRA_CRC, 0)
-        api = SteamGridDb(key, UrlHttp())
+        api = source
 
         page(getString(R.string.artwork_find), listOf("▲ ▼ ◀ ▶" to "Choose", "A" to "Pick", "B" to "Back"))
         query = field(getString(R.string.artwork_search), InputType.TYPE_CLASS_TEXT)

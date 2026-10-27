@@ -24,13 +24,12 @@ class CartridgeCarousel(
     private val recycler: RecyclerView,
     private val onSelected: (Int) -> Unit,
     private val onPlay: (Int) -> Unit,
-    private val bindArtwork: ((CartridgeView, RomEntry) -> Unit)? = null,
 ) {
     private val context = recycler.context
     private val itemWidth = Pixel.dp(context, ITEM_WIDTH_DP).roundToInt()
     private val layoutManager = LinearLayoutManager(context, LinearLayoutManager.HORIZONTAL, false)
     private val adapter = Adapter()
-    private val artwork = if (bindArtwork == null) ArtworkLoader(context) else null
+    private val artwork = ArtworkLoader(context)
     private val easeOut = PathInterpolator(0.25f, 1f, 0.5f, 1f) // ease-out-quart
     private val stepMs = if (Pixel.motionEnabled(context)) 220 else 0
 
@@ -79,10 +78,10 @@ class CartridgeCarousel(
 
     /** Reloads covers if the artwork store changed (after scraping, or a per-game pick). */
     fun reloadArtwork() {
-        if (artwork?.refresh() == true) adapter.notifyDataSetChanged()
+        if (artwork.refresh()) adapter.notifyDataSetChanged()
     }
 
-    fun release() { artwork?.shutdown() }
+    fun release() = artwork.shutdown()
 
     fun hasPack(entry: RomEntry) = entry.gameCode in packCodes
 
@@ -178,14 +177,7 @@ class CartridgeCarousel(
                 selectedCart = position == selected
                 contentDescription = title
             }
-            if (bindArtwork != null) bindArtwork.invoke(holder.cart, entry)
-            else artwork?.bind(holder.cart, entry)
-        }
-
-        override fun onViewRecycled(holder: Holder) {
-            holder.cart.tag = null
-            holder.cart.artworkRenderer = null
-            super.onViewRecycled(holder)
+            artwork.bind(holder.cart, entry)
         }
     }
 

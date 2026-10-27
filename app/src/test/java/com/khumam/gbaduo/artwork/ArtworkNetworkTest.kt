@@ -73,47 +73,6 @@ class ArtworkNetworkTest {
         assertThrows(ArtworkProviderException::class.java) { oversized.search("game", Platform.GB) }
     }
 
-    @Test fun steamSearchEncodesNameAndUsesBearerOnlyOnApiRequest() {
-        var request: ArtworkRequest? = null
-        val provider = SteamGridDbProvider("private-key", ArtworkTransport {
-            request = it
-            response("""{"success":true,"data":[{"id":123,"name":"Fire Emblem","release_date":1050192000}]}""")
-        })
-        val games = provider.search("Fire & Emblem", Platform.GBA)
-        assertEquals("Fire Emblem", games.single().title)
-        assertEquals("Bearer private-key", request!!.headers["Authorization"])
-        assertEquals("/api/v2/search/autocomplete/Fire%20%26%20Emblem", request!!.uri.rawPath)
-        assertFalse(request!!.uri.toString().contains("private-key"))
-    }
-
-    @Test fun steamImagesPreferStaticSquareAndExcludeFlaggedImages() {
-        var request: ArtworkRequest? = null
-        val provider = SteamGridDbProvider("key", ArtworkTransport {
-            request = it
-            response("""{"success":true,"data":[
-              {"id":1,"url":"https://cdn2.steamgriddb.com/grid/a.png","thumb":"https://cdn2.steamgriddb.com/thumb/a.png","width":512,"height":512,"author":{"name":"Artist"}},
-              {"id":2,"url":"https://cdn2.steamgriddb.com/grid/b.png","width":512,"height":512,"nsfw":true},
-              {"id":3,"url":"https://cdn2.steamgriddb.com/grid/c.png","width":512,"height":512,"humor":true}
-            ]}""")
-        })
-        val art = provider.images(ArtworkGame("steamgriddb", "123", "Fire Emblem"), Platform.GBA)
-        assertEquals(1, art.size)
-        assertEquals("Artist", art[0].author)
-        assertTrue(request!!.uri.rawQuery.contains("dimensions=512x512%2C1024x1024"))
-        assertTrue(request!!.uri.rawQuery.contains("types=static"))
-        assertTrue(request!!.uri.rawQuery.contains("nsfw=false"))
-    }
-
-    @Test fun serviceErrorsNeverContainCredentialsOrUrlsAndPreserveRetryHint() {
-        val provider = SteamGridDbProvider("DO-NOT-PRINT", ArtworkTransport {
-            ArtworkResponse(429, "private body DO-NOT-PRINT".toByteArray(), mapOf("Retry-After" to "15"))
-        })
-        val error = assertThrows(ArtworkProviderException::class.java) { provider.search("game", Platform.GB) }
-        assertEquals(15L, error.retryAfterSeconds)
-        assertFalse(error.toString().contains("DO-NOT-PRINT"))
-        assertFalse(error.toString().contains("https://"))
-    }
-
     @Test fun imageDownloadsValidateProviderHostAndNeverSendApiCredentials() {
         var requests = 0
         val transport = ArtworkTransport { request -> requests++; assertTrue(request.headers.isEmpty()); ArtworkResponse(200, byteArrayOf(1, 2), emptyMap()) }
@@ -124,39 +83,4 @@ class ArtworkNetworkTest {
         assertEquals(1, requests)
     }
 
-    @Test fun transportFailuresAndDebugDescriptionsDoNotExposeSecrets() {
-        val request = ArtworkRequest(URI("https://www.steamgriddb.com/api/v2/search?secret=PRIVATE"), mapOf("Authorization" to "SECRET"))
-        assertFalse(request.toString().contains("PRIVATE"))
-        assertFalse(request.toString().contains("SECRET"))
-        val provider = SteamGridDbProvider("PRIVATE", ArtworkTransport { throw IllegalStateException("PRIVATE https://example.invalid/?SECRET") })
-        val error = assertThrows(ArtworkProviderException::class.java) { provider.search("game", Platform.GBA) }
-        assertFalse(error.toString().contains("PRIVATE"))
-        assertFalse(error.toString().contains("SECRET"))
-        assertNull(error.cause)
-    }
-
-    @Test fun forgedOversizedJsonAndImageResponsesAreRejectedBeforeUse() {
-        val json = SteamGridDbProvider("key", ArtworkTransport { ArtworkResponse(200, ByteArray(2 * 1024 * 1024 + 1), emptyMap()) })
-        assertThrows(ArtworkProviderException::class.java) { json.search("game", Platform.GBA) }
-        assertThrows(ArtworkProviderException::class.java) {
-            ArtworkHttp.download(ArtworkCandidate("steamgriddb", "1", "https://cdn2.steamgriddb.com/grid/a.png"), ArtworkTransport {
-                ArtworkResponse(200, ByteArray(ArtworkHttp.MAX_IMAGE_BYTES + 1), emptyMap())
-            })
-        }
-        val redirect = SteamGridDbProvider("key", ArtworkTransport { ArtworkResponse(302, ByteArray(0), mapOf("Location" to "https://evil.invalid")) })
-        assertThrows(ArtworkProviderException::class.java) { redirect.search("game", Platform.GBA) }
-    }
-
-    @Test fun steamAllFormatsIsExplicitAndRetainsNonSquareArtworkChoices() {
-        var query = ""
-        val provider = SteamGridDbProvider("key", ArtworkTransport {
-            query = it.uri.rawQuery
-            response("""{"success":true,"data":[{"id":1,"url":"https://cdn2.steamgriddb.com/grid/a.png","width":600,"height":900}]}""")
-        })
-        val game = ArtworkGame("steamgriddb", "1", "game")
-        assertTrue(provider.images(game, Platform.GBA).isEmpty())
-        assertEquals(1, provider.imagesAllFormats(game, Platform.GBA).size)
-        assertFalse(query.contains("dimensions="))
-        assertTrue(query.contains("types=static"))
-    }
 }

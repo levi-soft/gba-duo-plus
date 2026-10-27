@@ -55,7 +55,8 @@ class GameSettingsActivity : PixelPage() {
 
         content.addView(label(getString(R.string.game_settings_artwork)), spaced(24))
         artworkState = note("", top = 8)
-        menuCard(R.drawable.ic_settings, Pixel.PINK, getString(R.string.artwork_find), "Libretro, SteamGridDB or a local image") { findOnline() }
+        menuCard(R.drawable.ic_settings, Pixel.PINK, getString(R.string.artwork_find), getString(R.string.artwork_pick_hint)) { findOnline() }
+        menuCard(R.drawable.ic_settings, Pixel.MINT, "Libretro / local image", "Find box art without an API key, or import an image") { findLibretro() }
         menuCard(R.drawable.ic_folders, Pixel.YELLOW, getString(R.string.artwork_match_folder), getString(R.string.artwork_match_needs_folder).takeIf { ArtworkPrefs.folderUri(this) == null } ?: getString(R.string.artwork_match_desc)) { matchFolder() }
         menuCard(R.drawable.ic_settings, Pixel.CORAL, getString(R.string.artwork_remove), getString(R.string.artwork_remove_desc)) { removeArtwork() }
         menuCard(R.drawable.ic_settings, Pixel.MINT, getString(R.string.artwork_auto), getString(R.string.artwork_auto_desc)) { backToAuto() }
@@ -86,6 +87,14 @@ class GameSettingsActivity : PixelPage() {
     }
 
     private fun findOnline() {
+        startActivity(Intent(this, ArtworkPickerActivity::class.java)
+            .putExtra(EXTRA_GAME_DIR, intent.getStringExtra(EXTRA_GAME_DIR))
+            .putExtra(EXTRA_TITLE, intent.getStringExtra(EXTRA_TITLE))
+            .putExtra(EXTRA_PLATFORM_ID, intent.getStringExtra(EXTRA_PLATFORM_ID))
+            .putExtra(EXTRA_CRC, crc))
+    }
+
+    private fun findLibretro() {
         val platform = platformId ?: return
         startActivity(
             Intent(this, com.khumam.gbaduo.artwork.ArtworkActivity::class.java)

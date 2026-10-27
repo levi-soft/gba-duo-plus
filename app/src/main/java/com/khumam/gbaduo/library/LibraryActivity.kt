@@ -18,8 +18,7 @@ import android.widget.Toast
 import androidx.recyclerview.widget.RecyclerView
 import com.khumam.gbaduo.R
 import com.khumam.gbaduo.BuildConfig
-import com.khumam.gbaduo.artwork.ArtworkBinder
-import com.khumam.gbaduo.artwork.ArtworkEntry
+import com.khumam.gbaduo.artwork.ArtworkRepository
 import com.khumam.gbaduo.artwork.ArtworkLibraryControls
 import com.khumam.gbaduo.achievements.RetroAchievements
 import com.khumam.gbaduo.companion.PackInstaller
@@ -56,7 +55,6 @@ class LibraryActivity : Activity() {
 
     private lateinit var library: RomLibrary
     private lateinit var carousel: CartridgeCarousel
-    private lateinit var artwork: ArtworkBinder
 
     private lateinit var recycler: RecyclerView
     private lateinit var pointer: TextView
@@ -106,8 +104,12 @@ class LibraryActivity : Activity() {
         forwardLegacyLaunch(intent)
         styleViews()
 
-        artwork = ArtworkBinder(this, library)
-        carousel = CartridgeCarousel(recycler, onSelected = ::showSelected, onPlay = { play() }, bindArtwork = artwork::bind)
+        carousel = CartridgeCarousel(recycler, onSelected = ::showSelected, onPlay = { play() })
+        // Copy legacy Plus covers once; the official loader renders the shared cache.
+        io.execute {
+            val hasArtwork = runCatching { ArtworkRepository(this).hasAnyArtwork() }.getOrDefault(false)
+            if (hasArtwork) runOnUiThread { if (!isDestroyed) carousel.reloadArtwork() }
+        }
         ArtworkLibraryControls.attach(actions as LinearLayout) { selectedEntry()?.let(::openGameSettings) }
         if (BuildConfig.SINGLE_SCREEN) com.khumam.gbaduo.player.singlescreen.SingleScreenLibraryChrome.attach(this)
 
@@ -246,7 +248,7 @@ class LibraryActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
-        artwork.refresh()
+        carousel.reloadArtwork()
         refresh()
         if (motion) blink.postDelayed(blinkStep, BLINK_MS)
     }
@@ -258,7 +260,7 @@ class LibraryActivity : Activity() {
     }
 
     override fun onDestroy() {
-        artwork.close()
+        carousel.release()
         io.shutdownNow()
         super.onDestroy()
     }

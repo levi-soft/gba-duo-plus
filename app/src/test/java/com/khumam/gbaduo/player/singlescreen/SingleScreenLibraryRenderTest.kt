@@ -3,14 +3,12 @@ package com.khumam.gbaduo.player.singlescreen
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Paint
-import android.graphics.RectF
 import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 import com.khumam.gbaduo.BuildConfig
 import com.khumam.gbaduo.R
-import com.khumam.gbaduo.artwork.ArtworkRenderer
 import com.khumam.gbaduo.library.LibraryActivity
 import com.khumam.gbaduo.library.ui.CartridgeView
 import com.khumam.gbaduo.library.ui.GraphPaperDrawable
@@ -42,7 +40,7 @@ class SingleScreenLibraryRenderTest {
         val controller = Robolectric.buildActivity(LibraryActivity::class.java).create().start().visible()
         val activity = controller.get()
         val root = activity.findViewById<ViewGroup>(R.id.root)
-        val bitmap = Bitmap.createBitmap(160, 160, Bitmap.Config.ARGB_8888)
+        val bitmap = Bitmap.createBitmap(160, 240, Bitmap.Config.ARGB_8888)
         try {
             activity.findViewById<OutlineText>(R.id.wordmark).text = "GBA DUO PLUS SS"
             if (!BuildConfig.SINGLE_SCREEN) SingleScreenLibraryChrome.attach(activity)
@@ -67,7 +65,8 @@ class SingleScreenLibraryRenderTest {
                 override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder {
                     val cart = CartridgeView(activity).apply {
                         layoutParams = RecyclerView.LayoutParams((236 * resources.displayMetrics.density).toInt(), -1)
-                        artworkRenderer = { canvas, bounds, _ -> ArtworkRenderer.draw(canvas, bounds, bitmap, true, resources.displayMetrics.density) }
+                        art = bitmap
+                        selectedCart = true
                     }
                     return object : RecyclerView.ViewHolder(cart) {}
                 }
@@ -80,8 +79,7 @@ class SingleScreenLibraryRenderTest {
             }
             val cart = shelf.getChildAt(0)
             assertNotNull(cart)
-            val cover = ArtworkRenderer.squareBounds(RectF(0f, 0f, cart.width.toFloat(), cart.height.toFloat()), 14f)
-            if (width >= height) assertTrue("Cover too small: $cover", cover.height() >= 140f)
+            if (width >= height) assertTrue("Cartridge too small", cart.height >= 140)
             val image = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
             val canvas = Canvas(image)
             GraphPaperDrawable(activity).apply { setBounds(0, 0, width, height); draw(canvas) }

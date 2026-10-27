@@ -26,25 +26,24 @@ class ArtworkHostIntegrationTest {
         view.draw(Canvas(it))
     }
 
-    @Test fun optionalArtworkDelegateCanHandleDrawingAndReceivesSelection() {
-        val cart = view().apply { selectedCart = true }
-        var called = false
-        cart.artworkRenderer = { canvas, area, selected ->
-            called = true
-            assertTrue(selected)
-            assertEquals(240f, area.width(), 0f)
-            assertEquals(300f, area.height(), 0f)
-            canvas.drawColor(Color.MAGENTA)
-            true
-        }
-        assertEquals(Color.MAGENTA, render(cart).getPixel(120, 150))
-        assertTrue(called)
-    }
-
-    @Test fun DecliningArtworkDelegatePreservesOriginalCartridgeDrawing() {
-        val original = render(view())
-        val fallback = render(view().apply { artworkRenderer = { _, _, _ -> false } })
-        assertTrue("No artwork must preserve the official cartridge rendering", original.sameAs(fallback))
+    @Test fun officialCartridgeKeepsPortraitArtInsideItsLabelAndRetainsShell() {
+        val portrait = Bitmap.createBitmap(64, 128, Bitmap.Config.ARGB_8888).apply { eraseColor(Color.MAGENTA) }
+        val cart = view().apply { art = portrait }
+        val rendered = render(cart)
+        val pixels = IntArray(rendered.width * rendered.height)
+        rendered.getPixels(pixels, 0, rendered.width, 0, 0, rendered.width, rendered.height)
+        val colored = pixels.indices.filter { pixels[it] == Color.MAGENTA }
+        assertTrue(colored.isNotEmpty())
+        val left = colored.minOf { it % rendered.width }
+        val right = colored.maxOf { it % rendered.width }
+        val top = colored.minOf { it / rendered.width }
+        val bottom = colored.maxOf { it / rendered.width }
+        assertTrue(left > 0 && right < rendered.width - 1 && top > 0 && bottom < rendered.height - 1)
+        assertEquals(0.5f, (right - left + 1f) / (bottom - top + 1f), 0.03f)
+        val plain = render(view())
+        assertFalse(plain.sameAs(rendered))
+        assertEquals(plain.getPixel(20, 150), rendered.getPixel(20, 150))
+        plain.recycle(); rendered.recycle(); portrait.recycle()
     }
 
     @Test @Config(qualifiers = "w320dp-h480dp")

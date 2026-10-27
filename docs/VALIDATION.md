@@ -1,3 +1,21 @@
+# 0.1.8-plus.2 artwork correction (2026-10-27)
+
+The 0.1.8-plus.1 Game settings action launched the Plus picker without raw ROM size; the picker rejected the missing value and finished before either provider searched. A regression test reproduced this failure before the fix. Libretro/local import now accepts unknown size while keeping platform/CRC and explicit-size bounds.
+
+The final integration uses the official SteamGridDB search, download, key editor and cartridge renderer. The duplicate Plus SteamGridDB provider, source-settings Activity, square renderer, image binder and remove-cover control are deleted. Libretro and local import remain separate additions. Shared encrypted credentials, artwork migration and atomic shared storage remain in place.
+
+- Regular Release: **88/88 tests passed**, including actual Game settings entry actions, Libretro search/preview/apply, official SteamGridDB search/select/download/storage with injected HTTP responses, missing-key routing, official portrait rendering, storage/migration, game settings and upgrade fixtures.
+- SS Debug: **117/117 tests passed**, including the artwork/SteamGridDB suites and Single Screen layout/render tests. The SS library capture now uses the official cartridge image property.
+- Both Release APKs passed R8, release lint, build, existing-certificate signing, alignment and package audit. Android versionCode is 15; Builder remains 1.1.5.
+- `CartridgeView.kt` and `CartridgeCarousel.kt` are byte-for-byte the pinned official v0.1.8 sources. The library uses the official image loader and copies legacy Plus covers into the shared cache on a worker before refreshing.
+- During validation, an initial full-flow fixture used an image below the official encoder's 64-pixel minimum and was corrected. SS render harness tests were moved from Release to their supported Debug test task; the Release-only attempt could not resolve the test Activity. No production validation limits or screenshot tolerances were loosened.
+
+Thor network checks: in-place updates retained all 15 library entries. Libretro downloaded a cover, opened its direct preview and applied it to the library. After the user saved a SteamGridDB key on the device, the consolidated official picker searched Fire Emblem, loaded cover thumbnails and downloaded/applied a selected cover to the library. The key survived removal of the duplicate Plus settings screen. No credentials were extracted or included in artifacts. These live network checks were performed on the regular edition; SS shares the paths and has automated coverage. Local Android document-picker import and bulk scraping were not re-run in this hotfix pass.
+
+Historical validation follows.
+
+---
+
 # 0.1.8 upgrade validation (2026-10-27)
 
 Source is based on official v0.1.8 (8832d19), with regular/SS versionCode 14. Builder remains 1.1.5.

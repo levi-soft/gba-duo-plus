@@ -6,13 +6,13 @@ GBA Duo made the central idea possible: play Game Boy Advance, Game Boy Color an
 
 Maintained by [levi-soft](https://github.com/levi-soft), Plus adds automatic companion creation, selectable library covers, additional pixel-art shaders, persistent control preferences, companion navigation for supported games and an optional GBA Duo Studio connection. It extends the official RetroAchievements client and adopts controller mapping, per-game settings, color correction and artwork settings from GBA Duo 0.1.8.
 
-**Current source version:** `0.1.8-plus.1` · **Upstream base:** `v0.1.8` · **License:** [GPL v3](LICENSE)
+**Current source version:** `0.1.8-plus.2` · **Upstream base:** `v0.1.8` · **License:** [GPL v3](LICENSE)
 
-**[Download GBA Duo Plus 0.1.8-plus.1 — APK and release notes](https://github.com/levi-soft/gba-duo-plus/releases/tag/v0.1.8-plus.1)**
+**[Download GBA Duo Plus 0.1.8-plus.2 — APK and release notes](https://github.com/levi-soft/gba-duo-plus/releases/tag/v0.1.8-plus.2)**
 
 **Companion tools:** [GBA Duo Companion Builder — build from your ROM](https://levi-soft.github.io/gba-duo-companion-builder/) · [Builder source](https://github.com/levi-soft/gba-duo-companion-builder) · [GBA Duo Studio — visual pack editor](https://github.com/levi-soft/gba-duo-studio)
 
-**[Full Plus feature guide in Vietnamese](docs/PLUS-FEATURES.vi.md)** · [0.1.8-plus.1 release details](docs/RELEASE-0.1.8-plus.1.md)
+**[Full Plus feature guide in Vietnamese](docs/PLUS-FEATURES.vi.md)** · [0.1.8-plus.2 release details](docs/RELEASE-0.1.8-plus.2.md)
 
 **Website:** [GBA Duo Plus](https://levi-soft.github.io/gba-duo-plus/) ·
 [GBA Duo Plus SS for phones, tablets and foldables](https://levi-soft.github.io/gba-duo-plus/single-screen/) ·
@@ -20,11 +20,15 @@ Maintained by [levi-soft](https://github.com/levi-soft), Plus adds automatic com
 
 **Single Screen edition:** [GBA Duo Plus SS](docs/SINGLE-SCREEN.md)
 embeds game and companion on one display, with portrait/landscape touch controls.
-It is a separate installable build in the same [Plus.1 release](https://github.com/levi-soft/gba-duo-plus/releases/tag/v0.1.7-plus.4).
+It is a separate installable build in the same [Plus.2 release](https://github.com/levi-soft/gba-duo-plus/releases/tag/v0.1.8-plus.2).
 The default Plus build retains dual-screen behavior. See the SS guide for device
 validation and known startup limits.
 
 [Tiếng Việt](README.vi.md) · [Features](#features) · [Comparison](docs/FEATURES.md) · [Build](docs/BUILDING.md) · [Launchers](docs/LAUNCHERS.md) · [Studio](docs/STUDIO-CONNECTION.md) · [Credits](CREDITS.md)
+
+## New in 0.1.8-plus.2
+
+Fixes artwork selection from Game settings and removes the duplicate Plus SteamGridDB client/settings page. SteamGridDB uses the official picker and one shared key editor; Plus retains Libretro and local image import. [Hotfix details](docs/RELEASE-0.1.8-plus.2.md).
 
 ## New in 0.1.8-plus.1
 
@@ -90,7 +94,7 @@ FE6 T-EN is original FE6; Vietnamese Remastered is an FE8-based hack. Other ROM 
 
 | Area | Plus behavior |
 |---|---|
-| Library artwork | Select square covers from a SteamGridDB gallery, import a local PNG/JPEG/WebP, or use the default no-account Libretro source for lookup and missing-artwork scraping. Covers are stored locally, retain aspect ratio and keep the original cartridge drawing as fallback. [Setup and extension boundary](docs/ARTWORK.md). |
+| Library artwork | Uses the official SteamGridDB picker, image loader and cartridge cover layout. Plus adds local PNG/JPEG/WebP import and no-key Libretro lookup/missing-artwork scraping. Selected covers remain in the shared local cache. [Setup and extension boundary](docs/ARTWORK.md). |
 | RetroAchievements | Retains the official 0.1.8 [rcheevos](https://github.com/RetroAchievements/rcheevos) client and adds encrypted token storage, achievement-list UI and save-state progress sidecars. Account sign-in, ROM recognition and the underlying client come from the official integration. |
 | Achievement presentation | Automatic sign-in/game notices, game image and unlocked/total count; bottom-right unlock popups with a 70% background opacity. Unsupported ROMs show a no-achievements notice. |
 | Pixel-art shaders | **xBRZ, HQ2x and ScaleFX**, adapted from the Libretro GLSL shader collection with original notices retained. |
@@ -116,7 +120,7 @@ See [the detailed baseline comparison](docs/FEATURES.md). Credit for algorithms,
 
 ## Getting started
 
-1. Download the signed **[0.1.8-plus.1 APK](https://github.com/levi-soft/gba-duo-plus/releases/tag/v0.1.7-plus.4)**, or [build from source](docs/BUILDING.md). Upstream APKs are the official edition, not Plus.
+1. Download the signed **[0.1.8-plus.2 APK](https://github.com/levi-soft/gba-duo-plus/releases/tag/v0.1.8-plus.2)**, or [build from source](docs/BUILDING.md). Upstream APKs are the official edition, not Plus.
 2. Open Plus and grant access to your own ROM folder using Android's folder picker. Supported inputs include `.gba`, `.gbc`, `.gb` and supported ZIP archives.
 3. Choose a game. Open the in-game menu with L2/BACK for save states, shader selection, Swap A/B and RetroAchievements.
 4. Open the game's Companion menu and choose **Find and create companion**, or import and assign a compatible ZIP. The [Builder website](https://levi-soft.github.io/gba-duo-companion-builder/) can also create ZIPs locally. Packs remain separate from the emulator.

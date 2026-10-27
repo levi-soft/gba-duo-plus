@@ -8,18 +8,22 @@ dạng pack, Lua và hệ thống giao diện CSS. Đây là nền tảng của 
 thông tin tác giả và các thông báo bản quyền gốc được giữ lại.
 
 Plus do [levi-soft](https://github.com/levi-soft) duy trì, phát triển thêm trên
-nền GBA Duo chính thức **v0.1.7**. Đây là bản fork độc lập, không phải bản phát
+nền GBA Duo chính thức **v0.1.8**. Đây là bản fork độc lập, không phải bản phát
 hành chính thức hay dự án được tác giả gốc bảo trợ.
 
-**Phiên bản mã nguồn:** `0.1.7-plus.4` · **Giấy phép:** [GPL v3](LICENSE)
+**Phiên bản mã nguồn:** `0.1.8-plus.2` · **Giấy phép:** [GPL v3](LICENSE)
 
-**[Tải GBA Duo Plus 0.1.7-plus.4 — APK và thông tin phát hành](https://github.com/levi-soft/gba-duo-plus/releases/tag/v0.1.7-plus.4)**
+**[Tải GBA Duo Plus 0.1.8-plus.2 — APK và thông tin phát hành](https://github.com/levi-soft/gba-duo-plus/releases/tag/v0.1.8-plus.2)**
 
 **[GBA Duo Companion Builder — tạo companion từ ROM](https://levi-soft.github.io/gba-duo-companion-builder/)** · [Mã nguồn Builder](https://github.com/levi-soft/gba-duo-companion-builder) · [GBA Duo Studio — thiết kế companion trực quan](https://github.com/levi-soft/gba-duo-studio)
 
-**[Giới thiệu đầy đủ tính năng Plus và hướng dẫn sử dụng](docs/PLUS-FEATURES.vi.md)** · [Chi tiết bản 0.1.7-plus.4](docs/RELEASE-0.1.7-plus.4.md)
+**[Giới thiệu đầy đủ tính năng Plus và hướng dẫn sử dụng](docs/PLUS-FEATURES.vi.md)** · [Chi tiết bản 0.1.8-plus.2](docs/RELEASE-0.1.8-plus.2.md)
 
 [English](README.md) · [So sánh tính năng](docs/FEATURES.md) · [Hướng dẫn build](docs/BUILDING.md) · [Tri ân và tác giả](CREDITS.md)
+
+## Mới trong 0.1.8-plus.2
+
+Sửa lỗi mở màn ảnh bìa từ Game settings. SteamGridDB dùng phần tìm, tải và cài đặt của bản chính thức; đã bỏ client và màn nhập key trùng của Plus. Plus giữ Libretro và nhập ảnh cục bộ. [Chi tiết bản vá](docs/RELEASE-0.1.8-plus.2.md).
 
 ## Mới trong 0.1.7-plus.4
 

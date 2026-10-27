@@ -1,5 +1,7 @@
 package com.khumam.gbaduo.settings
 
+import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import android.text.InputType
 import android.view.View
@@ -41,6 +43,9 @@ class SteamGridDbActivity : PixelPage() {
             visibility = View.GONE
         }
         content.addView(keyStatus, spaced(14))
+        content.addView(button("Get SteamGridDB API key", Pixel.LAVENDER) {
+            runCatching { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://www.steamgriddb.com/profile/preferences/api"))) }
+        }, spaced(16))
         focusFirst(test)
     }
 

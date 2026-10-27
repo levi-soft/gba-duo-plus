@@ -1,11 +1,11 @@
 # GBA Duo Plus: tính năng và bộ công cụ companion
 
-**GBA Duo Plus 0.1.8-plus.1** là bản fork cộng đồng do [levi-soft](https://github.com/levi-soft)
+**GBA Duo Plus 0.1.8-plus.2** là bản fork cộng đồng do [levi-soft](https://github.com/levi-soft)
 duy trì trên nền [GBA Duo v0.1.8 của khumam](https://github.com/khumam/gba-duo).
 Ứng dụng dành cho thiết bị Android hai màn hình, Android 11 trở lên, ARM64.
 Thiết bị phát triển chính là AYN Thor; các máy hai màn hình khác cần kiểm tra riêng.
 
-**[Tải APK và đọc ghi chú phát hành](https://github.com/levi-soft/gba-duo-plus/releases/tag/v0.1.8-plus.1)** ·
+**[Tải APK và đọc ghi chú phát hành](https://github.com/levi-soft/gba-duo-plus/releases/tag/v0.1.8-plus.2)** ·
 [Website Companion Builder](https://levi-soft.github.io/gba-duo-companion-builder/) ·
 [GBA Duo Studio](https://github.com/levi-soft/gba-duo-studio)
 
@@ -66,9 +66,9 @@ FE6 T-EN là FE6 gốc; FE6 Remastered Việt hóa là mod trên nền FE8. Void
 ## 3. Ảnh bìa thư viện game
 
 - **Libretro:** nguồn mặc định, tìm ảnh không cần tài khoản hoặc API key.
-- **SteamGridDB:** tìm và chọn ảnh trong gallery bằng API key riêng của bạn.
+- **SteamGridDB:** dùng phần tìm/chọn/tải ảnh của bản chính thức bằng API key riêng của bạn. Không còn client hay màn nhập key riêng của Plus.
 - **Ảnh trên máy:** nhập PNG, JPEG hoặc WebP.
-- Tìm ảnh cho các game còn thiếu; cấu hình tại **Settings → Artwork sources**.
+- Tìm ảnh cho các game còn thiếu tại **Settings → Scraping**; cấu hình SteamGridDB tại **Providers → SteamGridDB**.
 - Ảnh lưu trên thiết bị, dùng lại ngoại tuyến và giữ tỷ lệ; hình cartridge gốc
   là phương án hiển thị khi chưa có ảnh bìa.
 - Có thể hủy tìm ảnh; việc thay ảnh được chuẩn bị trước khi ghi nhận kết quả.
@@ -143,11 +143,11 @@ RAM cho pack. Plus giữ nền tảng và lịch sử gốc này.
 
 Plus có package riêng `com.khumam.gbaduo.plus`, cài song song với bản chính thức.
 Save, cài đặt, quyền thư mục và tài khoản của hai ứng dụng không tự chuyển qua lại.
-Bản này không có chế độ chơi trên điện thoại một màn hình đã bị hủy.
+Bản Plus thường dùng hai màn hình. [Plus SS](SINGLE-SCREEN.md) là APK riêng dành cho điện thoại, tablet và màn gập, phát hành cùng phiên bản.
 
 ## 9. Bản phát hành và kiểm chứng
 
-[Release 0.1.7-plus.4](https://github.com/levi-soft/gba-duo-plus/releases/tag/v0.1.8-plus.1)
+[Release 0.1.7-plus.2](https://github.com/levi-soft/gba-duo-plus/releases/tag/v0.1.7-plus.2)
 cung cấp APK ARM64 đã ký và SHA-256. APK được build từ source công bố, bao gồm
 các sửa lỗi hủy/tạo pack và ảnh bìa từ đợt rà soát cuối. Mã phiên bản Android là `10`.
 

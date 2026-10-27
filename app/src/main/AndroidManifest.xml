@@ -49,8 +49,6 @@
         <activity android:name=".settings.SettingsActivity" android:exported="false" />
         <activity android:name=".artwork.ArtworkActivity" android:exported="false"
             android:windowSoftInputMode="adjustResize|stateHidden" />
-        <activity android:name=".artwork.ArtworkSettingsActivity" android:exported="false"
-            android:windowSoftInputMode="adjustResize|stateHidden" />
         <activity android:name=".settings.RomFoldersActivity" android:exported="false" />
         <activity android:name=".settings.AboutActivity" android:exported="false" />
         <activity android:name=".companion.builder.AutomaticCompanionActivity"

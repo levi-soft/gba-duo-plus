@@ -44,8 +44,8 @@ class ScrapingActivity : PixelPage() {
         val (providers, summary) = menuCard(R.drawable.ic_folders, Pixel.YELLOW,
             getString(R.string.providers_title), "") { startActivity(Intent(this, ProvidersActivity::class.java)) }
         providersSummary = summary
-        menuCard(R.drawable.ic_settings, Pixel.MINT, "Libretro artwork", "Find missing covers without an API key, or configure Plus sources") {
-            startActivity(Intent(this, com.khumam.gbaduo.artwork.ArtworkSettingsActivity::class.java))
+        menuCard(R.drawable.ic_settings, Pixel.MINT, "Libretro artwork", "Find missing covers without an API key") {
+            com.khumam.gbaduo.artwork.ArtworkBatch.show(this)
         }
 
         content.addView(label(getString(R.string.scraping_run_label)), spaced(28))
