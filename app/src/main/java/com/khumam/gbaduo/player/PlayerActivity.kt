@@ -18,6 +18,8 @@ import com.khumam.gbaduo.R
 import com.khumam.gbaduo.BuildConfig
 import com.khumam.gbaduo.achievements.RetroAchievements
 import com.khumam.gbaduo.achievements.AchievementPopups
+import com.khumam.gbaduo.companion.WideControl
+import com.khumam.gbaduo.debug.StudioConnectionSettings
 import com.khumam.gbaduo.companion.CompanionActivity
 import com.khumam.gbaduo.companion.CompanionController
 import com.khumam.gbaduo.companion.CompanionPlacement
@@ -26,13 +28,17 @@ import com.khumam.gbaduo.companion.CompanionSettings
 import com.khumam.gbaduo.companion.PackFingerprint
 import com.khumam.gbaduo.companion.PackManifest
 import com.khumam.gbaduo.companion.PackStore
+import com.khumam.gbaduo.emu.AspectSettings
 import com.khumam.gbaduo.emu.AudioOut
 import com.khumam.gbaduo.emu.ColorSettings
 import com.khumam.gbaduo.emu.EmuThread
 import com.khumam.gbaduo.emu.GameView
 import com.khumam.gbaduo.emu.InputMapper
+import com.khumam.gbaduo.emu.PerfOverlaySettings
+import com.khumam.gbaduo.emu.ScaleSettings
 import com.khumam.gbaduo.emu.ShaderPreset
 import com.khumam.gbaduo.emu.ShaderSettings
+import com.khumam.gbaduo.emu.TiltShiftSettings
 import com.khumam.gbaduo.library.GameTitle
 import com.khumam.gbaduo.library.RomArchive
 import com.khumam.gbaduo.library.RomHeader
@@ -65,6 +71,7 @@ class PlayerActivity : Activity() {
     private var singleScreen: SingleScreenPlayerHost? = null
     private var startupTasks: StartupTasks? = null
     private var singleScreenActions: SingleScreenQuickActions? = null
+    private var perfOverlay: PerfOverlayView? = null
 
     /**
      * Whether this is Android's top resumed activity: the one on the top focused display,
@@ -74,11 +81,7 @@ class PlayerActivity : Activity() {
      */
     private var topResumed = false
 
-    private val prefs by lazy { getSharedPreferences("player", MODE_PRIVATE) }
     private var savedShader = ShaderPreset.OFF
-    private var savedSwapAb: Boolean
-        get() = prefs.getBoolean("swap_ab", false)
-        set(value) = prefs.edit().putBoolean("swap_ab", value).apply()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -176,10 +179,17 @@ class PlayerActivity : Activity() {
         savedShader = ShaderSettings.forGame(this, storage.settings)
         gameView.setShader(savedShader)
         gameView.setColorCorrection(ColorSettings.forGame(this, storage.settings))
+        gameView.setIntegerScaling(ScaleSettings.integer(this))
+        gameView.setAspectRatio(AspectSettings.default(this))
+        gameView.setTiltShift(TiltShiftSettings.default(this))
         RetroAchievements.init(this)
         achievementPopups = AchievementPopups(findViewById(android.R.id.content) as android.widget.FrameLayout).also { it.attach() }
-        singleScreen?.setGameAspect(if (header.platform == Platform.GBA) 1.5f else 160f / 144f)
+        singleScreen?.setGameSize(if (header.platform == Platform.GBA) 240 else 160,
+            if (header.platform == Platform.GBA) 160 else 144)
         emu = EmuThread(rom.bytes, storage.saveFile.absolutePath, gameView, audioOut, input)
+        StudioConnectionSettings.applyTo(this, emu)
+        emu.wideEnabled = storage.settings.getString(GameSettingsKeys.WIDE) == GameSettingsKeys.WIDE_ON
+        syncSingleScreenDisplayOptions()
         if (singleScreen != null) singleScreenActions = SingleScreenQuickActions(
             ready = { emu.loaded }, submit = { path, save, done -> emu.requestState(path, save, done) },
             path = SaveStates(storage).slotPath(0)
@@ -197,6 +207,8 @@ class PlayerActivity : Activity() {
             if (BuildConfig.SINGLE_SCREEN) audioOut.release()
         }
         emu.start()
+        perfOverlay = PerfOverlayView(findViewById(android.R.id.content) as android.widget.FrameLayout, PerfOverlaySettings.default(this)) { emu.framesRun }
+            .also { it.attach() }
 
         // The quick menu and companion screen talk to the core, so wait until the emu thread has loaded it.
         waitForLoadThenSetUp(gameView, header, crc32, storage)
@@ -210,6 +222,23 @@ class PlayerActivity : Activity() {
         // Debug singleTask keeps one native core owner. Recreate destroys the old
         // emulation session before onCreate starts another ROM.
         if (!sameRom) recreate()
+    }
+
+    /** Wide view on or off for this game (from the companion screen's button), kept in the game's settings. */
+    private fun setWide(on: Boolean, storage: GameStorage) {
+        if (on && !emu.wideAvailable) {
+            Toast.makeText(this, R.string.wide_unavailable, Toast.LENGTH_SHORT).show()
+            return
+        }
+        storage.settings.put(GameSettingsKeys.WIDE, if (on) GameSettingsKeys.WIDE_ON else null)
+        emu.wideEnabled = on
+        syncSingleScreenDisplayOptions()
+        emu.requestSnapshot()
+    }
+
+    private fun syncSingleScreenDisplayOptions() {
+        singleScreen?.setDisplayOptions(AspectSettings.default(this), ScaleSettings.integer(this),
+            wide = emu.wideEnabled && emu.wideAvailable)
     }
 
     private fun waitForLoadThenSetUp(gameView: GameView, header: RomHeader, crc32: Long, storage: GameStorage) {
@@ -228,10 +257,16 @@ class PlayerActivity : Activity() {
                         emu = emu,
                         states = SaveStates(storage),
                         initialShader = savedShader,
-                        initialSwapAb = savedSwapAb,
-                        onSwapAb = { savedSwapAb = it; ControlPrefs.save(this@PlayerActivity, input.swapAbButtons()) },
+                        initialTilt = TiltShiftSettings.default(this@PlayerActivity),
+                        initialIntegerScaling = ScaleSettings.integer(this@PlayerActivity),
                         onSetFfSpeed = { emu.ffMultiplier = it },
                         onSetShader = { savedShader = it; storage.settings.put(GameSettingsKeys.SHADER, it.id); gameView.setShader(it) },
+                        onSetTiltShift = { TiltShiftSettings.setDefault(this@PlayerActivity, it); gameView.setTiltShift(it) },
+                        onSetIntegerScaling = {
+                            ScaleSettings.setInteger(this@PlayerActivity, it)
+                            gameView.setIntegerScaling(it)
+                            syncSingleScreenDisplayOptions()
+                        },
                         onQuit = { finish() },
                         onAchievements = { done -> RetroAchievements.show(this@PlayerActivity, done) },
                     )
@@ -315,7 +350,9 @@ class PlayerActivity : Activity() {
         // Taps on the companion screen reach the pack's Lua through the emu thread.
         emu.onActionResult = { result -> runOnUiThread { companionScreen?.applyScriptResult(result) } }
         controller.onUiChange = emu::setUiState
-        controller.onScriptCall = emu::callAction
+        controller.onScriptCall = { name, args ->
+            if (WideControl.handles(name)) setWide(WideControl.next(emu.wideEnabled, args), storage) else emu.callAction(name, args)
+        }
         emu.setUiState(controller.uiState)
     }
 
@@ -394,7 +431,10 @@ class PlayerActivity : Activity() {
         if (!companionDrawQueued.compareAndSet(false, true)) return
         companionHandler.post {
             companionDrawQueued.set(false)
-            if (!isFinishing && input.peekKeys() and directionMask == 0) latestCompanionSnapshot.take()?.let { companionScreen?.update(it) }
+            if (!isFinishing && input.peekKeys() and directionMask == 0) latestCompanionSnapshot.take()?.let {
+                syncSingleScreenDisplayOptions()
+                companionScreen?.update(it)
+            }
         }
     }
 
@@ -491,6 +531,7 @@ class PlayerActivity : Activity() {
         companionScreen?.close()
         achievementPopups?.detach()
         playerNotes?.remove()
+        perfOverlay?.detach()
         if (::emu.isInitialized) {
             emu.shutdown()
             emu.join(1000)

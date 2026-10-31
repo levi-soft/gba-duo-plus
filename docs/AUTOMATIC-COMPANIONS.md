@@ -4,15 +4,29 @@ This feature belongs to GBA Duo Plus. It is not attributed to, or advertised as 
 
 ## Player flow
 
-In the library, select a game, open its Companion menu and choose **Find and create companion**. Plus looks up the actual ROM game code and CRC32 in the published catalogue, downloads a compatible builder and creates a companion using the ROM on the device. It then installs and selects the generated pack. The original ROM and its identity remain unchanged.
+In the library, select a game, open its Companion menu and choose **Get from the web…**. This official catalog page also offers **Create companion** when a creation profile matches the actual ROM game code and CRC32. There is no separate creation entry in the Companion menu. Ready-made ZIPs use the official downloader; selecting a matching creation profile runs the local builder using the ROM on the device. The original ROM and its identity remain unchanged.
+
+Opening the catalog fetches profile metadata without preparing the ROM or
+downloading the builder bundle. Those steps happen after selecting Create.
+Official pack browsing and creation-profile discovery report failures
+independently, so one source does not hide the other.
 
 Your ROM is never uploaded. The downloaded builder is cached and verified again before offline reuse. Only exact ROM profiles in the catalogue are supported; an unsupported ROM can still use manual ZIP import. The [website](https://levi-soft.github.io/gba-duo-companion-builder/) offers the same builder with ZIP/project downloads for manual use and [GBA Duo Studio](https://github.com/levi-soft/gba-duo-studio).
 
 Automatic packs use a stable ID for each source profile and exact ROM. Creating
-the same companion again updates its installed copy, with the old pack and
-assignment restored if commit fails. A selected automatic pack made by older
+the same companion again updates its installed copy. A failed installation
+commit restores the previous pack; assignment failure preserves the previous
+assignment but can leave the new pack installed. A selected automatic pack made by older
 Plus versions (UUID ID) is updated in place. Custom/manual IDs stay separate.
-Cancelling or failing creation leaves the previous assignment in place.
+Cancelling or failing creation before commit leaves the previous assignment in
+place. Creation returns its installed pack to the catalog and library; the final
+assignment is accepted only for the original game/selection. If a page closes
+after an installation has already committed, the pack can remain installed
+without being newly assigned.
+
+Official ZIP downloads retain the official installer. Closing the page prevents
+a late result from being assigned, but installation already underway can finish
+and leave its pack installed or updated.
 
 The Companion menu shows versions and disambiguates identical names/versions by
 ID. Choose **Manage installed packs…**, select a pack, then confirm **Delete pack**
@@ -28,7 +42,7 @@ preserves the old assignment without needing free space for a rollback write.
 
 - `plus/src/main/java/.../companion/builder/`: catalogue, bounded ROM staging, verified download/cache, isolated local WebView runner, cancellation and installation transaction.
 - `plus/src/main/res`: the Plus entry's resources and translations.
-- Host integration: a menu item delegating to `AutomaticCompanionEntry`, private Activity registration and JavaScript bridge keep rules. These edits are inventoried in `plus/upstream.json`.
+- Host integration: the existing Get from the web action carries immutable ROM identity into the official catalog; a Plus helper supplies exact-ROM creation discovery and a result-based launch. Private Activity registration and JavaScript bridge keep rules serve the local engine. These edits are inventoried in `plus/upstream.json`.
 - This feature bundles no game assets, ROM profiles or game-specific builder readers into the APK. Profiles and authored UI are delivered by the external builder catalogue; game-owned images/text are prepared locally from the player's ROM.
 
 The native download component uses HTTPS with same-origin catalogue/bundle rules, explicit byte/file limits and SHA-256 verification. Builder execution uses a private HTTPS origin, serves only the staged bundle and a single ROM route, blocks external requests/navigation, and exposes only the bounded build protocol. Catalogue HTTPS is the publisher trust boundary; SHA-256 detects bundle mismatch but is not an independent publisher signature.

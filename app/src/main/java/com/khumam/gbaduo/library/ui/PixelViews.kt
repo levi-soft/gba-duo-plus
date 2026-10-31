@@ -1,5 +1,6 @@
 package com.khumam.gbaduo.library.ui
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Paint
@@ -37,6 +38,9 @@ object Fonts {
  * A button that presses in: an ink-outlined face with a hard shadow; while pressed the
  * whole view moves into the shadow's place and the shadow disappears (DESIGN.md "Buttons").
  */
+// PixelPage and LibraryActivity are platform Activities; this button owns its
+// drawable, font and colors directly rather than using AppCompat tint inflation.
+@SuppressLint("AppCompatCustomView")
 class PixelButton @JvmOverloads constructor(
     context: Context,
     attrs: AttributeSet? = null,

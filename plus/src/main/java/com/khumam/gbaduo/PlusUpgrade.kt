@@ -20,6 +20,8 @@ object PlusUpgrade {
         val controls = context.getSharedPreferences("controls", Context.MODE_PRIVATE)
         val existingInstall = old.contains("swap_ab") || old.contains("shader_id") || File(context.filesDir, "games").isDirectory
         if (existingInstall && !controls.contains("scheme")) {
+            // Retired quick-menu setting: read once into upstream's controller mapping.
+            // A saved controller scheme always wins; the old flag is never an active setting.
             val swap = old.getBoolean("swap_ab", false)
             ControlPrefs.save(context, ControlScheme.DEFAULT.copy(buttons = ControlScheme.DEFAULT.buttons + mapOf(
                 GbaKeys.A to if (swap) KeyEvent.KEYCODE_BUTTON_A else KeyEvent.KEYCODE_BUTTON_B,

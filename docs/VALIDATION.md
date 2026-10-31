@@ -1,3 +1,131 @@
+# 0.1.9-plus.2 validation (2026-10-31)
+
+Official baseline remains v0.1.9
+(`61582fcb5e07d98b19675e75e9bde532a7c68c4c`). This candidate consolidates
+official downloads and exact-ROM creation in Get from the web. The checks below
+were completed locally before publication. Hosted checks for the published
+commit are listed in [GitHub Actions](https://github.com/levi-soft/gba-duo-plus/actions).
+
+- Regular Debug: **662/662** tests, 90 suites.
+- SS Debug: **662/662** tests, 90 suites.
+- Focused regular Release: **435/435** tests, 59 suites.
+- All three JVM gates have zero failures, errors and skipped tests.
+- Boundary/profile contracts: **5/5** Node checks. The inventory has 50 upstream
+  integration files and 65 Plus extension files.
+
+The new tests cover the actual catalog Activity with controlled HTTP/creator
+dependencies, including independent failures, late metadata, duplicate actions,
+ZIP installation, source-bound results and lifecycle cancellation. The creator
+Activity fixture exercises staging, verified distribution resolution, WebView
+bridge output, installation and its result-only return. Library result tests
+cover nonce/source/manifest checks and partial final-assignment write failure.
+The first focused build exposed protected-method calls in the test code; those
+calls were corrected before the passing gates above. No production API visibility
+was relaxed for tests.
+
+The official PackDownloader and PackUpdates implementations remain unchanged.
+Closing the catalog prevents late assignment, but an official installation
+already underway can complete. Likewise, a creation installation already
+committed can remain installed without a new assignment if its parent closes.
+These limits do not imply rollback after a successful installation commit.
+
+Both editions passed signed assembleRelease, R8, release lint, signature and
+package audits with versionCode 19 and the existing certificate. Native source
+and native harness files are unchanged from the preceding plus.1 candidate;
+its 326 ASan/UBSan checks remain prior evidence, not a new native test run.
+
+On AYN Thor, both APKs installed in place with unchanged first-install timestamps
+and matching installed APK hashes. Both thirty-game libraries retained folder
+access. The separate creation row is absent in both menus; Get from the web
+shows the matching creation profile on the official catalog page.
+
+- Regular: Maiden was created from its ZIP ROM, installed and selected on return
+  to the library. Repeating creation used the same automatic ID without adding a
+  duplicate. Cancelling the existing-pack confirmation preserved the original
+  selection. The original manual pack remained separate and was reselected.
+- SS: Back during creation startup returned to the catalog and left The Last
+  Promise unassigned. A subsequent full creation installed its matching pack;
+  selection was checked explicitly in The Last Promise's menu. Unexpected
+  navigation to Project Ember occurred between captures during this attempt;
+  its cause was not established, and this run does not claim to fix it.
+- Only the two packs generated for these tests were removed through installed
+  pack management. Original assignments and library positions 29/28 were
+  restored. Studio Connection remained Off in both editions. Temporary stay-on
+  was restored to 0, no Studio forward/socket remained, and Cocoon stayed
+  uninstalled as requested.
+- All seven backed-up public save/state files retained their exact SHA-256
+  hashes. No game session or state load was started during these creation tests.
+
+The live official catalog was browsed on Thor. It contained no matching official
+Fire Emblem ZIP, so a real matching official ZIP download was not performed on
+the device. Controlled host tests exercise that installation/result path using
+the unchanged official downloader. This is discovery/creation validation on two
+ROMs, not a new thirty-companion gameplay acceptance run. The web/PC Builder and
+the thirty companion profiles were not modified by this change.
+
+Historical validation follows.
+
+---
+
+# 0.1.9-plus.1 test candidate (2026-10-31)
+
+Official baseline: v0.1.9 (`61582fcb5e07d98b19675e75e9bde532a7c68c4c`).
+Regular and SS use versionCode 18 and the existing release signing certificate.
+Both signed candidates passed assembleRelease, R8, release lint and package
+audits. No GitHub publication or hosted CI run was performed for this candidate.
+
+- Regular Debug: **622/622** tests, 87 suites.
+- SS Debug: **622/622** tests, 87 suites.
+- Focused regular Release: **395/395** tests, 56 suites.
+- All JVM gates have zero failures, errors and skipped tests.
+- Native ASan/UBSan: **326/326** checks (50 Wide, 276 Lua/write-boundary checks).
+  The subsequent Studio Settings change does not alter native sources.
+- Boundary/profile contracts: **5/5** Node checks. The integration inventory has
+  49 upstream application files and 64 Plus extension files.
+
+On AYN Thor, in-place installation retained the thirty-game library, existing
+folder access, companion assignment and saved official control mapping. Button
+Mapping/Hotkeys remain available; the separate physical Swap A/B option is gone.
+Seven backed-up save/state files were checked after installation and testing;
+the regular edition's temporary Maiden fixture SRAM was restored from the fresh
+pre-test backup and then synchronized through game startup and normal quit.
+
+With game writes Off, real Maiden map-marker and roster taps moved the native
+cursor to Dolom (11,11) and Orion (1,4). RAM observations confirmed D-pad pulses,
+arrival of cursor/display coordinates, no A or other game-button pulse and
+unchanged unit positions, HP and inventory. This is a controlled Maiden test,
+not new thirty-ROM gameplay acceptance. xBRZ, HQ2x and ScaleFX rendered with the
+official Light tilt/integer viewport; one settled ScaleFX capture showed 59 FPS.
+That capture is not a general performance benchmark. SS booted without an
+assigned companion and cycled all three layouts while retaining its native
+session; an assigned live SS companion and physical rotation were not retested.
+
+Cocoon 3.11 imported all three additive GB/GBC/GBA profiles through its own UI.
+Plus, Plus SS and official GBADuo remained listed, and the selected GBA Plus
+default survived Cocoon restart. On the final regular APK, two cold launches of
+Maiden through Cocoon reached the title screen without opening Resume. Before
+any game-menu input, Studio reported the correct CRC, pack, unpaused state and
+advancing frames (379 to 599). An earlier launch on the preceding APK showed a
+black picture until Back/Resume; its cause was not established. The cold-launch
+observations do not claim a fix or universal warm-relaunch coverage for it.
+
+Studio Connection is now in Settings. Both editions retained On across a process
+restart and were returned to Off. On the regular edition, saved On exposed the
+read-only bridge in a new game; saved Off plus a process restart/new game left
+no Studio abstract socket while the game rendered normally. The quick menu has
+no Studio row; RetroAchievements and Quit still route correctly. Temporary
+performance, tilt, shader and integer choices were returned to their prior values.
+
+Remaining device limits: game.lua/Wide behavior has host/native coverage here,
+not a new physical Wide-pack playthrough. This run does not establish all thirty
+companions, every shader/color combination, Fold/portrait hardware behavior or
+authenticated RetroAchievements events. Private prototype work and user ROMs
+are not part of this candidate source.
+
+Historical validation follows.
+
+---
+
 # 0.1.8-plus.4 SS game-only mode (2026-10-27)
 
 - Both configurations passed all **537 Debug unit/host-render tests** on the

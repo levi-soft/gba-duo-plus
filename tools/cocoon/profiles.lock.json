@@ -1,0 +1,32 @@
+{
+  "repository": "https://github.com/inssekt/CocoonFE",
+  "branch": "gamenative",
+  "commit": "3c2b6785a024e7ae73d4bbb2b331ff7519a9b7e1",
+  "licenseNotice": "CocoonFE does not publish a repository LICENSE file. Upstream platform metadata is fetched with its source attribution; this project does not claim to relicense it. The integration generator and new Plus player definitions follow the GBA Duo Plus source license.",
+  "platforms": [
+    {
+      "id": "gb",
+      "file": "GameBoy.json",
+      "gitBlobSha1": "1d25a8505bf043b3a072e276f2b66322bc8be25b",
+      "revision": 18,
+      "officialPlayerId": "gb.com.khumam.gbaduo",
+      "extensions": ["gb", "gbc", "zip"]
+    },
+    {
+      "id": "gbc",
+      "file": "GameBoyColor.json",
+      "gitBlobSha1": "437a278a1319a387b248ecccb2974b58d7fb25ee",
+      "revision": 18,
+      "officialPlayerId": "gbc.com.khumam.gbaduo",
+      "extensions": ["gb", "gbc", "zip"]
+    },
+    {
+      "id": "gba",
+      "file": "GameBoyAdvance.json",
+      "gitBlobSha1": "f90bb602dceaa5f4864106381584e7eae30bbd8f",
+      "revision": 17,
+      "officialPlayerId": "gba.com.khumam.gbaduo",
+      "extensions": ["gba", "zip"]
+    }
+  ]
+}

@@ -9,6 +9,7 @@ import com.khumam.gbaduo.companion.CompanionSnapshot
 import com.khumam.gbaduo.companion.LuaScript
 import com.khumam.gbaduo.companion.NativeCoreMemoryReader
 import com.khumam.gbaduo.companion.PackManifest
+import com.khumam.gbaduo.companion.WideState
 import java.io.File
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.UUID
@@ -31,7 +32,7 @@ class EmuThread(
     private val coreSession = CoreSession()
     @Volatile var paused = false
     @Volatile var ffMultiplier = 2
-    /** Explicit per-session opt-in for Studio's read-only RAM tools. */
+    /** Initialized from this edition's saved Studio setting before the session starts. */
     @Volatile var studioConnectionEnabled = false
 
     private val frameNanos = (1_000_000_000.0 / 59.7275).toLong()
@@ -70,6 +71,13 @@ class EmuThread(
         ASK,
     }
 
+    /** The player turned Wide view on for this game (it also needs the pack's game.lua to define `wide()`). */
+    @Volatile var wideEnabled = false
+
+    /** The active pack's game.lua defines `wide()`: Wide view can be turned on. Set on the emu thread. */
+    @Volatile var wideAvailable = false
+        private set
+
     /** Set by PlayerActivity with the pack; see [answerWriteConsent]. */
     @Volatile var writeAccess = WriteAccess.NONE
 
@@ -94,6 +102,10 @@ class EmuThread(
     /** Called on this thread as it ends, after the core is unloaded (its save written): every time, even after a failure. */
     @Volatile var onStopped: (() -> Unit)? = null
 
+    /** Frames the core has run since the game started, fast-forwarded ones included; read by the performance overlay. */
+    @Volatile var framesRun = 0L
+        private set
+
     private val saveFile = File(savePath)
     private var saveSeen = 0L to 0L
     private var framesSinceSaveCheck = 0
@@ -102,6 +114,12 @@ class EmuThread(
     private var scriptLoadedForPack: PackManifest? = null
     private var scriptActive = false
 
+    private var gameScriptLoadedForPack: PackManifest? = null
+    private var gameFrameHook = false
+    private var gameWideHook = false
+    private var wideRequested = WideView.FRAME_WIDTH
+    private var gameErrorLogCountdown = 0
+
     @Volatile private var uiState: Map<String, Any?> = emptyMap()
     @Volatile private var uiStateChanged = true
     @Volatile private var snapshotRequested = false
@@ -109,6 +127,7 @@ class EmuThread(
     private val debugSession = UUID.randomUUID().toString()
     private var debugGameCode = ""
     private var debugCrc = ""
+    private var debugPlatform = ""
     private var latestDebugData: Map<String, Any?>? = null
     private var latestDebugFrame: Long? = null
     private val retainedScriptSnapshot = com.khumam.gbaduo.companion.RetainedScriptSnapshot()
@@ -117,7 +136,7 @@ class EmuThread(
     private val studioConnection = StudioConnection(object : BridgeProtocol.Backend {
         override fun info() = JSONObject().put("sessionId", debugSession)
             .put("gameCode", debugGameCode).put("crc32", debugCrc)
-            .put("platform", if (NativeCore.videoWidth() == 240) "gba" else "gb")
+            .put("platform", debugPlatform)
             .put("frame", NativeCore.frameCounter()).put("paused", paused)
             .put("packId", activePack?.id ?: JSONObject.NULL)
             .put("dataFrame", latestDebugFrame ?: JSONObject.NULL)
@@ -143,6 +162,8 @@ class EmuThread(
         saveSeen = saveFile.length() to saveFile.lastModified()
         RetroAchievements.gameStarted()
 
+        // Cache the platform before Wide view changes the GBA output width.
+        debugPlatform = if (NativeCore.videoWidth() == WideView.FRAME_WIDTH) "gba" else "gb"
         debugGameCode = NativeCore.gameCode().removePrefix("AGB-")
         debugCrc = "%08X".format(NativeCore.crc32())
         val romCrc = NativeCore.crc32()
@@ -158,7 +179,7 @@ class EmuThread(
 
         var nextFrameAt = System.nanoTime()
         while (running && !coreSession.stopped) {
-            studioConnection.service(BuildConfig.DEBUG || studioConnectionEnabled)
+            studioConnection.service(studioConnectionEnabled)
             val pack = activePack
             if (pack !== inputPack) {
                 cursorNavigator?.cancel()
@@ -196,12 +217,15 @@ class EmuThread(
             val fastForward = input.fastForward()
             val speed = if (fastForward) ffMultiplier.coerceAtLeast(2) else 1
 
+            applyWide()
             repeat(speed) {
                 val physical = input.keys()
                 val effective = if (buttonInput.active) buttonInput.keys(physical) else cursorNavigator?.keys(physical) ?: physical
                 if (BuildConfig.DEBUG && effective != effectiveInputKeys) android.util.Log.d("GbaDuoInput", "frame=" + NativeCore.frameCounter() + " physical=" + physical + " effective=" + effective + " target=" + (cursorNavigator?.activeTarget ?: 0) + " ff=" + input.fastForward())
                 effectiveInputKeys = effective; navigatorTarget = cursorNavigator?.activeTarget ?: 0
                 NativeCore.runFrame(effective)
+                framesRun++
+                runGameFrame()
                 RetroAchievements.frame()
             }
             gameView.postFrame()
@@ -222,6 +246,7 @@ class EmuThread(
         } finally {
             studioConnection.close()
             LuaScript.unload()
+            NativeCore.unloadGameScript()
             RetroAchievements.gameStopped()
             audioOut.stop()
             NativeCore.unload()
@@ -272,7 +297,7 @@ class EmuThread(
                         break
                     }
                     val (name, args) = pendingCalls.poll() ?: break
-                    val mayWrite = writeAccess == WriteAccess.ALLOWED && saveSafetyState()
+                    val mayWrite = GameScriptAccess.mayWrite(writeAccess, ::saveSafetyState)
                     val result = LuaScript.call(name, args, mayWrite)
                     if (result != null) {
                         onActionResult?.invoke(result)
@@ -295,13 +320,18 @@ class EmuThread(
             framesSinceSnapshot = 0
             val snapshotStarted = System.nanoTime()
             val snapshot = retainedScriptSnapshot.accept(
-                CompanionSnapshot.build(pack, NativeCoreMemoryReader, NativeCore.frameCounter(), scriptActive)
+                CompanionSnapshot.build(pack, NativeCoreMemoryReader, NativeCore.frameCounter(), scriptActive, WideState(wideEnabled, wideAvailable))
             )
             if (BuildConfig.DEBUG) android.util.Log.d("GbaDuoPerf", "snapshotMs=" + (System.nanoTime() - snapshotStarted) / 1_000_000)
             latestDebugData = snapshot
             latestDebugFrame = NativeCore.frameCounter()
             onSnapshot?.invoke(snapshot)
         }
+    }
+
+    /** Thread-safe: the next frame builds a fresh snapshot for the companion screen (a built-in value changed). */
+    fun requestSnapshot() {
+        snapshotRequested = true
     }
 
     /** Thread-safe: the companion screen's UI state changed (the script sees it as `ui`). */
@@ -348,6 +378,60 @@ class EmuThread(
         }
     }
 
+    /** Loads/unloads the pack's game.lua (if any) once per pack change, on this thread. */
+    private fun syncGameScriptForPack(pack: PackManifest?) {
+        if (pack === gameScriptLoadedForPack) return
+        gameScriptLoadedForPack = pack
+        gameFrameHook = false
+        gameWideHook = false
+        wideAvailable = false
+        NativeCore.unloadGameScript()
+
+        val file = pack?.gameScriptFile ?: return
+        val packDir = activePackDir ?: return
+        val source = runCatching { File(packDir, file).readText() }.getOrNull() ?: return
+        if (!NativeCore.loadGameScript(source, packDir.absolutePath)) {
+            Log.w(TAG, "game.lua did not load: ${NativeCore.lastGameError()}")
+            return
+        }
+        gameFrameHook = NativeCore.gameHas("frame")
+        gameWideHook = NativeCore.gameHas("wide")
+        wideAvailable = gameWideHook
+    }
+
+    /**
+     * Between frames: the picture width the core should draw. Wide only while the player has it on and
+     * game.lua defines `wide()`; otherwise the game's own 240. A wide picture is its own shape, so while it
+     * is on the aspect ratio setting steps aside (square pixels, whatever Settings says).
+     */
+    private fun applyWide() {
+        syncGameScriptForPack(activePack)
+        val (surfaceW, surfaceH) = gameView.surfaceSize
+        val wanted = WideView.wantedWidth(wideEnabled, gameWideHook, surfaceW, surfaceH, gameView.integerScaling)
+        if (wanted == wideRequested) return
+        wideRequested = wanted
+        NativeCore.setWide(wanted)
+        gameView.setVideoSize(NativeCore.videoWidth(), NativeCore.videoHeight())
+        gameView.setAspectOverride(if (NativeCore.videoWidth() > WideView.FRAME_WIDTH) AspectRatio.ORIGINAL else null)
+    }
+
+    /** After each emulated frame: game.lua's `frame()`, which may change the game once the player has allowed it. */
+    private fun runGameFrame() {
+        syncGameScriptForPack(activePack)
+        if (!gameFrameHook) return
+        if (GameScriptAccess.needsConsent(writeAccess, hasFrameHook = true, alreadyAsked = consentAsked)) {
+            consentAsked = true
+            onWriteConsentNeeded?.invoke()
+        }
+        val mayWrite = GameScriptAccess.mayWrite(writeAccess, ::saveSafetyState)
+        val width = NativeCore.videoWidth()
+        val left = ((width - GBA_FRAME_WIDTH) / 2).coerceAtLeast(0)
+        if (!NativeCore.gameFrame(NativeCore.frameCounter(), width, left, mayWrite) && gameErrorLogCountdown-- <= 0) {
+            gameErrorLogCountdown = GAME_ERROR_LOG_FRAMES
+            Log.w(TAG, "game.lua frame(): ${NativeCore.lastGameError()}")
+        }
+    }
+
     private fun saveSafetyState(): Boolean {
         val path = safetyStatePath ?: return true
         safetyStatePath = null
@@ -389,5 +473,10 @@ class EmuThread(
 
         /** About every 3 seconds. */
         const val SAVE_CHECK_FRAMES = 180
+
+        /** game.lua errors are logged at most this often (5 seconds). */
+        const val GAME_ERROR_LOG_FRAMES = 300
+
+        const val GBA_FRAME_WIDTH = 240
     }
 }

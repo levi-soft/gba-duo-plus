@@ -13,7 +13,7 @@ import java.util.zip.ZipOutputStream
 
 object GeneratedPackTransaction {
     const val MAX_ZIP_BYTES = 64 * 1024 * 1024L
-    fun install(zip: File, packsDir: File, storage: GameStorage, gameCode: String, crc32: Long, expectedAssignment: String?, token: BuildCancellation, writeAssignmentTemporary: ((File, ByteArray) -> Unit)? = null, commitOnOwnerThread: (() -> Unit) -> Unit = { it() }): PackManifest {
+    fun install(zip: File, packsDir: File, storage: GameStorage, gameCode: String, crc32: Long, expectedAssignment: String?, token: BuildCancellation, assignToGame: Boolean = true, writeAssignmentTemporary: ((File, ByteArray) -> Unit)? = null, commitOnOwnerThread: (() -> Unit) -> Unit = { it() }): PackManifest {
         token.check(); require(zip.isFile && zip.length() in 1..MAX_ZIP_BYTES) { "Invalid generated companion size" }
         require(storage.packId == expectedAssignment) { "Companion selection changed while building; nothing was replaced" }
         val work = File(zip.parentFile, ".generated-${UUID.randomUUID()}")
@@ -72,8 +72,9 @@ object GeneratedPackTransaction {
                         require(prepared.renameTo(target)) { "Could not install generated companion" }
                         installedDirectory = target
                         File(target, ".plus-generated-source").writeText(identity)
-                        // Finish and sync a sibling before replacing the assignment.
-                        BuilderFiles.atomicWrite(assignment, JSONObject().put("packId", result.id).toString().toByteArray(Charsets.UTF_8), writeAssignmentTemporary)
+                        // Catalog creation returns the installed ID to its parent,
+                        // which alone may assign it after accepting the result.
+                        if (assignToGame) BuilderFiles.atomicWrite(assignment, JSONObject().put("packId", result.id).toString().toByteArray(Charsets.UTF_8), writeAssignmentTemporary)
                     } catch (error: Exception) {
                         // Roll back before releasing the owner thread, so another
                         // import/delete cannot interleave with restoring this pack.

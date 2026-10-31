@@ -20,7 +20,7 @@ class BuilderRomSourceTest {
                 z.putNextEntry(ZipEntry(name)); z.write(bytes); z.closeEntry()
             }
         }
-        val out = ByteArrayOutputStream(); BuilderRomSource.copy("game.zip", zipped.toByteArray().inputStream(), out)
+        val out = ByteArrayOutputStream(); assertEquals("game.gba", BuilderRomSource.copy("game.zip", zipped.toByteArray().inputStream(), out))
         assertArrayEquals(byteArrayOf(1,2,3), out.toByteArray())
     }
     @Test fun `decompressed ROM limits and cancellation stop streaming`() {
@@ -31,5 +31,20 @@ class BuilderRomSourceTest {
         val zipped = ByteArrayOutputStream()
         ZipOutputStream(zipped).use { z -> z.putNextEntry(ZipEntry("game.gb")); z.write(1); z.closeEntry() }
         assertThrows(Exception::class.java) { BuilderRomSource.copy("game.zip", zipped.toByteArray().inputStream(), ByteArrayOutputStream()) }
+    }
+
+    @Test fun `creation rechecks raw header title code and entire staged ROM checksum`() {
+        val bytes = ByteArray(1024)
+        "FIREEMBLEM".toByteArray().copyInto(bytes, 0xA0)
+        "AE7E".toByteArray().copyInto(bytes, 0xAC); bytes[0xB2] = 0x96.toByte()
+        val file = java.io.File.createTempFile("builder-rom", ".gba").apply { writeBytes(bytes) }
+        val crc = java.util.zip.CRC32().apply { update(bytes) }.value
+        try {
+            BuilderRomSource.validate(file, "Game.gba", "FIREEMBLEM", "AE7E", crc, BuildCancellation())
+            assertThrows(IllegalArgumentException::class.java) { BuilderRomSource.validate(file, "Game.gba", "Display title", "AE7E", crc, BuildCancellation()) }
+            assertThrows(IllegalArgumentException::class.java) { BuilderRomSource.validate(file, "Game.gba", "FIREEMBLEM", "BE8E", crc, BuildCancellation()) }
+            bytes[1000] = 1; file.writeBytes(bytes)
+            assertThrows(IllegalArgumentException::class.java) { BuilderRomSource.validate(file, "Game.gba", "FIREEMBLEM", "AE7E", crc, BuildCancellation()) }
+        } finally { file.delete() }
     }
 }

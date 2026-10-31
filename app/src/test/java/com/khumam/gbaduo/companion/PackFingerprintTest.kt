@@ -7,6 +7,22 @@ import java.io.File
 import java.nio.file.Files
 
 class PackFingerprintTest {
+    @Test
+    fun declaredBehaviorFilesUnderAssetsInvalidateConsentButImagesDoNot() {
+        val dir = pack()
+        File(dir, "manifest.json").writeText("""{"id":"items","script":"assets/action.code","gameScript":"assets/game.lua","layout":"assets/screen.json","styles":["assets/theme.css"]}""")
+        val behavior = listOf("assets/action.code", "assets/game.lua", "assets/screen.json", "assets/theme.css")
+        behavior.forEach { File(dir, it).writeText("initial") }
+        for (file in behavior) {
+            val before = PackFingerprint.of(dir)
+            File(dir, file).appendText("changed")
+            assertNotEquals(file, before, PackFingerprint.of(dir))
+        }
+        val beforeImage = PackFingerprint.of(dir)
+        File(dir, "assets/ui/icon.png").writeBytes(byteArrayOf(8, 9))
+        assertEquals(beforeImage, PackFingerprint.of(dir))
+    }
+
 
     private fun pack(): File = Files.createTempDirectory("pack").toFile().apply {
         File(this, "manifest.json").writeText("""{"id":"items"}""")

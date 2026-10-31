@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.INTERNET" />
 
@@ -24,9 +25,9 @@
              here: the ROM comes as the intent's data or a rom/ROM/path/file
              extra, and this hands it to the player and finishes (see
              LaunchActivity). The VIEW filter is for "Open with" and launchers
-             that pick a handler by file: mimeType + pathPattern matches both
-             content:// and file:// URIs, scheme-less on purpose since
-             android:scheme without android:host matches nothing. -->
+             that pick a local MIME handler. A MIME-only filter accepts content/file
+             URIs; its pathPattern is ignored without scheme and host. ROM extension
+             checks therefore happen in LaunchActivity and its resolver. -->
         <activity
             android:name=".library.LaunchActivity"
             android:configChanges="orientation|screenSize|screenLayout|keyboardHidden"
@@ -35,7 +36,9 @@
             android:noHistory="true"
             android:taskAffinity=""
             android:theme="@style/Theme.Launch">
-            <intent-filter>
+            <!-- This is the inherited local-file/content-URI handler, not an HTTP App Link.
+                 LaunchActivity validates the ROM; explicit frontend VIEW intents use the same entry. -->
+            <intent-filter tools:ignore="AppLinkUrlError">
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
@@ -62,6 +65,7 @@
         <activity android:name=".settings.ArtworkFolderActivity" android:exported="false" />
         <activity android:name=".settings.SteamGridDbActivity" android:exported="false" />
         <activity android:name=".settings.ArtworkPickerActivity" android:exported="false" />
+        <activity android:name=".settings.PackCatalogActivity" android:exported="false" />
         <activity android:name=".settings.ButtonMappingActivity" android:exported="false" />
         <activity android:name=".settings.HotkeysActivity" android:exported="false" />
         <activity android:name=".settings.RetroAchievementsActivity" android:exported="false"

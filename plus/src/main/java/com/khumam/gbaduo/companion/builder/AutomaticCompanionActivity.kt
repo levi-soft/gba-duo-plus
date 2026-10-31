@@ -28,16 +28,18 @@ import org.json.JSONObject
 import java.io.ByteArrayInputStream
 import java.io.File
 import java.io.FileOutputStream
+import java.io.Closeable
 import java.net.URI
 import java.util.UUID
 import java.util.concurrent.Executors
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CompletionException
-import java.util.zip.CRC32
 
 /** Plus-only local builder. Neither the page nor JavaScript receives a real ROM URI. */
 class AutomaticCompanionActivity : Activity() {
-    private val token = BuildCancellation()
+    private var token = BuildCancellation()
+    private var resultSource: WebCompanionCreation.Source? = null
+    @Volatile private var parentCancellation: Closeable? = null
     private val io = Executors.newSingleThreadExecutor()
     private val bridgeLock = Any()
     private lateinit var status: TextView
@@ -53,6 +55,7 @@ class AutomaticCompanionActivity : Activity() {
     private var phase = Phase.PREPARING
     @Volatile private var config = "{}"
     @Volatile private var successful = false
+    internal var distributionFactory: (File) -> BuilderDistribution = { BuilderDistribution(it) }
 
     private enum class Phase { PREPARING, RECEIVING, INSTALLING, FINISHED, FAILED }
 
@@ -69,19 +72,31 @@ class AutomaticCompanionActivity : Activity() {
             val path = intent.getStringExtra(EXTRA_ROM) ?: error("Missing ROM")
             val rom = File(path).canonicalFile
             require(rom.path.startsWith(File(cacheDir, "companion-builder-input").canonicalPath + File.separator) && rom.isFile) { "Invalid local ROM" }
-            require(rom.length() in 0xB0L..MAX_ROM_BYTES) { "Invalid ROM size" }; input = rom
-            val title = intent.getStringExtra(EXTRA_TITLE).orEmpty().take(160)
+            input = rom
+            val operation = if (WebCompanionCreation.isResultRequest(intent)) {
+                try { WebCompanionCreation.takeOperation(intent) }
+                catch (_: Exception) { setResult(RESULT_CANCELED); finish(); return }
+            } else null
+            require(rom.length() in 0xB0L..MAX_ROM_BYTES) { "Invalid ROM size" }
+            if (operation != null) {
+                token = operation.cancellation
+                resultSource = operation.source
+                parentCancellation = token.onCancel { runOnUiThread { if (!isFinishing && !isDestroyed) finish() } }
+            }
+            val title = intent.getStringExtra(EXTRA_TITLE).orEmpty()
             val gameCode = intent.getStringExtra(EXTRA_CODE).orEmpty(); require(Regex("^[A-Z0-9]{4}$").matches(gameCode))
             val crc = intent.getLongExtra(EXTRA_CRC, -1); require(crc in 0..0xffffffffL)
             val catalog = URI(intent.getStringExtra(EXTRA_CATALOG) ?: DEFAULT_CATALOG_URL); BuilderCatalog.origin(catalog)
             val storage = GameStorage.forGame(filesDir, Platform.GBA, title, gameCode, crc)
-            val originalAssignment = storage.packId
+            if (operation != null) require(operation.source.entry.title == title && operation.source.entry.gameCode == gameCode && operation.source.crc32 == crc) { "Creation source changed" }
+            val originalAssignment = if (operation != null) operation.previousAssignment else storage.packId
+            require(storage.packId == originalAssignment) { "Companion selection changed while preparing the ROM" }
             work = File(cacheDir, "companion-builder-jobs/${UUID.randomUUID()}").apply { mkdirs() }
             status.text = "Checking ROM and finding a compatible companion…"
             io.execute {
                 try {
-                    validateRom(rom, gameCode, crc)
-                    val resolved = BuilderDistribution(File(cacheDir, "companion-builder-distribution")).resolve(catalog, token)
+                    BuilderRomSource.validate(rom, operation?.romFileName ?: intent.getStringExtra(EXTRA_FILENAME) ?: "ROM.gba", title, gameCode, crc, token)
+                    val resolved = distributionFactory(File(cacheDir, "companion-builder-distribution")).resolve(catalog, token)
                     distribution = resolved
                     val profile = resolved.catalog.profile(gameCode, crc)
                         ?: error("No companion profile is available for this ROM. You can still import a ZIP manually.")
@@ -95,16 +110,6 @@ class AutomaticCompanionActivity : Activity() {
                 } catch (error: Exception) { showError(error) }
             }
         } catch (error: Exception) { showError(error) }
-    }
-
-    private fun validateRom(file: File, code: String, expectedCrc: Long) {
-        val crc = CRC32(); file.inputStream().use { stream ->
-            val header = ByteArray(0xB0); require(stream.read(header) == header.size)
-            require(String(header, 0xAC, 4, Charsets.US_ASCII) == code) { "ROM game code changed" }; crc.update(header)
-            val buffer = ByteArray(32768)
-            while (true) { token.check(); val n = stream.read(buffer); if (n < 0) break; crc.update(buffer, 0, n) }
-        }
-        require(crc.value == expectedCrc) { "ROM checksum changed" }
     }
 
     private fun startPage(layout: LinearLayout, resolved: ResolvedBuilder, rom: File, storage: GameStorage, code: String, crc: Long, previous: String?) {
@@ -180,7 +185,8 @@ class AutomaticCompanionActivity : Activity() {
             }
             io.execute {
                 try {
-                    val manifest = GeneratedPackTransaction.install(File(work!!, "generated.zip"), File(filesDir, "packs"), storage, code, crc, previous, token) { commit ->
+                    val manifest = GeneratedPackTransaction.install(File(work!!, "generated.zip"), File(filesDir, "packs"), storage, code, crc, previous, token,
+                        assignToGame = resultSource == null) { commit ->
                         val result = CompletableFuture<Unit>()
                         runOnUiThread {
                             try {
@@ -193,9 +199,15 @@ class AutomaticCompanionActivity : Activity() {
                     synchronized(bridgeLock) { successful = true; phase = Phase.FINISHED }
                     runOnUiThread {
                         if (!isFinishing && !isDestroyed) {
-                            setResult(RESULT_OK); this@AutomaticCompanionActivity.progress.visibility = View.GONE
-                            status.text = "Companion created and assigned: " + manifest.name
-                            button.text = "Done"
+                            val source = resultSource
+                            if (source != null) {
+                                setResult(RESULT_OK, WebCompanionCreation.resultIntent(manifest.id, source))
+                                finish()
+                            } else {
+                                setResult(RESULT_OK); this@AutomaticCompanionActivity.progress.visibility = View.GONE
+                                status.text = "Companion created and assigned: " + manifest.name
+                                button.text = "Done"
+                            }
                         }
                     }
                 } catch (error: Exception) { showError(error) }
@@ -206,6 +218,7 @@ class AutomaticCompanionActivity : Activity() {
     }
 
     private fun showError(error: Exception) {
+        parentCancellation?.close(); parentCancellation = null
         if (successful || !token.cancel()) return
         synchronized(bridgeLock) { phase = Phase.FAILED; runCatching { stream?.close() }; stream = null }
         runOnUiThread {
@@ -218,6 +231,7 @@ class AutomaticCompanionActivity : Activity() {
     }
 
     override fun onDestroy() {
+        parentCancellation?.close(); parentCancellation = null
         token.cancel()
         synchronized(bridgeLock) { runCatching { stream?.close() }; stream = null }
         web?.apply { stopLoading(); removeJavascriptInterface("PlusBuilder"); destroy() }; web = null
@@ -235,9 +249,13 @@ class AutomaticCompanionActivity : Activity() {
         private const val EXTRA_CODE = "builder.code"
         private const val EXTRA_CRC = "builder.crc"
         private const val EXTRA_CATALOG = "builder.catalog"
-        fun launch(context: Context, romFile: File, gameTitle: String, gameCode: String, crc32: Long, catalogUrl: String = DEFAULT_CATALOG_URL) {
-            context.startActivity(Intent(context, AutomaticCompanionActivity::class.java).putExtra(EXTRA_ROM, romFile.absolutePath)
-                .putExtra(EXTRA_TITLE, gameTitle).putExtra(EXTRA_CODE, gameCode).putExtra(EXTRA_CRC, crc32).putExtra(EXTRA_CATALOG, catalogUrl))
+        private const val EXTRA_FILENAME = "builder.filename"
+        internal fun intent(context: Context, romFile: File, gameTitle: String, gameCode: String, crc32: Long, catalogUrl: String = DEFAULT_CATALOG_URL, romFileName: String = "ROM.gba"): Intent =
+            Intent(context, AutomaticCompanionActivity::class.java).putExtra(EXTRA_ROM, romFile.absolutePath)
+                .putExtra(EXTRA_TITLE, gameTitle).putExtra(EXTRA_CODE, gameCode).putExtra(EXTRA_CRC, crc32).putExtra(EXTRA_CATALOG, catalogUrl).putExtra(EXTRA_FILENAME, romFileName)
+
+        fun launch(context: Context, romFile: File, gameTitle: String, gameCode: String, crc32: Long, catalogUrl: String = DEFAULT_CATALOG_URL, romFileName: String = "ROM.gba") {
+            context.startActivity(intent(context, romFile, gameTitle, gameCode, crc32, catalogUrl, romFileName))
         }
     }
 }

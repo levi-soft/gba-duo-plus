@@ -7,8 +7,16 @@ import android.widget.TextView
 import com.khumam.gbaduo.R
 import com.khumam.gbaduo.achievements.RetroAchievements
 import com.khumam.gbaduo.companion.CompanionSettings
+import com.khumam.gbaduo.debug.StudioConnectionSettings
+import com.khumam.gbaduo.emu.AspectRatio
+import com.khumam.gbaduo.emu.AspectSettings
 import com.khumam.gbaduo.emu.ColorCorrection
 import com.khumam.gbaduo.emu.ColorSettings
+import com.khumam.gbaduo.emu.PerfOverlay
+import com.khumam.gbaduo.emu.PerfOverlaySettings
+import com.khumam.gbaduo.emu.TiltShift
+import com.khumam.gbaduo.emu.TiltShiftSettings
+import com.khumam.gbaduo.emu.ScaleSettings
 import com.khumam.gbaduo.emu.ShaderPreset
 import com.khumam.gbaduo.emu.ShaderSettings
 import com.khumam.gbaduo.library.RomLibrary
@@ -26,6 +34,11 @@ class SettingsActivity : PixelPage() {
     private lateinit var scrapingSummary: TextView
     private lateinit var shaderSummary: TextView
     private lateinit var colorSummary: TextView
+    private lateinit var aspectSummary: TextView
+    private lateinit var tiltSummary: TextView
+    private lateinit var scaleSummary: TextView
+    private lateinit var perfSummary: TextView
+    private lateinit var studioSummary: TextView
 
     private val raListener: (RetroAchievements.State) -> Unit = { state ->
         raSummary.text = when (state) {
@@ -57,6 +70,16 @@ class SettingsActivity : PixelPage() {
             getString(R.string.shader_title), getString(R.string.shader_summary)) { chooseShader() }.second
         colorSummary = menuCard(R.drawable.ic_settings, Pixel.MINT,
             getString(R.string.color_title), getString(R.string.color_summary)) { chooseColor() }.second
+        aspectSummary = menuCard(R.drawable.ic_settings, Pixel.CORAL,
+            getString(R.string.aspect_title), getString(R.string.aspect_summary)) { chooseAspect() }.second
+        tiltSummary = menuCard(R.drawable.ic_settings, Pixel.YELLOW,
+            getString(R.string.tilt_title), getString(R.string.tilt_summary)) { chooseTilt() }.second
+        scaleSummary = menuCard(R.drawable.ic_settings, Pixel.PURPLE_LIGHT,
+            getString(R.string.scale_title), getString(R.string.scale_off)) { toggleScale() }.second
+        perfSummary = menuCard(R.drawable.ic_settings, Pixel.MINT,
+            getString(R.string.perf_title), getString(R.string.perf_summary)) { choosePerf() }.second
+        studioSummary = menuCard(R.drawable.ic_settings, Pixel.PURPLE_LIGHT,
+            getString(R.string.studio_connection_title), getString(R.string.studio_connection_summary_off)) { chooseStudioConnection() }.second
         scrapingSummary = menuCard(R.drawable.ic_settings, Pixel.PINK,
             getString(R.string.scraping_title), getString(R.string.scraping_summary)) {
             startActivity(Intent(this, ScrapingActivity::class.java))
@@ -81,6 +104,11 @@ class SettingsActivity : PixelPage() {
         renderWrites()
         shaderSummary.text = getString(R.string.shader_summary_current, ShaderSettings.default(this).displayName)
         colorSummary.text = getString(R.string.shader_summary_current, ColorSettings.default(this).displayName)
+        aspectSummary.text = getString(R.string.shader_summary_current, AspectSettings.default(this).displayName)
+        tiltSummary.text = getString(R.string.shader_summary_current, TiltShiftSettings.default(this).displayName)
+        perfSummary.text = getString(R.string.shader_summary_current, PerfOverlaySettings.default(this).displayName)
+        renderScale()
+        renderStudioConnection()
         val artCount = Artwork.store(this).count()
         scrapingSummary.text = if (artCount == 0) getString(R.string.scraping_summary)
         else resources.getQuantityString(R.plurals.scraping_summary_count, artCount, artCount)
@@ -102,6 +130,25 @@ class SettingsActivity : PixelPage() {
             .show()
     }
 
+    private fun renderStudioConnection() {
+        studioSummary.text = getString(if (StudioConnectionSettings.enabled(this))
+            R.string.studio_connection_summary_on else R.string.studio_connection_summary_off)
+    }
+
+    /** A saved choice for the next game opened in this edition. */
+    private fun chooseStudioConnection() {
+        val options = arrayOf(getString(R.string.studio_connection_off), getString(R.string.studio_connection_on))
+        AlertDialog.Builder(this)
+            .setTitle(R.string.studio_connection_title)
+            .setSingleChoiceItems(options, if (StudioConnectionSettings.enabled(this)) 1 else 0) { dialog, which ->
+                StudioConnectionSettings.setEnabled(this, which == 1)
+                renderStudioConnection()
+                dialog.dismiss()
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
     /** The app-wide color correction; a game can still pick its own in Game settings. */
     private fun chooseColor() {
         val options = ColorCorrection.entries
@@ -114,6 +161,58 @@ class SettingsActivity : PixelPage() {
             }
             .setNegativeButton(android.R.string.cancel, null)
             .show()
+    }
+
+    /** Blur toward the top and bottom of the game picture; the next game started uses it. */
+    private fun chooseTilt() {
+        val options = TiltShift.entries
+        AlertDialog.Builder(this)
+            .setTitle(R.string.tilt_title)
+            .setSingleChoiceItems(options.map { it.displayName }.toTypedArray(), options.indexOf(TiltShiftSettings.default(this))) { dialog, which ->
+                TiltShiftSettings.setDefault(this, options[which])
+                tiltSummary.text = getString(R.string.shader_summary_current, options[which].displayName)
+                dialog.dismiss()
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    /** FPS and CPU readout over the game; the next game started uses it. */
+    private fun choosePerf() {
+        val options = PerfOverlay.entries
+        AlertDialog.Builder(this)
+            .setTitle(R.string.perf_title)
+            .setSingleChoiceItems(options.map { it.displayName }.toTypedArray(), options.indexOf(PerfOverlaySettings.default(this))) { dialog, which ->
+                PerfOverlaySettings.setDefault(this, options[which])
+                perfSummary.text = getString(R.string.shader_summary_current, options[which].displayName)
+                dialog.dismiss()
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    /** The shape of the game picture, on whichever screen the game runs. */
+    private fun chooseAspect() {
+        val options = AspectRatio.entries
+        AlertDialog.Builder(this)
+            .setTitle(R.string.aspect_title)
+            .setSingleChoiceItems(options.map { it.displayName }.toTypedArray(), options.indexOf(AspectSettings.default(this))) { dialog, which ->
+                AspectSettings.setDefault(this, options[which])
+                aspectSummary.text = getString(R.string.shader_summary_current, options[which].displayName)
+                dialog.dismiss()
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    private fun renderScale() {
+        scaleSummary.text = getString(if (ScaleSettings.integer(this)) R.string.scale_on else R.string.scale_off)
+    }
+
+    /** Flips at once; the next game started uses it. */
+    private fun toggleScale() {
+        ScaleSettings.setInteger(this, !ScaleSettings.integer(this))
+        renderScale()
     }
 
     private fun renderWrites() {

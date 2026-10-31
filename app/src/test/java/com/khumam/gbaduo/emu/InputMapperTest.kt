@@ -50,10 +50,19 @@ class InputMapperTest {
         assertEquals(0, mapper.keys())
     }
 
-    @Test fun labelledTouchButtonsIgnorePhysicalSwapAndRejectExtraBits() {
-        val mapper = InputMapper().apply { swapAbButtons() }
+    @Test fun labelledTouchButtonsIgnoreControllerRemappingAndRejectExtraBits() {
+        val remapped = ControlScheme.DEFAULT.copy(buttons = ControlScheme.DEFAULT.buttons + mapOf(
+            GbaKeys.A to KEYCODE_BUTTON_B,
+            GbaKeys.B to KEYCODE_BUTTON_A,
+        ))
+        val mapper = InputMapper(remapped)
         mapper.setTouchKeys(GbaKeys.A or (1 shl 15))
         assertEquals(GbaKeys.A, mapper.keys())
+        mapper.setTouchKeys(0)
+        mapper.onKey(KEYCODE_BUTTON_A, down = true)
+        assertEquals(GbaKeys.B, mapper.keys())
+        mapper.onKey(KEYCODE_BUTTON_A, down = false)
+        assertEquals(0, mapper.keys())
     }
 
     private fun scheme(block: (ControlScheme) -> ControlScheme): ControlScheme = block(ControlScheme.DEFAULT)

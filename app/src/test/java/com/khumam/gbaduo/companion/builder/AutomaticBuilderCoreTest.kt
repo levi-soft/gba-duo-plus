@@ -73,6 +73,58 @@ class AutomaticBuilderCoreTest {
         assertEquals("keep", File(blockedRecord, "keep.txt").readText())
     }
 
+    @Test fun discoveryDownloadsOnlyBoundedMetadataAndCanReadItOfflineWithoutABundle() {
+        val root = createTempDir(); val requests = mutableListOf<Pair<URI, Long>>()
+        val json = catalog(byteArrayOf(1)); var offline = false
+        val distribution = BuilderDistribution(File(root, "cache")) { uri, limit, _ ->
+            requests += uri to limit
+            if (offline) throw IOException("offline")
+            check(uri == origin) { "Discovery tried to download the builder" }
+            json.toByteArray()
+        }
+        assertNotNull(distribution.catalog(origin, BuildCancellation()).profile("AE7E", 0x32cd990d))
+        assertEquals(listOf(origin to BuilderCatalog.MAX_CATALOG_BYTES), requests)
+        assertFalse(File(root, "cache/bundles").exists()); assertFalse(File(root, "cache/runs").exists())
+        offline = true
+        assertNotNull(distribution.catalog(origin, BuildCancellation()).profile("AE7E", 0x32cd990d))
+        // Cached metadata is not a promise that offline creation is possible.
+        assertThrows(IOException::class.java) { distribution.resolve(origin, BuildCancellation()) }
+    }
+
+    @Test fun discoveringANewerBundleDoesNotInvalidateTheVerifiedOfflinePair() {
+        val root = createTempDir(); val bytes = zip(root, mapOf("plus-runner.html" to "123456789")).readBytes()
+        val verified = catalog(bytes); val newer = JSONObject(verified).apply {
+            put("builderVersion", "0.9.7")
+            getJSONObject("builder").put("sha256", "a".repeat(64))
+        }.toString()
+        var mode = 0
+        val distribution = BuilderDistribution(File(root, "cache")) { uri, _, _ ->
+            if (mode == 2) throw IOException("offline")
+            if (uri == origin) (if (mode == 0) verified else newer).toByteArray() else bytes
+        }
+        distribution.resolve(origin, BuildCancellation()).close()
+        mode = 1
+        assertEquals("0.9.7", distribution.catalog(origin, BuildCancellation()).version)
+        mode = 2
+        assertEquals("0.9.7", distribution.catalog(origin, BuildCancellation()).version)
+        distribution.resolve(origin, BuildCancellation()).use {
+            assertTrue(it.fromCache); assertEquals("0.9.6", it.catalog.version)
+        }
+    }
+
+    @Test fun discoveryRejectsOversizedOrUntrustedMetadataRatherThanUsingStaleCache() {
+        val root = createTempDir(); var response = catalog(byteArrayOf(1)).toByteArray()
+        val distribution = BuilderDistribution(File(root, "cache")) { _, _, _ -> response }
+        distribution.catalog(origin, BuildCancellation())
+        response = ByteArray(BuilderCatalog.MAX_CATALOG_BYTES.toInt() + 1)
+        assertThrows(IllegalArgumentException::class.java) { distribution.catalog(origin, BuildCancellation()) }
+        response = JSONObject(catalog(byteArrayOf(1))).apply {
+            getJSONObject("builder").put("url", "https://evil.invalid/builder.zip")
+        }.toString().toByteArray()
+        assertThrows(IllegalArgumentException::class.java) { distribution.catalog(origin, BuildCancellation()) }
+        assertThrows(IllegalArgumentException::class.java) { distribution.catalog(URI("http://example.org/catalog.json"), BuildCancellation()) }
+    }
+
     @Test fun zipSlipDuplicateAndInflationLimitsAreRejected() {
         val root = createTempDir()
         for (name in listOf("../escaped", "/outside", "a\\b")) {
@@ -219,6 +271,37 @@ class AutomaticBuilderCoreTest {
             commit(); assertFalse(token.cancel())
         }
         assertEquals(result.id, storage.packId); assertTrue(File(packs, result.id).isDirectory); assertTrue(token.committed)
+    }
+
+    @Test fun catalogCreationInstallsButLeavesTheOriginalAssignmentBytesForItsParent() {
+        val root = createTempDir(); val packs = File(root, "packs")
+        val storage = GameStorage.forGame(root, Platform.GBA, "Raw header", "AE7E", 0x32cd990d)
+        storage.packId = "manual-choice"
+        val assignment = File(storage.dir, "pack.json"); val original = assignment.readBytes()
+        val token = BuildCancellation()
+        val result = GeneratedPackTransaction.install(generated(root), packs, storage, "AE7E", 0x32cd990d,
+            "manual-choice", token, assignToGame = false,
+            writeAssignmentTemporary = { _, _ -> fail("Result-only creator must not write an assignment") })
+        assertTrue(File(packs, "${result.id}/manifest.json").isFile)
+        assertArrayEquals(original, assignment.readBytes()); assertEquals("manual-choice", storage.packId)
+        assertFalse(token.cancel()); assertEquals("manual-choice", storage.packId)
+    }
+
+    @Test fun cancelAtCatalogCommitPreservesAnAlreadyAssignedStableIdAndItsContents() {
+        val root = createTempDir(); val packs = File(root, "packs")
+        val storage = GameStorage.forGame(root, Platform.GBA, "Game", "AE7E", 0x32cd990d)
+        val previous = GeneratedPackTransaction.install(generated(root), packs, storage, "AE7E", 0x32cd990d, null, BuildCancellation())
+        val marker = File(packs, "${previous.id}/keep.txt").apply { writeText("previous contents") }
+        val oldManifest = File(packs, "${previous.id}/manifest.json").readBytes()
+        val oldAssignment = File(storage.dir, "pack.json").readBytes(); val token = BuildCancellation()
+        assertThrows(java.util.concurrent.CancellationException::class.java) {
+            GeneratedPackTransaction.install(generated(root), packs, storage, "AE7E", 0x32cd990d, previous.id,
+                token, assignToGame = false) { commit -> token.cancel(); commit() }
+        }
+        assertEquals("previous contents", marker.readText())
+        assertArrayEquals(oldManifest, File(packs, "${previous.id}/manifest.json").readBytes())
+        assertArrayEquals(oldAssignment, File(storage.dir, "pack.json").readBytes())
+        assertEquals(listOf(previous.id), packs.listFiles()!!.map { it.name })
     }
 
     @Test fun partialAssignmentWriteFailurePreservesPreviousBytesAndRemovesNewPack() {

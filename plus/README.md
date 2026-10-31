@@ -30,14 +30,13 @@ into the existing host. See [Single Screen](../docs/SINGLE-SCREEN.md).
 
 `companion/builder/` owns automatic companion discovery, the verified offline
 builder cache, local WebView execution, ROM staging and safe installation.
-The host only delegates its menu option and registers the private Activity.
+The existing Get from the web catalog delegates exact-ROM creation through a
+source-bound adapter and registers the private Activity. Ready-made ZIP downloads
+and update checks retain the official implementations.
 Manual companion ZIP import is retained. Removal/replacement when upstream
 provides equivalent support is documented in [AUTOMATIC-COMPANIONS](../docs/AUTOMATIC-COMPANIONS.md).
 
-`artwork/` owns legacy cover migration, square image rendering, asynchronous binding,
-provider clients, source credentials, the image picker and Libretro batch lookup. Selected covers share upstream 0.1.8 artwork storage. The
-official carousel only invokes optional bind/draw delegates and opens the Plus
-entry. See [ARTWORK](../docs/ARTWORK.md) for provider setup and removal steps.
+`artwork/` owns legacy cover migration, Libretro/manual image selection, encrypted credentials and missing-cover lookup. Selected covers use the official shared artwork store and cartridge rendering. The official folder matcher, including Cocoon names, remains inherited. The official carousel uses optional Plus actions without a second cover renderer. See [ARTWORK](../docs/ARTWORK.md) for provider setup and removal steps.
 
 ## Review and upgrade
 
@@ -50,7 +49,7 @@ node --test tools/upstream-boundary.test.mjs
 An optional pristine official checkout can coexist beside Plus:
 
 ```sh
-git worktree add --detach ../GBA-Duo-Official-Reference 8832d19ebc833da2ab3303d2d1ff48e5720ea68c
+git worktree add --detach ../GBA-Duo-Official-Reference 61582fcb5e07d98b19675e75e9bde532a7c68c4c
 git -C ../GBA-Duo-Official-Reference status --short
 ```
 

@@ -1,6 +1,16 @@
 # Read-only Studio Connection
 
-In a **release** game session, open the quick menu and enable **Studio Connection**. This is an explicit per-session opt-in and is not a permanently enabled LAN/debug service. Debug builds also enable the development connection while a game runs.
+Open **Settings > Studio Connection** and choose **Off** or **On**. The choice is
+saved for this app edition and applies when the next game session starts. It
+defaults to **Off** in release and debug builds; debug builds do not override a
+saved Off choice. Reopen the game after changing the setting. The quick menu no
+longer contains a separate connection toggle.
+
+When On, the read-only connection runs only while a game session is open, including
+when that session is paused, and closes when the session ends. This setting does
+not add a LAN listener or change the existing abstract ADB transport. Plus and
+Plus SS have separate saved settings, but share the socket name below: enable
+the connection in only one running edition at a time.
 
 The endpoint is Android's abstract Unix socket **`gbaduo-plus-studio`**. A desktop tool can reach it through USB debugging/ADB:
 
@@ -57,4 +67,4 @@ Get [GBA Duo Studio](https://github.com/levi-soft/gba-duo-studio), the separate 
 
 Compatible GBA Duo Studio builds discover the device, establish forwarding and read this protocol. They can inspect raw memory and use the selected companion's actual runtime data for preview. The editor and bridge do not automatically discover every game's field addresses or guarantee hot reload. Save/export/import a pack using the normal workflow when changing it.
 
-Official GBA Duo v0.1.6 does not expose this Plus bridge. Ordinary native-format packs do not require it; it is optional authoring tooling. The Studio repository is a separate project and is not bundled in this source publication.
+Official GBA Duo v0.1.9 does not expose this Plus bridge. Ordinary native-format packs do not require it; it is optional authoring tooling. The Studio repository is a separate project and is not bundled in this source publication.

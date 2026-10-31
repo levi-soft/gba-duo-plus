@@ -53,13 +53,28 @@ class PlusUpgradeTest {
         assertEquals(ShaderPreset.SCALEFX, ShaderSettings.default(context))
     }
     @Test fun existingNewChoicesWinOverLegacyPreferences() {
-        context.getSharedPreferences("player", 0).edit().putString("shader_id", "gba_color").commit()
-        ControlPrefs.save(context, ControlScheme.DEFAULT)
+        context.getSharedPreferences("player", 0).edit().putBoolean("swap_ab", true).putString("shader_id", "gba_color").commit()
+        val custom = ControlScheme.DEFAULT.copy(buttons = ControlScheme.DEFAULT.buttons + (GbaKeys.A to KeyEvent.KEYCODE_BUTTON_X))
+        ControlPrefs.save(context, custom)
         ShaderSettings.setDefault(context, ShaderPreset.HQ2X)
         ColorSettings.setDefault(context, ColorCorrection.GBC)
         PlusUpgrade.migrate(context)
-        assertEquals(ControlScheme.DEFAULT, ControlPrefs.load(context))
+        assertEquals(custom, ControlPrefs.load(context))
         assertEquals(ShaderPreset.HQ2X, ShaderSettings.default(context))
         assertEquals(ColorCorrection.GBC, ColorSettings.default(context))
+    }
+    @Test fun retiredSwapFlagCannotChangeControllerMappingAfterMigration() {
+        val old = context.getSharedPreferences("player", 0)
+        old.edit().putBoolean("swap_ab", true).commit()
+        PlusUpgrade.migrate(context)
+        val custom = ControlScheme.DEFAULT.copy(buttons = ControlScheme.DEFAULT.buttons + (GbaKeys.A to KeyEvent.KEYCODE_BUTTON_X))
+        ControlPrefs.save(context, custom)
+        val encoded = context.getSharedPreferences("controls", 0).getString("scheme", null)
+        old.edit().putBoolean("swap_ab", false).commit()
+
+        PlusUpgrade.migrate(context)
+
+        assertEquals(custom, ControlPrefs.load(context))
+        assertEquals(encoded, context.getSharedPreferences("controls", 0).getString("scheme", null))
     }
 }

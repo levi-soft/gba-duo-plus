@@ -1,17 +1,17 @@
 # GBA Duo Plus: tính năng và bộ công cụ companion
 
-**GBA Duo Plus 0.1.8-plus.4** là bản fork cộng đồng do [levi-soft](https://github.com/levi-soft)
-duy trì trên nền [GBA Duo v0.1.8 của khumam](https://github.com/khumam/gba-duo).
+**GBA Duo Plus 0.1.9-plus.2** là bản fork cộng đồng do [levi-soft](https://github.com/levi-soft)
+duy trì trên nền [GBA Duo v0.1.9 của khumam](https://github.com/khumam/gba-duo).
 Ứng dụng dành cho thiết bị Android hai màn hình, Android 11 trở lên, ARM64.
 Thiết bị phát triển chính là AYN Thor; các máy hai màn hình khác cần kiểm tra riêng.
 
-**[Tải APK và đọc ghi chú phát hành](https://github.com/levi-soft/gba-duo-plus/releases/tag/v0.1.8-plus.4)** ·
+**[Tải APK và đọc ghi chú phát hành](https://github.com/levi-soft/gba-duo-plus/releases/tag/v0.1.9-plus.2)** ·
 [Website Companion Builder](https://levi-soft.github.io/gba-duo-companion-builder/) ·
 [GBA Duo Studio](https://github.com/levi-soft/gba-duo-studio)
 
-## Nền 0.1.8
+## Nền 0.1.9
 
-Source đã ghép controller/hotkey mapping, Game settings, chỉnh màu riêng và artwork của upstream 0.1.8, giữ Builder 1.1.5 cùng các phần mở rộng Plus/SS. [Chi tiết nâng cấp](RELEASE-0.1.8-plus.1.md).
+Source đã ghép kho pack trực tuyến, FPS/CPU, tỉ lệ/phóng nguyên lần, tilt-shift và game.lua/Wide view của upstream 0.1.9. Điều khiển dùng mapping chính thức; bỏ Swap A/B riêng nhưng giữ mapping đã lưu. Builder 1.2.0, chọn unit FE, Studio, shader mở rộng và SS được giữ. Cocoon dùng [hồ sơ package Plus](COCOON-SETUP.vi.md).
 
 ## Mới ở 0.1.7-plus.4
 
@@ -19,9 +19,11 @@ Source đã ghép controller/hotkey mapping, Game settings, chỉnh màu riêng 
 
 ## 1. Tạo companion tự động ngay trong Plus
 
-Trong thư viện, chọn game → **Companion → Find and create companion**.
-Plus đọc game code và CRC32 của ROM, tìm profile tương thích, tải builder có kiểm
-tra kích thước/SHA-256, tạo pack ngay trên thiết bị, rồi cài và gán pack cho game.
+Trong thư viện, chọn game → **Companion pack → Get from the web…**.
+Trang kho dùng luồng tải ZIP chính thức và có thêm **Create companion** khi tìm
+được profile khớp chính xác ROM. Mục tạo riêng trong menu đã được bỏ. Khi chọn
+tạo, Plus kiểm tra game code/CRC32, tải builder có kiểm tra kích thước/SHA-256,
+tạo pack ngay trên thiết bị rồi trả kết quả về thư viện để gán.
 
 - ROM không được tải lên máy chủ và không bị chỉnh sửa.
 - Hình ảnh, sprite và văn bản cần cho pack được chuẩn bị từ ROM trên thiết bị.
@@ -46,22 +48,7 @@ Builder và Plus dùng chung bộ tạo companion. Trên website Chrome/Edge:
 3. Bấm **Build companion** và chờ xử lý cục bộ.
 4. Tải Local ZIP để nhập vào Plus, hoặc project JSON để chỉnh sửa trong Studio.
 
-Builder **1.1.0** hỗ trợ mười profile sau; tất cả companion là **1.0.0**.
-
-| Profile | Game code | CRC32 | Companion |
-|---|---|---|---|
-| FE7 Vietnamese | `AE7E` | `32CD990D` | 1.0.0 |
-| FE6 Vietnamese | `BE8E` | `BD53D5F3` | 1.0.0 |
-| FE8 Vietnamese | `BE8E` | `3CD932D7` | 1.0.0 |
-| FE7 English | `AE7E` | `2A524221` | 1.0.0 |
-| FE8 Europe | `BE8P` | `B3005195` | 1.0.0 |
-| FE8 English - USA/Australia | `BE8E` | `A47246AE` | 1.0.0 |
-| FE6 T-EN | `AFEJ` | `197DE10B` | 1.0.0 |
-| Project Ember | `AFEJ` | `636F7B05` | 1.0.0 |
-| Project Ember Reverse Recruitment | `AFEJ` | `29BC2257` | 1.0.0 |
-| Void's Blitzarre Adventure | `BE8E` | `9D22107C` | 1.0.0 |
-
-FE6 T-EN là FE6 gốc; FE6 Remastered Việt hóa là mod trên nền FE8. Void có sáu ô skill và Talk, nhưng phạm vi Map chưa tính skill thay đổi tầm/di chuyển. [Phạm vi và kiểm chứng](https://github.com/levi-soft/gba-duo-companion-builder/blob/main/docs/RELEASE-1.1.0.md).
+Builder **1.2.0** có **30 profile**, companion **1.0.0**. Xem [danh sách ROM hiện tại](https://levi-soft.github.io/gba-duo-companion-builder/supported-games.html?lang=vi) và [giới hạn kiểm chứng](https://github.com/levi-soft/gba-duo-companion-builder/releases/tag/v1.2.0).
 
 ## 3. Ảnh bìa thư viện game
 
@@ -95,7 +82,7 @@ ROM dịch/mod phải được RetroAchievements nhận diện và hỗ trợ đ
 
 - Bổ sung **xBRZ, HQ2x, ScaleFX** qua tích hợp GLES3 từ shader Libretro.
 - Giữ các bộ lọc gốc được lựa chọn và cơ chế ghi nhớ shader đã có ở upstream.
-- **Swap A/B** được ghi nhớ giữa các lần chơi.
+- Dùng bộ mapping/hotkey chính thức; lựa chọn A/B cũ được chuyển một lần vào mapping, không còn công tắc riêng.
 - Với profile Fire Emblem đã hỗ trợ, companion có thể gọi `input.focusUnit(id)`
   khi chạm nhân vật để điều hướng con trỏ bằng D-pad có giới hạn.
 - Điều hướng xét trạng thái game và nhường cho đầu vào tay cầm; đây không phải
@@ -122,13 +109,14 @@ Khả năng hiển thị và thao tác còn tùy pack, phiên bản ROM và thi�
 hoặc dữ liệu live và giao diện Việt/Anh. Có thể mở project từ Builder, sửa giao
 diện rồi xuất ZIP để nhập vào Plus.
 
-Trong Plus, bật **Studio Connection** cho từng phiên rồi kết nối qua USB/ADB để:
+Trong Plus, chọn **Settings → Studio Connection → On**, rồi mở game và kết nối qua USB/ADB để:
 
 - Đọc RAM và snapshot dữ liệu companion.
 - Kiểm tra ROM, VRAM, palette và OAM trong phạm vi giới hạn.
 - Cho công cụ phát hiện khả năng mà bridge hỗ trợ qua protocol revision 2.
 
 Bridge máy tính này chỉ đọc, không mở cổng LAN và không có lệnh ghi RAM.
+Lựa chọn bật/tắt được lưu cho những lần mở game sau, riêng cho Plus và Plus SS.
 Quyền ghi RAM dành cho pack của upstream là cơ chế riêng.
 Xem [giao thức và cách kết nối](STUDIO-CONNECTION.md).
 

@@ -15,9 +15,32 @@ class BuilderDistribution(
     private val cache: File,
     private val fetch: (URI, Long, BuildCancellation) -> ByteArray = ::download,
 ) {
+    /** Discovery deliberately does not download, verify or extract the builder bundle. */
+    fun catalog(catalogUri: URI, token: BuildCancellation): BuilderCatalog {
+        BuilderCatalog.origin(catalogUri); token.check()
+        // A new discovery record must not replace the last verified catalog/bundle pair.
+        val metadata = record(catalogUri, "metadata")
+        try {
+            val bytes = fetch(catalogUri, BuilderCatalog.MAX_CATALOG_BYTES, token)
+            require(bytes.size <= BuilderCatalog.MAX_CATALOG_BYTES) { "Catalogue exceeds size limit" }
+            val catalog = BuilderCatalog.parse(bytes.toString(Charsets.UTF_8), catalogUri)
+            token.check(); BuilderFiles.atomicWrite(metadata, bytes)
+            return catalog
+        } catch (network: IOException) {
+            token.check()
+            val cached = listOf(metadata, record(catalogUri, "catalog")).firstOrNull {
+                it.isFile && it.length() in 1..BuilderCatalog.MAX_CATALOG_BYTES
+            } ?: throw network
+            val catalog = BuilderCatalog.parse(cached.readText(), catalogUri)
+            token.check(); return catalog
+        }
+    }
+
+    private fun record(uri: URI, kind: String) = File(cache, "$kind-${BuilderFiles.sha256(uri.toString().toByteArray(Charsets.UTF_8))}.json")
+
     fun resolve(catalogUri: URI, token: BuildCancellation): ResolvedBuilder {
         BuilderCatalog.origin(catalogUri)
-        val record = File(cache, "catalog-${BuilderFiles.sha256(catalogUri.toString().toByteArray())}.json")
+        val record = record(catalogUri, "catalog")
         var unclaimedDirectory: File? = null
         try {
             val bytes = fetch(catalogUri, BuilderCatalog.MAX_CATALOG_BYTES, token)

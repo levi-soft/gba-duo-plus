@@ -27,7 +27,7 @@ sealed interface KeyResult {
  * actions, game buttons. While the hotkey button is held nothing new reaches the game; a
  * hotkey button that's also a game button reaches it as a short tap when released alone.
  */
-class InputMapper(private var scheme: ControlScheme = ControlScheme.DEFAULT) {
+class InputMapper(private val scheme: ControlScheme = ControlScheme.DEFAULT) {
 
     @Volatile private var pressed = 0
     @Volatile private var ffHeld = false
@@ -38,14 +38,6 @@ class InputMapper(private var scheme: ControlScheme = ControlScheme.DEFAULT) {
     /** Screen labels are logical GBA buttons; physical controller remapping never changes them. */
     fun setTouchKeys(keys: Int) { touchKeys = keys and 0x3ff }
     fun setTouchFastForward(enabled: Boolean) { touchFastForward = enabled }
-
-    fun swapAbButtons(): ControlScheme {
-        releaseAll()
-        scheme = scheme.copy(buttons = scheme.buttons + mapOf(
-            GbaKeys.A to scheme.buttons.getValue(GbaKeys.B),
-            GbaKeys.B to scheme.buttons.getValue(GbaKeys.A)))
-        return scheme
-    }
 
     private var hotkeyDown = false
     private var comboUsed = false

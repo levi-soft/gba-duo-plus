@@ -1,7 +1,11 @@
 package com.khumam.gbaduo.player.singlescreen
 
+import com.khumam.gbaduo.emu.AspectRatio
+import com.khumam.gbaduo.emu.ScreenFit
+import com.khumam.gbaduo.emu.WideView
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.roundToInt
 
 /** Pixel geometry. Window size selects the layout; device names and native resolutions do not. */
 internal object SingleScreenLayout {
@@ -17,7 +21,7 @@ internal object SingleScreenLayout {
         fun next() = entries[(ordinal + 1) % entries.size]
     }
     data class Arrangement(val game: Rect, val companion: Rect, val controls: Map<Control, Rect>, val mode: Mode,
-        val logo: Rect, val gameOnly: Boolean = false)
+        val logo: Rect, val gameOnly: Boolean = false, val gameArea: Rect = game)
 
     private val footerControls = listOf(Control.SWAP, Control.QUICK_SAVE, Control.SELECT, Control.MENU,
         Control.START, Control.QUICK_LOAD, Control.FAST_FORWARD)
@@ -77,12 +81,14 @@ internal object SingleScreenLayout {
         }
         if (gameOnly) {
             val game: Rect
+            val gameArea: Rect
             if (portrait) {
                 // Balance three separate zones above the fixed utility row.
                 val playBottom = controls.getValue(Control.MENU).y - gap
                 val controlHeight = min(260f * density, h * .46f)
                 val screenBox = Rect(gap, gap, (w - gap * 2).coerceAtLeast(1f),
                     (playBottom * .48f - gap * 2).coerceAtLeast(1f))
+                gameArea = screenBox
                 val fitted = fit(screenBox, gameAspect)
                 game = fitted.copy(y = screenBox.y + (screenBox.height - fitted.height) / 2)
                 val small = min(hit, w * .105f)
@@ -102,6 +108,7 @@ internal object SingleScreenLayout {
                 val rail = w * if (expanded) .18f else .16f
                 val screenBox = Rect(rail + gap * 2, gap, (w - rail * 2 - gap * 4).coerceAtLeast(1f),
                     (h - footer - gap * 2).coerceAtLeast(1f))
+                gameArea = screenBox
                 val fitted = fit(screenBox, gameAspect)
                 game = fitted.copy(y = screenBox.y + (screenBox.height - fitted.height) / 2)
                 val pad = min(rail * .90f, min(h * .38f, 144f * density))
@@ -118,10 +125,11 @@ internal object SingleScreenLayout {
                 logo = Rect((rail - logoWidth) / 2, h * .29f, logoWidth, min(36f * density, h * .09f))
             }
             return Arrangement(shifted(game), Rect(0f, topInset, 0f, 0f),
-                controls.mapValues { shifted(it.value) }, mode, shifted(logo), gameOnly = true)
+                controls.mapValues { shifted(it.value) }, mode, shifted(logo), gameOnly = true, gameArea = shifted(gameArea))
         }
         val first: Rect
         val second: Rect
+        var gameArea: Rect? = null
         when (mode) {
             Mode.PHONE_LANDSCAPE -> {
                 val leftRail = w * .12f
@@ -132,7 +140,7 @@ internal object SingleScreenLayout {
                     screenHeightLimit / smallRatio)
                 val controlBox = Rect(w - gap - controlWidth, gap, controlWidth, controlWidth * smallRatio)
                 val baselineBox = Rect(leftRail + gap, gap, controlBox.x - leftRail - gap * 3, h - footer - gap * 2)
-                fun frames(primaryAspect: Float, secondaryAspect: Float): Pair<Rect, Rect> {
+                fun frames(primaryAspect: Float, secondaryAspect: Float): Triple<Rect, Rect, Rect> {
                     val extraWidth = (baselineBox.width - baselineBox.height * primaryAspect).coerceAtLeast(0f)
                     val secondaryWidth = min(controlWidth + extraWidth, screenHeightLimit * secondaryAspect)
                     val secondaryBox = Rect(w - gap - secondaryWidth, gap, secondaryWidth, secondaryWidth / secondaryAspect)
@@ -140,13 +148,15 @@ internal object SingleScreenLayout {
                     val fitted = fit(primaryBox, primaryAspect)
                     val primary = fitted.copy(x = primaryBox.right - fitted.width)
                     val centeredPrimary = primary.copy(y = primaryBox.y + (primaryBox.height - primary.height) / 2)
-                    return centeredPrimary to fit(secondaryBox, secondaryAspect).copy(y = centeredPrimary.y)
+                    return Triple(centeredPrimary, fit(secondaryBox, secondaryAspect).copy(y = centeredPrimary.y), primaryBox)
                 }
                 val normalFrames = frames(gameAspect, 4f / 3f)
                 val swappedFrames = frames(4f / 3f, gameAspect)
                 val selected = if (swapped) swappedFrames else normalFrames
                 first = selected.first
                 second = selected.second
+                // Only the primary pane has spare width isolated from the touch controls.
+                gameArea = if (swapped) selected.second else selected.third
                 // Keep one portrait-style A/B cluster in both screen orders.
                 // Its lower-left button can use the empty space beside R.
                 val faceTop = max(normalFrames.second.bottom, swappedFrames.second.bottom) + gap
@@ -203,8 +213,29 @@ internal object SingleScreenLayout {
                 logo = logo.copy(y = centre - logo.height / 2)
             }
         }
-        return Arrangement(shifted(if (swapped) second else first), shifted(if (swapped) first else second),
-            controls.mapValues { shifted(it.value) }, mode, shifted(logo))
+        val game = if (swapped) second else first
+        return Arrangement(shifted(game), shifted(if (swapped) first else second),
+            controls.mapValues { shifted(it.value) }, mode, shifted(logo), gameArea = shifted(gameArea ?: game))
+    }
+
+    /** Fit the upstream display options inside this pane, without moving the controls or companion. */
+    fun withDisplayOptions(base: Arrangement, nativeWidth: Int, nativeHeight: Int, aspect: AspectRatio,
+        integer: Boolean, wide: Boolean): Arrangement {
+        val gba = nativeWidth == WideView.FRAME_WIDTH && nativeHeight == WideView.FRAME_HEIGHT
+        val enabledWide = wide && gba
+        if (aspect == AspectRatio.ORIGINAL && !integer && !enabledWide) return base
+        val area = base.gameArea
+        val width = area.width.roundToInt().coerceAtLeast(1)
+        val height = area.height.roundToInt().coerceAtLeast(1)
+        val videoWidth = if (gba) WideView.wantedWidth(enabledWide, true, width, height, integer) else nativeWidth
+        // Upstream Wide view paints square pixels; explicit aspect overrides resume when it closes.
+        val effectiveAspect = if (enabledWide && videoWidth > nativeWidth) AspectRatio.ORIGINAL else aspect
+        val viewport = ScreenFit.viewport(width, height, videoWidth, nativeHeight, effectiveAspect, integer)
+        // Very small split panes may be smaller than one native pixel scale. Keep the
+        // surface within its pane; GameView handles the upstream integer viewport inside it.
+        val w = min(area.width, viewport.width.toFloat())
+        val h = min(area.height, viewport.height.toFloat())
+        return base.copy(game = Rect(area.x + (area.width - w) / 2, area.y + (area.height - h) / 2, w, h))
     }
 
     private fun fit(box: Rect, aspect: Float): Rect {

@@ -9,6 +9,7 @@ class ShaderPresetTest {
     fun byIdFindsMatchingPreset() {
         assertEquals(ShaderPreset.HQ2X, ShaderPreset.byId("hq2x"))
         assertEquals(ShaderPreset.XBRZ, ShaderPreset.byId("xbrz"))
+        assertEquals(ShaderPreset.LCD, ShaderPreset.byId("lcd"))
     }
 
     @Test

@@ -6,6 +6,19 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class CompanionInputTest {
+    @Test fun officialGameScriptFormatPreservesTheLegacyReadOnlyCursorContract() {
+        val legacy = PackManifest.parse(manifest().toString())
+        val withGame = PackManifest.parse(manifest().put("formatVersion", 4).put("gameScript", "game.lua").toString())
+        assertEquals(17, config().length())
+        assertEquals(2, legacy.formatVersion)
+        assertNull(legacy.gameScriptFile)
+        assertFalse(legacy.canWriteMemory)
+        assertEquals("game.lua", withGame.gameScriptFile)
+        assertFalse(withGame.canWriteMemory)
+        assertEquals(legacy.cursorNavigation, withGame.cursorNavigation)
+        assertEquals(CursorProfile.FE6_EMBER, CompanionCursorProfile.resolve(withGame, "TEST", 0x12345678L))
+    }
+
     private fun config(profile: CursorProfile = CursorProfile.FE6_EMBER): JSONObject = JSONObject().apply {
         put("version", 1); put("kind", "fe-map")
         for (field in listOf("cursor", "size", "chapter", "turn", "bm", "procs", "playerScript", "idlePc", "blue", "green", "red", "unavailableMask")) {

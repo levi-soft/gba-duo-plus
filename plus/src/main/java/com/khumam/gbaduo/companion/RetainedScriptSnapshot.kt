@@ -12,7 +12,7 @@ internal class RetainedScriptSnapshot {
             return next
         }
         val previous = valid ?: return next + ("_scriptStale" to true)
-        return previous + mapOf(
+        return previous + next.filterKeys { it == "_wide" || it == "_wideLabel" } + mapOf(
             "_frameCounter" to next["_frameCounter"],
             "_scriptError" to next["_scriptError"],
             "_scriptStale" to true,

@@ -1,22 +1,23 @@
-# Plus 0.1.8 compared with official GBA Duo v0.1.8
+# Plus 0.1.9 compared with official GBA Duo v0.1.9
 
-Baseline: official tag `v0.1.8`, commit `8832d19ebc833da2ab3303d2d1ff48e5720ea68c`.
-This is a source comparison; runtime validation limits are in [VALIDATION](VALIDATION.md).
+Baseline: official tag `v0.1.9`, commit `61582fcb5e07d98b19675e75e9bde532a7c68c4c`.
+This is a source/integration inventory. Actual build and device evidence is
+recorded separately in [VALIDATION](VALIDATION.md).
 
-| Capability | Official 0.1.8 | Plus integration |
-|---|---|---|
-| GB/GBC/GBA emulation | mGBA, dual-screen player | Same pinned mGBA revision; retain the normal player and optional SS edition. |
-| Controllers and hotkeys | Full remapping, hold/toggle fast-forward, quick states and slot selection | Adopt upstream. Migrate existing Plus A/B preferences; SS touch labels remain independent of physical mappings. |
-| Shader and color settings | Global and per-game shader selection; independent Off/GBA/GBC color correction | Adopt upstream settings; retain xBRZ, HQ2x and ScaleFX. Apply correction once at their final output. Legacy GBA Color selection becomes GBA correction. Scale2x remains hidden as in Plus. |
-| Game artwork | SteamGridDB, artwork folder, scraping and per-game locks | Use one shared artwork cache and encrypted SGDB key. Retain Libretro without an API key, the Plus SGDB gallery, manual import and square covers. Copy legacy selections without deleting rollback data. |
-| Save synchronization and import | External save folder; import existing `.sav` | Adopt upstream import handling; retain RA state sidecar synchronization and stable per-ROM storage identity. |
-| RetroAchievements | Official Softcore client, queued popups, transparent-region and unknown-game fixes | Adopt fixes; retain Keystore token protection, achievement list, state progress and bottom-right popups with 70% panel opacity. |
-| Companion JSON/CSS/Lua and graphics | Official format, responsive layout, bounded scripts, permission-gated RAM writes | Retain Plus selector/rendering fixes, last valid snapshot retention and standard button requests. FE navigation uses exact-ROM pack metadata with physical-input cancellation. |
-| Automatic companions | No bundled automatic builder | Retain verified Builder integration, local generation, installation and pack management. Builder remains 1.1.5; companion versions do not change. |
-| Studio Connection | No Plus inspection bridge | Retain optional per-session read-only RAM/ROM/graphics inspection through ADB. |
-| Single Screen | No Plus SS edition | Preserve the approved phone, foldable and tablet layouts, touch controls, quick states, swap and theme switching. |
-| Launcher integration | External launch entry point | Retain Plus path aliases and existing-session handling. |
-| Translation, hash overrides, Hardcore | Outside this Plus release | Remain excluded. ROM identity is not replaced. |
+| Capability | Integration decision |
+|---|---|
+| GB/GBC/GBA core | Adopt official 0.1.9; retain the same pinned mGBA revision. |
+| Controls and hotkeys | Use the official mapper as the only physical-button configuration. Remove Plus Swap A/B UI/API; retain one-time migration without overriding a saved scheme. SS touch labels keep their semantic A/B meaning. |
+| Web companion packs | Use the official catalog/downloader/update/installer path. Get from the web is the single entry and also offers exact-ROM local creation profiles on that page. |
+| Local companion creation | Keep Builder 1.2.0: exact-ROM local generation is distinct from downloading prepared ZIPs. All thirty companion profiles remain 1.0.0. |
+| Display | Adopt official aspect/integer/sharp scaling, tilt-shift and FPS/CPU overlay. Plus shaders draw into the official viewport/offscreen targets; color correction is applied once. |
+| game.lua / Wide view | Adopt official format 4 and independent game-script VM/budgets. Preserve permission and safety-save boundaries. |
+| Native FE focus | Keep existing tap-only D-pad/button API and exact-ROM cursor metadata for format-2 packs; game-write permission remains unnecessary. |
+| Companion errors | Retain the last valid unit/map snapshot; current frame/error/Wide state remains live. |
+| Cocoon | Reuse official VIEW/URI protocol and unchanged artwork matching. Cocoon's registry needs a Plus package entry; supply supported local platform-import profiles instead of changing application identity. |
+| Artwork | Keep official folder/Cocoon and SteamGridDB flow, plus Libretro/manual import, shared storage and chosen cover shapes. |
+| Studio / SS | Move Studio Connection to a saved Off/On Settings choice. Keep read-only inspection and the separate single-screen edition, using upstream display geometry within each allocated game pane. |
+| RA and save identity | Keep the official client with existing encrypted-token/list/state-sidecar extensions and stable per-ROM storage. |
 
-Original authorship and dependency licenses remain in Git history and source notices.
-Private ROMs, saves, companion packs, captures and signing credentials are not shipped.
+Original authorship and dependency notices are retained. No ROM, save, private
+companion, signing credential or private device capture belongs in this source.

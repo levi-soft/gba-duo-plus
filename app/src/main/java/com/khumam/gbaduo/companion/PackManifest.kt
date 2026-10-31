@@ -31,6 +31,8 @@ data class PackManifest(
     val permissions: Set<String> = emptySet(),
     /** Optional exact-ROM map navigation contract, interpreted by Plus. */
     val cursorNavigation: CursorProfile? = null,
+    /** The pack's game.lua (relative to the pack root), run against the game itself every frame; see [GameScriptAccess]. */
+    val gameScriptFile: String? = null,
 ) {
     /** The pack's actions may change the game's RAM (`mem.write*`), once the player allows it. */
     val canWriteMemory: Boolean get() = MEMORY_WRITE in permissions
@@ -42,10 +44,11 @@ data class PackManifest(
     class InvalidManifestException(message: String) : Exception(message)
 
     companion object {
-        /** 1: original format. 2: adds `styles` (CSS). 3: adds `permissions`. */
-        const val SUPPORTED_FORMAT_VERSION = 3
+        /** 1: original format. 2: adds `styles` (CSS). 3: adds `permissions`. 4: adds `gameScript`. */
+        const val SUPPORTED_FORMAT_VERSION = 4
         private const val STYLES_FORMAT_VERSION = 2
         private const val PERMISSIONS_FORMAT_VERSION = 3
+        private const val GAME_SCRIPT_FORMAT_VERSION = 4
 
         const val MEMORY_WRITE = "memory-write"
 
@@ -56,6 +59,15 @@ data class PackManifest(
         fun isValidId(id: String): Boolean = ID_REGEX.matches(id)
 
         private fun hex(s: String): Long = s.removePrefix("0x").removePrefix("0X").toLong(16)
+
+        /** Manifest references are pack-relative on Android and on desktop tooling. */
+        private fun packPath(path: String, field: String): String {
+            if (path.isBlank() || path.startsWith('/') || '\\' in path || '\u0000' in path ||
+                Regex("^[A-Za-z]:").containsMatchIn(path) || path.split('/').any { it == ".." }) {
+                throw InvalidManifestException("Unsafe $field path")
+            }
+            return path
+        }
 
         fun parse(json: String): PackManifest {
             val root = try {
@@ -91,7 +103,9 @@ data class PackManifest(
                 )
             }
 
-            val styleFiles = root.optJSONArray("styles")?.let { arr -> (0 until arr.length()).map { arr.getString(it) } } ?: emptyList()
+            val styleFiles = root.optJSONArray("styles")?.let { arr ->
+                (0 until arr.length()).map { packPath(arr.getString(it), "styles") }
+            } ?: emptyList()
             if (styleFiles.isNotEmpty() && formatVersion < STYLES_FORMAT_VERSION) {
                 throw InvalidManifestException("'styles' needs formatVersion $STYLES_FORMAT_VERSION")
             }
@@ -100,6 +114,10 @@ data class PackManifest(
             val permissions = permissionsJson?.let { arr -> (0 until arr.length()).map { arr.getString(it) }.toSet() } ?: emptySet()
             if (permissionsJson != null && formatVersion < PERMISSIONS_FORMAT_VERSION) {
                 throw InvalidManifestException("'permissions' needs formatVersion $PERMISSIONS_FORMAT_VERSION")
+            }
+            val gameScriptFile = root.optString("gameScript", "").ifBlank { null }?.let { packPath(it, "gameScript") }
+            if (gameScriptFile != null && formatVersion < GAME_SCRIPT_FORMAT_VERSION) {
+                throw InvalidManifestException("'gameScript' needs formatVersion $GAME_SCRIPT_FORMAT_VERSION")
             }
             val unknown = permissions - PERMISSIONS
             if (unknown.isNotEmpty()) {
@@ -125,12 +143,13 @@ data class PackManifest(
                 gameCodes = gameCodes,
                 crc32s = crc32s,
                 tickHz = root.optInt("tickHz", 4).coerceIn(1, 30),
-                layoutFile = root.optString("layout", "layout.json"),
-                scriptFile = root.optString("script", "").ifBlank { null },
+                layoutFile = packPath(root.optString("layout", "layout.json"), "layout"),
+                scriptFile = root.optString("script", "").ifBlank { null }?.let { packPath(it, "script") },
                 values = values,
                 styleFiles = styleFiles,
                 permissions = permissions,
                 cursorNavigation = cursorNavigation,
+                gameScriptFile = gameScriptFile,
             )
         }
     }

@@ -10,15 +10,15 @@ upgrade procedure.
 
 - Original application: https://github.com/khumam/gba-duo
 - Creator/project owner: **khumam**, with upstream contributors.
-- Plus baseline: **v0.1.8**, commit `8832d19ebc833da2ab3303d2d1ff48e5720ea68c`.
+- Plus baseline: **v0.1.9**, commit `61582fcb5e07d98b19675e75e9bde532a7c68c4c`.
 - Plus repository/maintenance: https://github.com/levi-soft/gba-duo-plus
 - Overall application license: GNU GPL v3, retaining individual component notices.
 
-The publication started from official v0.1.6 history. The 0.1.8 upgrade merges the official v0.1.8 tag while retaining the Plus-specific additions. Original authorship remains visible in Git history. It does not import the private experimental Dev branch history, local machine configuration, credentials, device data or private companion releases.
+The publication started from official v0.1.6 history. The 0.1.9 upgrade merges the official v0.1.9 tag while retaining the Plus-specific additions. Original authorship remains visible in Git history. It does not import the private experimental Dev branch history, local machine configuration, credentials, device data or private companion releases.
 
 Some Plus work was developed in a local experimental Dev edition before being selected for Plus. Hash-override and translation experiments were deliberately excluded from this edition. Their absence is tested; they are not simply hidden menu items.
 
-When updating the fork, compare the chosen upstream revision first. Do not label an inherited capability as a new Plus feature. For example, external LaunchActivity support and saved shader selection already belong to the official v0.1.6 baseline; Plus adopts/extends them. The comparison in [FEATURES](FEATURES.md) is explicitly pinned to the current 0.1.8 baseline.
+When updating the fork, compare the chosen upstream revision first. Do not label an inherited capability as a new Plus feature. For example, external LaunchActivity support and saved shader selection already belong to the official v0.1.6 baseline; Plus adopts/extends them. The comparison in [FEATURES](FEATURES.md) is explicitly pinned to the current 0.1.9 baseline.
 
 The `upstream` remote is a local development convenience and is not embedded in GitHub clones. Contributors may add it themselves:
 

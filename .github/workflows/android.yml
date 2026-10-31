@@ -21,6 +21,7 @@ jobs:
       - name: Verify upstream extension boundary
         run: |
           node --test tools/upstream-boundary.test.mjs
+          node --test tools/cocoon/build-profiles.test.mjs
           node tools/upstream-boundary.mjs check
       - uses: android-actions/setup-android@v3
         with:
@@ -33,7 +34,7 @@ jobs:
       - name: Focused release tests
         run: >-
           ./gradlew :app:testReleaseUnitTest
-          --tests '*PlusFeatureContractTest' --tests '*BridgeProtocolTest'
+          --tests '*PlusFeatureContractTest' --tests '*BridgeProtocolTest' --tests '*StudioConnection*Test'
           --tests '*FeMapCursorNavigatorTest' --tests '*CompanionInputTest' --tests '*InputMapperTest'
           --tests '*PlusUpgradeTest' --tests '*Control*Test' --tests '*KeyCaptureTest' --tests '*KeyNamesTest'
           --tests '*GameShaderTest' --tests '*GameSettingsTest' --tests '*SaveLibraryImportTest'
@@ -43,6 +44,12 @@ jobs:
           --tests '*ResponsiveCssTest' --tests '*GameTitleTest'
           --tests '*SaveSyncTest' --tests '*GameStorageTest'
           --tests '*PackFingerprintTest' --tests '*PackManifestTest'
+          --tests '*PackCatalogTest' --tests '*PackDownloaderTest' --tests '*PackUpdatesTest'
+          --tests '*WideControlTest' --tests '*GameScriptAccessTest'
+          --tests '*ScreenFitTest' --tests '*WideViewTest' --tests '*TiltShiftTest'
+          --tests '*CompanionMenuIntegrationTest' --tests '*PackCatalogActivityTest'
+          --tests '*WebCompanionCreation*Test'
+          --tests '*AutomaticBuilderActivityTest'
           --tests '*RetroAchievementsActivityTest'
           --tests '*AchievementPopupsTest' --tests '*CompanionTreeTest'
           --tests '*AutomaticBuilderCoreTest' --tests '*BuilderRomSourceTest'
@@ -58,7 +65,10 @@ jobs:
           ./gradlew -PsingleScreen=true :app:testDebugUnitTest
           --tests '*SingleScreen*Test' --tests '*TouchButtonsTest'
           --tests '*StartupTasksTest' --tests '*InputMapperTest' --tests '*CoreSessionTest'
-          --tests '*PlusFeatureContractTest'
+          --tests '*PlusFeatureContractTest' --tests '*StudioConnection*Test'
+          --tests '*CompanionMenuIntegrationTest' --tests '*PackCatalogActivityTest'
+          --tests '*WebCompanionCreation*Test'
+          --tests '*AutomaticBuilderActivityTest'
       - name: Build separate Single Screen APK
         run: ./gradlew -PsingleScreen=true :app:assembleRelease
       - uses: actions/upload-artifact@v4

@@ -23,10 +23,15 @@ import com.khumam.gbaduo.artwork.ArtworkLibraryControls
 import com.khumam.gbaduo.achievements.RetroAchievements
 import com.khumam.gbaduo.companion.PackInstaller
 import com.khumam.gbaduo.companion.PackManifest
+import com.khumam.gbaduo.companion.Fetch
+import com.khumam.gbaduo.companion.PackDownloader
 import com.khumam.gbaduo.companion.PackStore
 import com.khumam.gbaduo.companion.management.CompanionPackManagement
 import com.khumam.gbaduo.companion.management.InstalledPackStorage
-import com.khumam.gbaduo.companion.builder.AutomaticCompanionEntry
+import com.khumam.gbaduo.companion.builder.WebCompanionCreation
+import com.khumam.gbaduo.companion.builder.BuilderFiles
+import com.khumam.gbaduo.companion.PackUpdates
+import com.khumam.gbaduo.library.artwork.UrlHttp
 import com.khumam.gbaduo.library.ui.CartridgeCarousel
 import com.khumam.gbaduo.library.ui.DialogBoxDrawable
 import com.khumam.gbaduo.library.ui.Fonts
@@ -36,12 +41,14 @@ import com.khumam.gbaduo.library.ui.Pixel
 import com.khumam.gbaduo.library.ui.PixelBoxDrawable
 import com.khumam.gbaduo.library.ui.PixelButton
 import com.khumam.gbaduo.player.PlayerActivity
+import com.khumam.gbaduo.settings.PackCatalogActivity
 import com.khumam.gbaduo.settings.RomFoldersActivity
 import com.khumam.gbaduo.settings.SettingsActivity
 import com.khumam.gbaduo.settings.GameSettingsActivity
 import com.khumam.gbaduo.storage.GameStorage
 import com.khumam.gbaduo.storage.LegacyMigration
 import java.io.File
+import org.json.JSONObject
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
@@ -76,7 +83,20 @@ class LibraryActivity : Activity() {
     private val packsDir by lazy { File(filesDir, "packs") }
     private val packStore by lazy { PackStore(packsDir) }
     private val prefs by lazy { getSharedPreferences("library", MODE_PRIVATE) }
+    private val packUpdates by lazy { PackUpdates(getSharedPreferences("pack_updates", MODE_PRIVATE)) }
     private var pickPackFor: GameStorage? = null
+    private data class WebPackRequest(
+        val id: String,
+        val requestCode: Int,
+        val entry: RomEntry,
+        val crc32: Long,
+        val storage: GameStorage,
+        val originalPackId: String?,
+        val source: WebCompanionCreation.Source?,
+    )
+    private var webPackRequest: WebPackRequest? = null
+    private var nextWebRequestCode = REQUEST_WEB_PACK
+    internal var writeWebPackAssignmentTemporary: ((File, ByteArray) -> Unit)? = null
 
     /** Folder scans and ROM hashing are blocking SAF I/O; one background thread keeps them ordered. */
     private val io: ExecutorService = Executors.newSingleThreadExecutor()
@@ -250,6 +270,7 @@ class LibraryActivity : Activity() {
         super.onResume()
         carousel.reloadArtwork()
         refresh()
+        checkPackUpdates()
         if (motion) blink.postDelayed(blinkStep, BLINK_MS)
     }
 
@@ -260,6 +281,7 @@ class LibraryActivity : Activity() {
     }
 
     override fun onDestroy() {
+        webPackRequest = null
         carousel.release()
         io.shutdownNow()
         super.onDestroy()
@@ -300,7 +322,7 @@ class LibraryActivity : Activity() {
         tagPlatform.text = entry.platform.label
         tagCode.text = entry.gameCode
         tagCode.visibility = if (entry.gameCode.isBlank()) View.GONE else View.VISIBLE
-        tagPack.text = getString(R.string.tag_pack)
+        tagPack.text = getString(if (carousel.hasPackUpdate(entry)) R.string.tag_pack_update else R.string.tag_pack)
         tagPack.visibility = if (carousel.hasPack(entry)) View.VISIBLE else View.GONE
         fileName.text = entry.fileName
         position.text = getString(R.string.position_of, pad(index + 1), pad(carousel.items.size))
@@ -329,12 +351,15 @@ class LibraryActivity : Activity() {
         background(work = {
             val entries = library.list()
             // Packs match by game code; a pack that also pins CRCs is checked when you open its menu.
-            val codes = packStore.list().flatMap { it.gameCodes }.toSet()
-            entries to codes
+            val packs = packStore.list()
+            val codes = packs.flatMap { it.gameCodes }.toSet()
+            val updatable = packUpdates.updatableIds(packs.associate { it.id to it.version }, BuildConfig.VERSION_NAME)
+            val updateCodes = packs.filter { it.id in updatable }.flatMap { it.gameCodes }.toSet()
+            Triple(entries, codes, updateCodes)
         }) { result ->
             if (generation != refreshGeneration) return@background // a newer refresh superseded this one
-            val (entries, codes) = result.getOrDefault(emptyList<RomEntry>() to emptySet())
-            carousel.submit(entries, codes, keepFileName = prefs.getString(KEY_LAST_SELECTED, null))
+            val (entries, codes, updateCodes) = result.getOrDefault(Triple(emptyList<RomEntry>(), emptySet(), emptySet()))
+            carousel.submit(entries, codes, updateCodes, keepFileName = prefs.getString(KEY_LAST_SELECTED, null))
             updateHud(entries)
             when {
                 entries.isNotEmpty() -> showShelf()
@@ -418,6 +443,22 @@ class LibraryActivity : Activity() {
 
     // ---- companion packs ------------------------------------------------------------
 
+    /** Looks for newer versions of installed packs at most twice a day; a hit shows on the cartridge's pack tag. */
+    private fun checkPackUpdates() {
+        val now = System.currentTimeMillis()
+        if (!packUpdates.isStale(now)) return
+        background(work = {
+            if (packStore.list().isEmpty()) return@background null
+            PackDownloader(UrlHttp(), packsDir, cacheDir).catalog()
+        }) { result ->
+            when (val fetched = result.getOrNull()) {
+                null -> if (result.isFailure) packUpdates.markFailed(now)
+                is Fetch.Ok -> { packUpdates.save(fetched.value, now); refresh() }
+                is Fetch.Failed -> packUpdates.markFailed(now)
+            }
+        }
+    }
+
     /** Runs [work] on [io], then [onResult] on the main thread unless the activity has gone away. */
     private fun <T> background(work: () -> T, onResult: (Result<T>) -> Unit) {
         if (io.isShutdown) return
@@ -477,9 +518,8 @@ class LibraryActivity : Activity() {
             val name = if (pack.id == assignedId) "✓ $label" else label
             if (pack.canWriteMemory) "$name · ${getString(R.string.pack_modifies_game)}" else name
         }
-        val automaticIndex = labels.size
-        labels += getString(R.string.plus_builder_create)
         labels += getString(R.string.import_pack)
+        labels += getString(R.string.pack_web_get)
 
         AlertDialog.Builder(this)
             .setTitle(R.string.companion_pack)
@@ -489,10 +529,22 @@ class LibraryActivity : Activity() {
             .setItems(labels.toTypedArray()) { _, which ->
                 when (which) {
                     0 -> storage.packId = null
-                    automaticIndex -> AutomaticCompanionEntry.launch(this, entry, storage, crc32)
-                    labels.size - 1 -> {
+                    labels.size - 2 -> {
                         pickPackFor = storage
                         pickPackZip()
+                    }
+                    labels.size - 1 -> {
+                        val requestId = java.util.UUID.randomUUID().toString()
+                        val requestCode = nextWebRequestCode++
+                        if (nextWebRequestCode > 0x7fff) nextWebRequestCode = REQUEST_WEB_PACK
+                        val web = Intent(this, PackCatalogActivity::class.java)
+                            .putExtra(PackCatalogActivity.EXTRA_GAME_CODE, entry.gameCode)
+                            .putExtra(PackCatalogActivity.EXTRA_TITLE, GameTitle.display(entry.fileName, entry.title))
+                            .putExtra(PackCatalogActivity.EXTRA_REQUEST_ID, requestId)
+                        WebCompanionCreation.attachSource(web, entry, crc32)
+                        webPackRequest = WebPackRequest(requestId, requestCode, entry, crc32, storage,
+                            storage.packId, WebCompanionCreation.source(web))
+                        startActivityForResult(web, requestCode)
                     }
                     else -> storage.packId = matches[which - 1].id
                 }
@@ -511,6 +563,32 @@ class LibraryActivity : Activity() {
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode == REQUEST_PICK_PACK) handlePackPicked(resultCode, data)
+        if (requestCode >= REQUEST_WEB_PACK) {
+            val request = webPackRequest?.takeIf { it.requestCode == requestCode } ?: return
+            if (resultCode != RESULT_OK) {
+                webPackRequest = null
+                return
+            }
+            // A result from an older page cannot consume a newer request or select its pack.
+            val result = data ?: return
+            if (result.getStringExtra(PackCatalogActivity.EXTRA_REQUEST_ID) != request.id) return
+            webPackRequest = null
+            if (isFinishing || isDestroyed || request.storage.packId != request.originalPackId) return
+            if (WebCompanionCreation.source(result) != request.source) return
+            val id = result.getStringExtra(PackCatalogActivity.EXTRA_PACK_ID) ?: return
+            if (!PackManifest.isValidId(id)) return
+            val manifest = packStore.byId(id) ?: return
+            if (!manifest.matches(request.entry.gameCode, request.crc32)) return
+            try {
+                // Result-only creation deferred selection until this acceptance boundary.
+                // A failed/partial write must never truncate the previous assignment.
+                BuilderFiles.atomicWrite(File(request.storage.dir, "pack.json"),
+                    JSONObject().put("packId", id).toString().toByteArray(Charsets.UTF_8),
+                    writeWebPackAssignmentTemporary)
+            } catch (error: Exception) {
+                Toast.makeText(this, "Could not select companion: ${error.message.orEmpty()}", Toast.LENGTH_LONG).show()
+            }
+        }
     }
 
     private fun handlePackPicked(resultCode: Int, data: Intent?) {
@@ -536,6 +614,7 @@ class LibraryActivity : Activity() {
 
     companion object {
         private const val REQUEST_PICK_PACK = 2
+        private const val REQUEST_WEB_PACK = 0x2000
         private const val KEY_LAST_SELECTED = "last_selected"
         private const val JUMP = 5
         private const val BLINK_MS = 530L

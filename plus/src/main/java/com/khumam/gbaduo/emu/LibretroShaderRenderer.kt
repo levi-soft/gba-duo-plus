@@ -74,19 +74,19 @@ internal class LibretroShaderRenderer(private val assets: AssetManager, private 
         } finally { GL.glBindFramebuffer(GL.GL_FRAMEBUFFER,0) }
     }
 
-    fun draw(input:Int,width:Int,height:Int,surfaceWidth:Int,surfaceHeight:Int,colorMode:Float=0f) {
+    /** The upstream GameView has already chosen the output aspect, scale and target. */
+    fun draw(input:Int,width:Int,height:Int,outWidth:Int,outHeight:Int,colorMode:Float=0f,
+             outputFramebuffer:Int=0,viewportX:Int=0,viewportY:Int=0) {
         GL.glDisable(GL.GL_BLEND)
         GL.glDisable(GL.GL_DITHER)
-        val fit = minOf(surfaceWidth.toFloat()/width,surfaceHeight.toFloat()/height)
-        val outWidth=(width*fit).toInt(); val outHeight=(height*fit).toInt()
         if(outWidth<=0 || outHeight<=0) return
         allocate(width,height,outWidth,outHeight)
         if(preset==ShaderPreset.XBRZ) {
             GL.glBindFramebuffer(GL.GL_FRAMEBUFFER,fbos[0])
             GL.glViewport(0,0,outWidth,outHeight)
             render(programs[0],input,input,0,width,height,outWidth,outHeight,false)
-            GL.glBindFramebuffer(GL.GL_FRAMEBUFFER,0)
-            GL.glViewport((surfaceWidth-outWidth)/2,(surfaceHeight-outHeight)/2,outWidth,outHeight)
+            GL.glBindFramebuffer(GL.GL_FRAMEBUFFER,outputFramebuffer)
+            GL.glViewport(viewportX,viewportY,outWidth,outHeight)
             render(blit,textures[0],input,0,width,height,outWidth,outHeight,true,colorMode)
         }else {
             var previous=input
@@ -96,8 +96,8 @@ internal class LibretroShaderRenderer(private val assets: AssetManager, private 
                 render(programs[i],previous,input,if(i>=2) textures[0] else 0,width,height,width*scale,height*scale,false)
                 previous=textures[i]
             }
-            GL.glBindFramebuffer(GL.GL_FRAMEBUFFER,0)
-            GL.glViewport((surfaceWidth-outWidth)/2,(surfaceHeight-outHeight)/2,outWidth,outHeight)
+            GL.glBindFramebuffer(GL.GL_FRAMEBUFFER,outputFramebuffer)
+            GL.glViewport(viewportX,viewportY,outWidth,outHeight)
             render(blit,previous,input,0,width,height,outWidth,outHeight,true,colorMode)
         }
         GL.glActiveTexture(GL.GL_TEXTURE0)

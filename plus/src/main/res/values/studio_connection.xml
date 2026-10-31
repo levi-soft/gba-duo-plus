@@ -1,0 +1,7 @@
+<resources>
+    <string name="studio_connection_title">Studio Connection</string>
+    <string name="studio_connection_off">Off</string>
+    <string name="studio_connection_on">On</string>
+    <string name="studio_connection_summary_off">Off for new game sessions</string>
+    <string name="studio_connection_summary_on">On for new game sessions</string>
+</resources>

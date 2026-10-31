@@ -1,6 +1,14 @@
 <resources>
     <string name="plus_builder_title">Automatic companion · Plus</string>
-    <string name="plus_builder_create">Find and create companion</string>
+    <string name="plus_builder_create">Create companion</string>
+    <string name="plus_web_downloads">Downloadable packs</string>
+    <string name="plus_web_no_downloads">No downloadable packs for %1$s yet.</string>
+    <string name="plus_web_creation">Create from your ROM</string>
+    <string name="plus_web_creation_checking">Checking creation profiles…</string>
+    <string name="plus_web_creation_failed">Could not check creation profiles. Try again.</string>
+    <string name="plus_web_creation_none">No creation profile matches this ROM revision.</string>
+    <string name="plus_web_creating">Preparing companion creation…</string>
+    <string name="plus_web_pack_mismatch">Installed, but this pack does not match your ROM revision.</string>
     <string name="plus_builder_cancel">Cancel</string>
     <string name="plus_builder_copying">Preparing your ROM on this device…</string>
     <string name="plus_builder_existing">A new companion will be selected only after creation succeeds. Your current companion stays installed and remains selected if you cancel or creation fails.</string>

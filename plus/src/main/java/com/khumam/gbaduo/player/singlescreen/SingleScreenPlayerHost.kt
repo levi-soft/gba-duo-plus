@@ -12,6 +12,7 @@ import android.widget.FrameLayout
 import android.widget.TextView
 import android.widget.ProgressBar
 import com.khumam.gbaduo.R
+import com.khumam.gbaduo.emu.AspectRatio
 import com.khumam.gbaduo.companion.CompanionController
 import com.khumam.gbaduo.companion.android.ComposeHostOwner
 import com.khumam.gbaduo.companion.android.companionView
@@ -63,6 +64,11 @@ internal class SingleScreenPlayerHost(
         indeterminateTintList = android.content.res.ColorStateList.valueOf(Color.LTGRAY)
     }
     private var gameAspect = 1.5f
+    private var nativeWidth = 240
+    private var nativeHeight = 160
+    private var aspect = AspectRatio.ORIGINAL
+    private var integerScaling = false
+    private var wideView = false
     private var portraitTopInset = 0f
     internal var arrangement = SingleScreenLayout.arrange(1f, 1f, 1f)
         private set
@@ -88,6 +94,21 @@ internal class SingleScreenPlayerHost(
 
     fun setGameAspect(ratio: Float) {
         if (ratio > 0 && ratio.isFinite() && ratio != gameAspect) { gameAspect = ratio; requestLayout() }
+    }
+
+    fun setGameSize(width: Int, height: Int) {
+        require(width > 0 && height > 0)
+        nativeWidth = width
+        nativeHeight = height
+        setGameAspect(width.toFloat() / height)
+    }
+
+    fun setDisplayOptions(aspect: AspectRatio, integer: Boolean, wide: Boolean) {
+        if (aspect == this.aspect && integer == integerScaling && wide == wideView) return
+        this.aspect = aspect
+        integerScaling = integer
+        wideView = wide
+        requestLayout()
     }
 
     fun gameLoaded() {
@@ -187,8 +208,9 @@ internal class SingleScreenPlayerHost(
         val w = MeasureSpec.getSize(widthMeasureSpec)
         val h = MeasureSpec.getSize(heightMeasureSpec)
         setMeasuredDimension(w, h)
-        arrangement = SingleScreenLayout.arrange(w.toFloat(), h.toFloat(), resources.displayMetrics.density,
+        val base = SingleScreenLayout.arrange(w.toFloat(), h.toFloat(), resources.displayMetrics.density,
             gameAspect, portraitTopInset, screensSwapped, gameOnly = screenMode == ScreenMode.GAME_ONLY)
+        arrangement = SingleScreenLayout.withDisplayOptions(base, nativeWidth, nativeHeight, aspect, integerScaling, wideView)
         fun measure(view: View, rect: SingleScreenLayout.Rect) = view.measure(
             MeasureSpec.makeMeasureSpec(rect.width.roundToInt(), MeasureSpec.EXACTLY),
             MeasureSpec.makeMeasureSpec(rect.height.roundToInt(), MeasureSpec.EXACTLY))

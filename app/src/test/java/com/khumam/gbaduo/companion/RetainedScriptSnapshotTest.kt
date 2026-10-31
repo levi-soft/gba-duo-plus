@@ -4,6 +4,20 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class RetainedScriptSnapshotTest {
+    @Test fun failedTickKeepsCurrentWideControlsWithoutReplayingNavigation() {
+        val retained = RetainedScriptSnapshot()
+        retained.accept(mapOf("hp" to 20, "_wide" to 1, "_wideLabel" to "ON",
+            "ui" to mapOf("set" to mapOf("mainTab" to "Map"))))
+        val failed = retained.accept(mapOf("_scriptError" to "timeout", "_wide" to 0, "_wideLabel" to "OFF"))
+        assertEquals(20, failed["hp"])
+        assertEquals(0, failed["_wide"])
+        assertEquals("OFF", failed["_wideLabel"])
+        assertFalse(failed.containsKey("ui"))
+        val unavailable = retained.accept(mapOf("_scriptError" to "timeout", "_wide" to 0, "_wideLabel" to "N/A"))
+        assertEquals("N/A", unavailable["_wideLabel"])
+        assertEquals(20, unavailable["hp"])
+    }
+
     @Test fun failedTickRetainsTheWholeViewAndExposesCurrentErrorAndOriginalFrame() {
         val retained = RetainedScriptSnapshot()
         val good = mapOf("_frameCounter" to 10L, "hp" to 20, "mapCells" to listOf(mapOf("tile" to "grass")))

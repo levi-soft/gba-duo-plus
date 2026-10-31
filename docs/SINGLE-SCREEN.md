@@ -1,6 +1,6 @@
 # GBA Duo Plus SS — Single Screen edition
 
-SS is a separate phone edition of **0.1.8-plus.4**, built from the Plus source.
+SS is a separate phone edition of **0.1.9-plus.2**, built from the Plus source.
 It embeds the existing companion controller in the game Activity. It does not
 require a second Android display or alter the companion ZIP format.
 
@@ -47,7 +47,7 @@ require a second Android display or alter the companion ZIP format.
   choice persists across sessions. It does not recolour a companion's authored UI.
 - Multiple fingers, diagonals and sliding A/B are supported. Touch input and
   physical gamepad input release independently. Labelled touch A/B keep their
-  labels' meaning; the existing Swap A/B preference applies to the gamepad.
+  labels' meaning; physical buttons use the official saved controller mapping.
 - Rotation resizes the existing surface and companion without recreating the
   Activity, core or loaded ROM. Auto-rotation follows Android's user setting.
   Immersive windows use the full display. In portrait, the hardware camera/notch
@@ -89,8 +89,8 @@ same existing four `PLUS_*` environment variables. Without them the APK is unsig
 
 | Edition | Application ID | Version | Local APK name |
 |---|---|---|---|
-| Plus | `com.khumam.gbaduo.plus` | `0.1.8-plus.4` | `GBA-Duo-Plus-0.1.8-plus.4.apk` |
-| Plus SS | `com.khumam.gbaduo.plus.ss` | `0.1.8-plus.4-ss` | `GBA-Duo-Plus-SS-0.1.8-plus.4.apk` |
+| Plus | `com.khumam.gbaduo.plus` | `0.1.9-plus.2` | `GBA-Duo-Plus-0.1.9-plus.2.apk` |
+| Plus SS | `com.khumam.gbaduo.plus.ss` | `0.1.9-plus.2-ss` | `GBA-Duo-Plus-SS-0.1.9-plus.2.apk` |
 
 The apps install side by side and have separate private saves, companion packs,
 settings, sign-ins and folder permissions. Import an existing companion ZIP or
@@ -98,11 +98,18 @@ create one with the same automatic Builder flow. There is no automatic migration
 
 Audit a signed SS APK with `tools/package-apk.ps1 -Edition SS -ApkPath <apk>`.
 It keeps the regular and SS checksum entries in the same local release directory.
-Both editions are built from the same 0.1.8-plus.4 source and distributed together.
+Both editions are built from the same 0.1.9-plus.2 source and distributed together.
 The older Plus.4 SS asset was added after its original tag; that historical release
 retains its original APKs and separately documented SS source commit.
 
 ## Verification status
+
+The current 0.1.9-plus.2 release passed 662 Debug tests in each edition and 435
+focused regular Release tests. Both signed APKs passed build, R8 and lint, and
+installed in place on Thor. SS used Get from the web to create and select the
+matching The Last Promise pack; startup cancellation retained its previous
+unassigned state. This creation check did not start a game session. Detailed
+observations and limits are in [VALIDATION](VALIDATION.md).
 
 The Plus.4 three-state Swap update passes all 537 Debug unit/host-render tests
 in both SS and regular Plus configurations, and both Release APKs build. Geometry

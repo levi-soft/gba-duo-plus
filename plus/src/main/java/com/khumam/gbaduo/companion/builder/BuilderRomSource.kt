@@ -2,16 +2,41 @@ package com.khumam.gbaduo.companion.builder
 
 import com.khumam.gbaduo.library.RomArchive
 import com.khumam.gbaduo.library.RomHeader
+import com.khumam.gbaduo.library.Platform
+import java.io.File
 import java.io.FilterInputStream
 import java.io.InputStream
 import java.io.OutputStream
 import java.io.IOException
 import java.util.zip.ZipInputStream
+import java.util.zip.CRC32
 
 /** Bounded streaming copy to a private input file. Never changes the source ROM. */
 object BuilderRomSource {
     const val MAX_ROM_BYTES = 32L * 1024 * 1024
-    fun copy(name: String, input: InputStream, output: OutputStream, maxRomBytes: Long = MAX_ROM_BYTES, cancelled: () -> Boolean = { false }) {
+    /** Re-read the staged ROM, including the raw header identity used by GameStorage. */
+    fun validate(file: File, fileName: String, title: String, gameCode: String, expectedCrc: Long, token: BuildCancellation) {
+        token.check(); require(file.isFile && file.length() in 0xB0L..MAX_ROM_BYTES) { "Invalid ROM size" }
+        val crc = CRC32()
+        file.inputStream().use { input ->
+            val header = ByteArray(RomHeader.SIZE)
+            var count = 0
+            while (count < header.size) {
+                token.check(); val n = input.read(header, count, header.size - count)
+                if (n < 0) break
+                count += n
+            }
+            val parsed = RomHeader.parse(fileName, header.copyOf(count))
+            require(parsed.platform == Platform.GBA && parsed.gameCode == gameCode) { "ROM game code changed" }
+            require(parsed.title == title) { "ROM header title changed" }
+            crc.update(header, 0, count)
+            val buffer = ByteArray(32768)
+            while (true) { token.check(); val n = input.read(buffer); if (n < 0) break; crc.update(buffer, 0, n) }
+        }
+        token.check(); require(crc.value == expectedCrc) { "ROM checksum changed" }
+    }
+
+    fun copy(name: String, input: InputStream, output: OutputStream, maxRomBytes: Long = MAX_ROM_BYTES, cancelled: () -> Boolean = { false }): String {
         val bounded = object : FilterInputStream(input) {
             var count = 0L
             override fun read(): Int { if (cancelled()) throw IOException("Cancelled"); val n = super.read(); if (n >= 0 && ++count > 64L * 1024 * 1024) throw IOException("Archive exceeds 64 MiB"); return n }
@@ -19,7 +44,7 @@ object BuilderRomSource {
         }
         if (!RomArchive.isArchiveName(name)) {
             require(name.endsWith(".gba", ignoreCase = true)) { "Automatic companions currently require a GBA ROM" }
-            copyRom(bounded, output, maxRomBytes, cancelled); return
+            copyRom(bounded, output, maxRomBytes, cancelled); return name
         }
         val zip = ZipInputStream(bounded)
         var skippedTotal = 0L
@@ -28,7 +53,7 @@ object BuilderRomSource {
             val leaf = entry.name.substringAfterLast('/')
             if (!entry.isDirectory && !leaf.startsWith("._") && !entry.name.startsWith("__MACOSX/") && RomHeader.isRomFileName(leaf)) {
                 require(leaf.endsWith(".gba", ignoreCase = true)) { "The first ROM in this ZIP is not a GBA game" }
-                copyRom(zip, output, maxRomBytes, cancelled); return
+                copyRom(zip, output, maxRomBytes, cancelled); return leaf
             }
             // Skipped entries are bounded too: do not let a decompression bomb
             // hide before the selected ROM and consume unlimited CPU/time.

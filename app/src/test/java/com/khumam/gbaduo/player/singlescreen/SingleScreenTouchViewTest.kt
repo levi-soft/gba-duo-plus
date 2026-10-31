@@ -5,6 +5,7 @@ import android.view.InputDevice
 import android.view.MotionEvent
 import android.view.View
 import com.khumam.gbaduo.emu.GbaKeys
+import com.khumam.gbaduo.emu.AspectRatio
 import com.khumam.gbaduo.player.singlescreen.SingleScreenLayout.Control
 import org.junit.Assert.*
 import org.junit.Test
@@ -23,6 +24,35 @@ class SingleScreenTouchViewTest {
     @Before fun resetDisplayPreference() {
         org.robolectric.RuntimeEnvironment.getApplication().getSharedPreferences("single_screen_display", Activity.MODE_PRIVATE)
             .edit().clear().commit()
+    }
+
+    @Test fun displayOptionsResizeTheSameSurfaceAcrossScreenModesAndRotation() {
+        val activity = Robolectric.buildActivity(Activity::class.java).setup().get()
+        val surface = View(activity)
+        val host = SingleScreenPlayerHost(activity, surface, {}, {})
+        activity.setContentView(host)
+        host.setGameSize(240, 160)
+        host.gameLoaded()
+        layout(host, 1280, 360)
+        val parent = surface.parent
+        val swap = host.controlView(Control.SWAP)
+        try {
+            repeat(3) {
+                host.setDisplayOptions(AspectRatio.ORIGINAL, integer = false, wide = true)
+                layout(host, 1280, 360)
+                assertSame(parent, surface.parent)
+                host.setDisplayOptions(AspectRatio.FOUR_THREE, integer = true, wide = false)
+                layout(host, 360, 800)
+                assertSame(parent, surface.parent)
+                assertSame(swap, host.controlView(Control.SWAP))
+                swap.performClick()
+                layout(host, 1280, 360)
+            }
+            assertEquals(SingleScreenLayout.ScreenMode.GAME_FIRST, host.screenMode)
+        } finally {
+            host.close()
+            activity.finish()
+        }
     }
 
     @Test fun swapRepositionsExistingViewsAndPersistsWithoutLeavingHeldInput() {

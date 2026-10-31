@@ -30,8 +30,8 @@ class AboutActivity : PixelPage() {
 
         content.addView(label(getString(R.string.about_credits_title)), spaced(28))
         note(getString(R.string.about_credits), top = 6)
-        note("Community Plus edition, based on GBA Duo v0.1.7 by khumam and its contributors. " +
-            "Plus adds pixel-art shaders, saved Swap A/B, cursor profiles and Studio Connection. " +
+        note("Community Plus edition, based on GBA Duo v0.1.9 by khumam and its contributors. " +
+            "Plus adds local companion creation, pixel-art shaders, cursor profiles and Studio Connection. " +
             "Thanks to mGBA, Lua, RetroAchievements/rcheevos and Libretro shader contributors. " +
             "GPL-3.0; third-party licenses and original authorship are retained.", top = 12)
         content.addView(button("Original GBA Duo by khumam", Pixel.YELLOW) {

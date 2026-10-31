@@ -1,6 +1,7 @@
 package com.khumam.gbaduo.companion.builder
 
 import java.io.File
+import java.io.Closeable
 import java.io.InputStream
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
@@ -12,13 +13,28 @@ class BuildCancellation {
     @Volatile var cancelled: Boolean = false; private set
     @Volatile var committed: Boolean = false; private set
     private val terminal = Any()
-    /** False means a completed assignment already won, or cancellation already happened. */
-    fun cancel(): Boolean = synchronized(terminal) {
-        if (committed || cancelled) false else { cancelled = true; true }
+    private val cancellationListeners = mutableSetOf<() -> Unit>()
+    /** False means installation already committed, or cancellation already happened. */
+    fun cancel(): Boolean {
+        val listeners = synchronized(terminal) {
+            if (committed || cancelled) return false
+            cancelled = true
+            cancellationListeners.toList().also { cancellationListeners.clear() }
+        }
+        listeners.forEach { runCatching { it() } }
+        return true
+    }
+    internal fun onCancel(listener: () -> Unit): Closeable {
+        val alreadyCancelled = synchronized(terminal) {
+            if (!cancelled && !committed) cancellationListeners += listener
+            cancelled
+        }
+        if (alreadyCancelled) listener()
+        return Closeable { synchronized(terminal) { cancellationListeners -= listener } }
     }
     fun check() { if (cancelled || Thread.currentThread().isInterrupted) throw CancellationException("Cancelled") }
     fun commit(action: () -> Unit) = synchronized(terminal) {
-        check(); action(); committed = true
+        check(); action(); committed = true; cancellationListeners.clear()
     }
 }
 

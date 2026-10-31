@@ -8,18 +8,22 @@ dạng pack, Lua và hệ thống giao diện CSS. Đây là nền tảng của 
 thông tin tác giả và các thông báo bản quyền gốc được giữ lại.
 
 Plus do [levi-soft](https://github.com/levi-soft) duy trì, phát triển thêm trên
-nền GBA Duo chính thức **v0.1.8**. Đây là bản fork độc lập, không phải bản phát
+nền GBA Duo chính thức **v0.1.9**. Đây là bản fork độc lập, không phải bản phát
 hành chính thức hay dự án được tác giả gốc bảo trợ.
 
-**Phiên bản mã nguồn:** `0.1.8-plus.4` · **Giấy phép:** [GPL v3](LICENSE)
+**Phiên bản mã nguồn:** `0.1.9-plus.2` · **Giấy phép:** [GPL v3](LICENSE)
 
-**[Tải GBA Duo Plus 0.1.8-plus.4 — APK và thông tin phát hành](https://github.com/levi-soft/gba-duo-plus/releases/tag/v0.1.8-plus.4)**
+**[Tải GBA Duo Plus 0.1.9-plus.2 — APK và thông tin phát hành](https://github.com/levi-soft/gba-duo-plus/releases/tag/v0.1.9-plus.2)**
 
 **[GBA Duo Companion Builder — tạo companion từ ROM](https://levi-soft.github.io/gba-duo-companion-builder/)** · [Mã nguồn Builder](https://github.com/levi-soft/gba-duo-companion-builder) · [GBA Duo Studio — thiết kế companion trực quan](https://github.com/levi-soft/gba-duo-studio)
 
-**[Giới thiệu đầy đủ tính năng Plus và hướng dẫn sử dụng](docs/PLUS-FEATURES.vi.md)** · [Chi tiết bản 0.1.8-plus.4](docs/RELEASE-0.1.8-plus.4.md)
+**[Giới thiệu đầy đủ tính năng Plus và hướng dẫn sử dụng](docs/PLUS-FEATURES.vi.md)** · [Chi tiết bản 0.1.9-plus.2](docs/RELEASE-0.1.9-plus.2.md)
 
 [English](README.md) · [So sánh tính năng](docs/FEATURES.md) · [Hướng dẫn build](docs/BUILDING.md) · [Tri ân và tác giả](CREDITS.md)
+
+## Mới trong 0.1.9-plus.2
+
+Đã ghép kho tải pack, FPS/CPU, tỉ lệ ảnh, phóng nguyên lần, tilt-shift, game.lua và Wide view của bản chính thức. Bỏ cấu hình Swap A/B riêng; dùng mapping chính thức và giữ lựa chọn cũ. Studio Connection chuyển vào Settings và lưu lựa chọn bật/tắt. Get from the web dùng chung cho tải pack và tạo companion khớp ROM. Builder, chọn unit FE, shader mở rộng và SS vẫn được giữ. Cocoon dùng [hồ sơ player đúng package Plus](docs/COCOON-SETUP.vi.md). Xem [thay đổi và phạm vi kiểm tra](docs/RELEASE-0.1.9-plus.2.md).
 
 ## Mới trong 0.1.8-plus.4
 
@@ -54,9 +58,9 @@ Companion có thể gửi các nút GB/GBA tiêu chuẩn cho game khớp profile
   client gốc được kế thừa.
 - **Shader:** bổ sung xBRZ, HQ2x và ScaleFX từ các tác giả được ghi nhận trong
   bộ shader Libretro; Plus thực hiện phần tích hợp trên Android GLES3.
-- **Điều khiển:** ghi nhớ Swap A/B; hỗ trợ chạm chọn nhân vật để di chuyển con
+- **Điều khiển:** dùng mapping/hotkey chính thức; hỗ trợ chạm chọn nhân vật để di chuyển con
   trỏ ở các profile Fire Emblem đã được xác minh.
-- **Kết nối Studio:** bật theo từng phiên để công cụ máy tính đọc RAM, dữ liệu
+- **Kết nối Studio:** bật/tắt trong Settings, lưu lựa chọn cho lần mở game sau để công cụ máy tính đọc RAM, dữ liệu
   companion và kiểm tra ROM/VRAM/palette/OAM có giới hạn qua USB/ADB.
 - **Launcher và bảo trì:** hỗ trợ cấu hình player Daijisho; mã mở rộng Plus
   được đặt trong `plus/`, có danh mục các điểm nối với mã chính thức để phục vụ
@@ -68,30 +72,14 @@ Companion có thể gửi các nút GB/GBA tiêu chuẩn cho game khớp profile
 companion ngay trong Chrome/Edge: chọn ROM, bấm **Build companion**, tải ZIP để
 nhập vào ứng dụng hoặc tải project JSON để mở trong GBA Duo Studio. Website có
 giao diện tiếng Việt/Anh. Plus dùng chung bộ builder này để tạo, cài và gán pack
-ngay trong ứng dụng qua **Companion → Find and create companion**.
+ngay trong ứng dụng qua **Companion pack → Get from the web… → Create companion**.
 
 ROM, hình ảnh và văn bản trích từ game được xử lý trên máy, không gửi lên máy chủ.
 ROM gốc không bị sửa. Builder đã tải và kiểm tra được lưu để dùng lại ngoại tuyến.
 
-### Builder 1.1.0 — mười profile ROM chính xác
+### Builder 1.2.0 — 30 profile ROM chính xác
 
-Bảy companion tiếng Anh được chốt **1.0.0**, cùng ba companion Việt hóa **1.0.0**. Builder **1.1.0** bổ sung bảy profile cho website và chức năng tạo tự động trong Plus. Sau này chỉ tăng Builder khi thêm profile; sửa companion dùng phiên bản riêng.
-
-| Profile | Game code | CRC32 | Companion |
-|---|---|---|---|
-| FE7 Vietnamese | `AE7E` | `32CD990D` | 1.0.0 |
-| FE6 Vietnamese | `BE8E` | `BD53D5F3` | 1.0.0 |
-| FE8 Vietnamese | `BE8E` | `3CD932D7` | 1.0.0 |
-| FE7 English | `AE7E` | `2A524221` | 1.0.0 |
-| FE8 Europe | `BE8P` | `B3005195` | 1.0.0 |
-| FE8 English - USA/Australia | `BE8E` | `A47246AE` | 1.0.0 |
-| FE6 T-EN | `AFEJ` | `197DE10B` | 1.0.0 |
-| Project Ember | `AFEJ` | `636F7B05` | 1.0.0 |
-| Project Ember Reverse Recruitment | `AFEJ` | `29BC2257` | 1.0.0 |
-| Void's Blitzarre Adventure | `BE8E` | `9D22107C` | 1.0.0 |
-
-FE6 T-EN là FE6 gốc; FE6 Việt hóa Remastered là ROM hack trên nền FE8. ROM khác hoặc bản vá khác cần profile riêng. Các profile tiếng Anh dùng UI, Growth và Analysis tiếng Anh. Void hỗ trợ sáu ô skill và Talk; lớp phủ phạm vi trên Map hiện chưa tính skill thay đổi tầm/di chuyển. Xem [phạm vi và kiểm chứng](https://github.com/levi-soft/gba-duo-companion-builder/blob/main/docs/RELEASE-1.1.0.md).
-
+Cả 30 companion ở **1.0.0**. [Danh sách ROM và phiên bản](https://levi-soft.github.io/gba-duo-companion-builder/supported-games.html?lang=vi) lấy từ catalog Builder hiện tại. Xem [phạm vi kiểm chứng và giới hạn](https://github.com/levi-soft/gba-duo-companion-builder/releases/tag/v1.2.0).
 
 ## Những gì được kế thừa từ bản chính thức
 
@@ -113,7 +101,7 @@ dịch/mod. Bản này được thiết kế cho thiết bị Android **hai màn
 2. Thêm thư mục ROM của bạn trong ứng dụng và chọn game.
 3. Mở menu Companion để tạo pack tự động, nhập ZIP hoặc gán pack có sẵn.
 4. Chọn Artwork để tìm hoặc nhập ảnh bìa; cấu hình nguồn tại Settings → Artwork sources.
-5. Dùng L2/BACK trong game để mở menu save state, shader, Swap A/B và RetroAchievements.
+5. Dùng L2/BACK trong game để mở menu save state, hiển thị/shader và RetroAchievements.
 
 Plus có application ID riêng `com.khumam.gbaduo.plus` và cài tách biệt với bản
 chính thức. Save, cài đặt, phiên đăng nhập và quyền thư mục của hai ứng dụng

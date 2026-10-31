@@ -112,13 +112,18 @@ class ArtworkPickerActivity : PixelPage() {
         })
     }
 
+    private fun busy(text: String) {
+        results.removeAllViews()
+        results.addView(busyRow(text), spaced(12))
+    }
+
     private fun search() {
         if (!shapePicker.isEnabled) return
         val name = query.text.toString().trim()
         if (name.isEmpty()) return
         selectedGame = null
         val request = ++requestId
-        message(getString(R.string.artwork_searching), error = false)
+        busy(getString(R.string.artwork_searching))
         io.execute {
             if (request != requestId) return@execute
             val result = api.search(name)
@@ -158,7 +163,7 @@ class ArtworkPickerActivity : PixelPage() {
         selectedGame = game
         val selectedShape = shape
         val request = ++requestId
-        message(getString(R.string.artwork_searching), error = false)
+        busy(getString(R.string.artwork_searching))
         io.execute {
             if (request != requestId) return@execute
             val result = api.grids(game.id, selectedShape)
@@ -206,7 +211,7 @@ class ArtworkPickerActivity : PixelPage() {
         shapePicker.isEnabled = false
         query.isEnabled = false
         val request = ++requestId
-        message(getString(R.string.artwork_searching), error = false)
+        busy(getString(R.string.artwork_downloading))
         io.execute {
             val stored = (api.download(grid.url) as? Sgdb.Ok)?.value?.let(ArtworkImages::encode)?.also {
                 Artwork.store(this).put(platform.id, crc, it, "steamgriddb", grid.id.toString())
